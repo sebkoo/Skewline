@@ -24,9 +24,8 @@ import Replay
     try SessionCodec.write(session, to: url)
     let decoded = try SessionCodec.read(from: url)
 
-    #expect(decoded.observations.count == 1)
-    let decodedObservation = decoded.observations[0]
-    #expect(decodedObservation.trackingQuality == .limited(.excessiveMotion))
-    #expect(decodedObservation.covariance == observation.covariance)
-    #expect(decodedObservation.transform == observation.transform)
+    // Whole-session equality rather than field-by-field: it covers `id`,
+    // `startDate` and `timestamp`, which the per-field version silently
+    // skipped, and it cannot drift out of date as fields are added.
+    #expect(decoded == session)
 }
