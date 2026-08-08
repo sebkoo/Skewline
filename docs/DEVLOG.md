@@ -141,3 +141,47 @@ true.
 declared only iOS and that macOS worked by fallback. `AsyncThrowingStream`
 required `.macOS(.v13)` to be declared explicitly, and because the note existed
 that was a twenty-second fix instead of twenty minutes of confusion.
+
+## 2026-08-08 — commits 3 and 4: the licence, and a test that was quietly lying
+
+Two small commits before this repository is fit to be seen by anyone else.
+
+**Apache-2.0 rather than MIT, for the patent grant.** MIT is shorter and says
+nothing about patents. Apache-2.0 grants an explicit patent licence from
+contributors to users, which is the clause a company's legal review looks for
+before allowing an outside dependency. For a repository that will eventually
+contain estimation algorithms, that is worth 202 lines of boilerplate. The
+appendix template at the end stays as-is; it exists for people applying the
+licence to their own files, not for this one.
+
+**The round-trip test was passing while skipping three fields.** It asserted
+`transform`, `covariance` and `trackingQuality` individually, and never touched
+`timestamp`, `id` or `startDate`. Nothing was wrong with those fields — but
+nothing was checking them either, and a test that passes is easy to mistake for
+a test that covers. Replaced the four assertions with one:
+
+    #expect(decoded == session)
+
+`CaptureSession` is already `Equatable`, so this covers every field including
+the three that were missing, and it cannot drift as fields are added. The diff
+reads like I deleted three assertions and kept one; I actually widened coverage,
+which is why the reason is written into the code rather than left to the commit
+message. The cost is a less precise failure message — a mismatch says "these
+sessions differ" instead of naming the field. That is a fair trade while there
+is one test; if it ever fails I can split it then.
+
+**A command block with a manual edit in the middle does not survive being
+pasted.** I ran a block whose steps were: create the licence, *delete a
+duplicated line in `.gitignore` by hand*, then `git add` and commit. The middle
+step got skipped, and the result was a commit whose message promised two things
+and whose diff contained one. The same shape of mistake as `--amend` acting on
+whatever HEAD happens to be: anything that assumes I will stop and think between
+two lines of a block is a step that will not happen. From here, either the
+command performs the edit or the edit is not in the block.
+
+The part worth remembering is what caught it. `git show --stat` did — a human
+reading the diff against the message. **No hook can.** A `commit-msg` hook can
+check that a subject is imperative, under 72 characters and correctly prefixed;
+it cannot check whether the subject is *true* of the diff beneath it. When I
+wire hooks in a later commit, that limit is the thing to be honest about rather
+than paper over: the guardrails will police form, and form is not accuracy.
