@@ -4,11 +4,13 @@ import PackageDescription
 let package = Package(
     name: "SpatialCapture",
     platforms: [
-        .iOS(.v18)
+        .iOS(.v18),
+        .macOS(.v13),
     ],
     products: [
         .library(name: "Core", targets: ["Core"]),
         .library(name: "Replay", targets: ["Replay"]),
+        .library(name: "Capture", targets: ["Capture"]),
     ],
     targets: [
         .target(
@@ -18,9 +20,13 @@ let package = Package(
             name: "Replay",
             dependencies: ["Core"]
         ),
+        .target(
+            name: "Capture",
+            dependencies: ["Core", "Replay"]
+        ),
         .testTarget(
             name: "UnitTests",
-            dependencies: ["Core", "Replay"]
+            dependencies: ["Core", "Replay", "Capture"]
         ),
     ]
 )
