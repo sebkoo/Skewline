@@ -21,3 +21,5 @@ Package.resolved
 
 # Never commit
 PRIVATE-*.md
+
+.claude/settings.local.json
