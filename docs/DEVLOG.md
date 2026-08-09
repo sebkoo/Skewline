@@ -106,3 +106,18 @@ of. Now there is one.
 - **No cache, deliberately.** A precompiled module that remembered an absolute
   path it no longer lived at already broke a local build three commits ago. The
   whole run takes 38 seconds; there is nothing to optimise.
+  
+  ## 2026-08-09 · the permission rules
+
+- **`git show --stat` and `git push` in one pasted block is not a check.** The
+  stat printed one file where the message promised rules, but the paste had
+  already run the push by the time anyone read it. A check downstream of the
+  thing it guards is decoration.
+- **`.gitignore` said `.claude/` and nobody looked.** `git add` refused the
+  path, the commit succeeded anyway, and the message outlived its diff for the
+  second time in this repository. An excluded parent cannot have a child
+  re-included, so the fix is `.claude/*` with `!.claude/settings.json`.
+- **The rules bind the agent, not the terminal.** `git commit --amend` is denied
+  to the agent and still available here, which is the right split: the one time
+  amend went wrong it was a human command run twice, and that is a human's
+  problem to notice.
