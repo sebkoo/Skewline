@@ -17,9 +17,9 @@ Package.resolved
 .LSOverride
 
 # Claude Code session state
-.claude/
+.claude/*
+!.claude/settings.json
 
 # Never commit
 PRIVATE-*.md
 
-.claude/settings.local.json
