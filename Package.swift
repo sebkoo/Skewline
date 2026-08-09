@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "SpatialCapture",
+    name: "Skewline",
     platforms: [
         .iOS(.v18),
         .macOS(.v13),
