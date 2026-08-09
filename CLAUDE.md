@@ -27,7 +27,7 @@ The whole suite runs on a Mac with no device attached. `canImport(ARKit)` is
 **true** on macOS — a stub ships in the SDK — so iOS-only code needs
 `#if canImport(ARKit) && os(iOS)`, and code inside a false branch is not
 type-checked on that host. Confirm it compiles for the device with
-`xcodebuild -destination 'generic/platform=iOS' build`.
+xcodebuild -scheme Skewline-Package -destination 'generic/platform=iOS' build
 
 Two Swift 6 facts that bite here: `simd` matrix types are `Sendable` but not
 `Codable`, and a `public` struct gets no implicit `Sendable` (SE-0302) with no
