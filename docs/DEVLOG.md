@@ -89,3 +89,20 @@ of. Now there is one.
 - **A coined word is not automatically free.** The most invented-looking
   candidate is a trading company with a mark published for opposition.
   Novelty is a guess about the world, not a fact about it.
+
+## 2026-08-09 · commit 5 — CI
+
+- **`Skewline-Package` is the scheme that matters.** `xcodebuild -list` reports
+  four — `Core`, `Replay`, `Capture`, and the SwiftPM-synthesised umbrella. Only
+  the umbrella builds every product in one pass, which is what puts the
+  ARKit-gated file in front of a compiler that has `os(iOS)` true.
+- **The brief predicted the first push would fail. It did not.** `macos-26`,
+  `/Applications/Xcode_26.6.app`, `checkout@v7` and the scheme name were all
+  looked up rather than guessed. Looking things up is cheaper than a fix commit.
+- **A pinned toolchain is an assumption until the log prints it.** One step
+  running `xcodebuild -version && swift --version` reports Xcode 26.6, build
+  17F113 — the same build as this machine. Without it a silently failed
+  `xcode-select` is indistinguishable from a green run.
+- **No cache, deliberately.** A precompiled module that remembered an absolute
+  path it no longer lived at already broke a local build three commits ago. The
+  whole run takes 38 seconds; there is nothing to optimise.
