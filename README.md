@@ -1,5 +1,7 @@
 # Skewline
 
+[![CI](https://github.com/sebkoo/Skewline/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sebkoo/Skewline/actions/workflows/ci.yml)
+
 Spatial capture for iOS, where every measurement carries its own confidence.
 
 ## The idea
@@ -33,13 +35,19 @@ Three modules and a handful of tests.
 swift build && swift test
 ```
 
+Two CI jobs run on every push to `main`. One runs that test suite on macOS. The
+other builds for iOS — because the sensor path is behind
+`#if canImport(ARKit) && os(iOS)`, and code inside a false branch is never
+type-checked, so the macOS tests can be green while that file is not even valid
+Swift.
+
 ## Where this goes
 
 Each rung is entered only when the one below it runs.
 
 ```text
-v0.1  foundation   types · replay · ingest boundary · tests · CI      ● here
-v0.2  capture      ARKit · camera frames · device motion · depth
+v0.1  foundation   types · replay · ingest boundary · tests · CI       done
+v0.2  capture      ARKit · camera frames · device motion · depth       next
 v0.3  render       a point cloud shaded by its own confidence
 v0.4  measure      frame time, and drift under replay
 v0.5  interop      a point-cloud reader over Swift–C++
@@ -47,8 +55,6 @@ v0.6  fit          the uncertainty model, fitted offline
 v0.7  service      the fitted model reaches the device
 v0.8  view         a dashboard over the same service
 ```
-
-Everything in v0.1 exists except CI, which is the next commit.
 
 Rungs are planned; individual commits are not. What each commit contains is
 decided by what the one before it turned out to be wrong about — which is why

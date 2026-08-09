@@ -1,16 +1,58 @@
 # Roadmap
 
-**Where this is:** v0.1 — everything but CI. The ladder is in the
-[README](../README.md).
+Three time-scales live in three places. This page is the middle one: what has
+been built, what the next few commits are, and what each future rung is waiting
+on. The [README](../README.md) has the ladder at a glance;
+[`DEVLOG.md`](DEVLOG.md) has what actually happened, including the mistakes.
 
 Each rung is entered only when the previous one runs. The test every rung has to
 pass: **does the rung below force this, or would it merely look good here?** If
 it is the second, it does not go in.
 
+## The shape of it
+
+Three modules. The graph is acyclic with `Core` at the root, and it is enforced
+by the compiler rather than by anyone's discipline.
+
+```text
+Core        done      a pose and its uncertainty, carried as one value.
+ │                    No I/O, no dependencies.
+ │
+ ├─ Replay  done      the session format on disk. Depends on Core and
+ │                    nothing else — which is what keeps the whole test
+ │                    suite runnable with no device attached.
+ │
+ └─ Capture done      the ingest boundary. Depends on Core and Replay.
+     │
+     ├─ SensorSource          the live path, iOS only, behind
+     │                        #if canImport(ARKit) && os(iOS)
+     └─ ReplaySessionSource   the recorded path
+```
+
+`Replay` must never depend on `Capture`. Replay is what makes the pipeline
+testable without hardware, so anything it imports becomes a thing every test
+drags along.
+
+Where the rest attaches:
+
+```text
+v0.2  sensors    ARKit, camera frames, device motion, depth, into Capture
+v0.3  Render     reads Core values, shades each point by its confidence
+v0.4  Measure    replays sessions, compares predicted error to observed
+v0.5  Interop    fills Core from a point-cloud file, over Swift ↔ C++
+v0.6  Fit        consumes replayed sessions offline and fits the model
+v0.7  Service    serves what Fit produced, back to the device
+v0.8  View       reads Service
+```
+
+Nothing above v0.2 touches `Core`'s shape. If a later rung needs `Core` to
+change, that is a signal the boundary was drawn wrong, and it belongs in
+[`DEVLOG.md`](DEVLOG.md) before it belongs in a diff.
+
 ## What has shipped
 
-Thirteen commits, in five steps. The decisions behind each are in
-[`DEVLOG.md`](DEVLOG.md), including the ones that were mistakes.
+Six steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md), including
+the ones that were mistakes.
 
 1. **Types.** A pose, a 6×6 covariance beside it, and the tracker's own opinion
    of itself at that instant — carried as one value, `Codable` and `Sendable`,
@@ -23,12 +65,32 @@ Thirteen commits, in five steps. The decisions behind each are in
    either. A protocol with a single implementation is a type with extra steps.
 4. **The name.** One line of `Package.swift`.
 5. **Public.** Licence, project brief, roadmap, readme.
+6. **CI, in two jobs.** `swift test` on macOS never compiles the sensor path,
+   because that file sits behind `#if canImport(ARKit) && os(iOS)` and code
+   inside a false branch is not type-checked on that host. A green suite
+   therefore says nothing about the device build, so the device build is a
+   second job that builds the `Skewline-Package` umbrella scheme for
+   `generic/platform=iOS`.
 
-**Next: CI, and it needs two jobs.** `swift test` on macOS never compiles the
-sensor path, because that file sits entirely behind
-`#if canImport(ARKit) && os(iOS)` and code inside a false branch is not
-type-checked on that host. A green test suite therefore says nothing at all
-about whether the device build works, so the device build is a separate job.
+## Decided but not yet done
+
+A list that only shrinks. Anything finished moves to *What has shipped* above
+rather than gaining a tick here, so this section is empty when there is nothing
+outstanding — which is the honest resting state, not a gap.
+
+```text
+  .claude/settings.json — the staging and force-push rules that the briefs
+  currently state as advice, turned into refusals
+───────────────────────────────────────────────────────────────────────────
+  v0.2 capture is a rung, not a commit list. Nothing below this line is
+  decided at commit level, and nothing should be.
+```
+
+Below that line, what each commit contains is decided by what the one before it
+turned out to be wrong about. That is why [`DEVLOG.md`](DEVLOG.md) records the
+mistakes and not only the decisions: it is the input to the next commit rather
+than a diary. Commit 2's shape came out of commit 1's report; commit 5 exists
+because commit 2 discovered that `canImport(ARKit)` is true on macOS.
 
 ## What is next, and what forces it
 
