@@ -33,6 +33,29 @@ Three modules and a handful of tests.
 swift build && swift test
 ```
 
+## Where this goes
+
+Each rung is entered only when the one below it runs.
+
+```text
+v0.1  foundation   types · replay · ingest boundary · tests · CI      ● here
+v0.2  capture      ARKit · camera frames · device motion · depth
+v0.3  render       a point cloud shaded by its own confidence
+v0.4  measure      frame time, and drift under replay
+v0.5  interop      a point-cloud reader over Swift–C++
+v0.6  fit          the uncertainty model, fitted offline
+v0.7  service      the fitted model reaches the device
+v0.8  view         a dashboard over the same service
+```
+
+Everything in v0.1 exists except CI, which is the next commit.
+
+Rungs are planned; individual commits are not. What each commit contains is
+decided by what the one before it turned out to be wrong about — which is why
+[`docs/DEVLOG.md`](docs/DEVLOG.md) records the mistakes alongside the decisions.
+[`docs/ROADMAP.md`](docs/ROADMAP.md) says what forces each rung, and what is
+deliberately never built.
+
 ## What is not here
 
 No app, no interface, no rendering, no reconstruction — and **no accuracy
@@ -42,10 +65,6 @@ measured is worse than no number.
 Reconstruction is deliberately out of scope. This is the layer underneath it:
 any reconstruction is only as trustworthy as its input, and today that input
 arrives with no confidence attached.
-
-[`docs/ROADMAP.md`](docs/ROADMAP.md) says what enters next and what forces it.
-[`docs/DEVLOG.md`](docs/DEVLOG.md) is the running record of decisions and
-surprises, including the ones that were mistakes.
 
 ## Licence
 
