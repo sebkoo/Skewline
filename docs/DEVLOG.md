@@ -121,3 +121,24 @@ of. Now there is one.
   to the agent and still available here, which is the right split: the one time
   amend went wrong it was a human command run twice, and that is a human's
   problem to notice.
+
+## 2026-08-09 · the first device capture
+
+- **The first second of a capture is not a measurement.** ARKit reports
+  identity translation while it initialises: 59 observations at exactly
+  `[0,0,0]`, every one of them `limited(initializing)`, and not one `normal`
+  observation there. Only the quality field separates a placeholder from a
+  pose — the thing this package claims and had never demonstrated.
+- **Nothing was dropped.** 3,026 frame gaps, total spread 1.251 microseconds,
+  none over 100 ms. Consuming the stream in a detached task and writing once
+  at stop is what bought that; a write on the delegate queue would have looked
+  like a tracking problem rather than an I/O one.
+- **The origin is read at `run()`, not at the first frame.** That frame arrives
+  750, 440 and 376 ms later across three launches, so the rejected alternative
+  would have put any earlier sample that far below zero — silently, and only
+  once a second sensor existed to notice.
+- **Twenty-three per cent of the file is zeros meaning `not measured yet`.**
+  108,972 of them. The `TODO(owner):` on covariance is not a small one.
+- **A command written into `CLAUDE.md` had never been run as written.** The iOS
+  build needs `-scheme Skewline-Package`. Same shape as the `.gitignore`
+  misses: a documented claim nobody had executed.
