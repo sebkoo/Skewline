@@ -174,3 +174,45 @@ of. Now there is one.
 - **`deviceMotionRate` is public API the plan never named.** The 200 Hz probe
   needed somewhere for its rationale to live; a named `public static let` is
   where the doc comment went. One symbol of surface outside the plan's manifest.
+
+## 2026-08-10 · commit 3 — camera frames and the container
+
+- **The copy did not dent the load-bearing queue.** 1,849 poses at 59.976 Hz,
+  gap spread 1.876 µs, none over 100 ms — the same shape as before the copy
+  existed. "Zero gaps" was a claim about code that no longer existed the moment
+  the frame path landed; now it is a claim about this code, re-measured.
+- **The accounting closes from the file alone.** 1,793 kept + 56 holes =
+  1,849 callbacks, strided 0. `dropped` counts backpressure and only
+  backpressure — a strided-out frame is neither kept nor dropped — and a
+  dropped yield has already paid the pixel copy. The split had to be disjoint
+  before the first probe; conflated counters could not have told the next
+  bullet's three stories apart.
+- **The 56 losses are three stories, not one.** 31 in a single 533 ms hole
+  during initialization with the phone still — encoder cold start, the one
+  first-use cost a shared `CIContext` still pays. 14 at t=5.44 under `normal`
+  tracking at 3.5 rad/s — not identifiable from the file; the panel's
+  encode-max against max-lag is the adjudicator. 11 across nine micro-holes,
+  all before t=21 — then zero drops for the final ten seconds, including a
+  24.4 rad/s pan. Motion does not stress the encoder; the steady state holds
+  60 Hz at stride 1, JPEG 0.7, 1920×1440.
+- **Every frame timestamp is an exact member of the pose timestamp set.**
+  Zero mismatches across 1,793 frames. That a frame and its pose come from the
+  same `ARFrame` was a design intention; it is now a property of a file.
+- **No third protocol, and it will look like an omission.** A
+  `CameraFrameSource` would have one honest conformer, and its element type
+  would decide where encoding lives — the question v0.4 exists to answer with
+  measurements. The boundary gets drawn in v0.3, when the renderer makes a
+  second consumer real.
+- **The planned failure injection could not fail.** Breaking the frame-name
+  zero-padding breaks nothing: writer and reader share the naming function, so
+  both move together. The reader's index mapping was skewed instead and the
+  round trip went red at a missing file. A sabotage that cannot fail is the
+  same lie as a test that has never failed.
+- **The app target defaults to `MainActor`; the package does not.** A plain
+  struct in the harness is UI-isolated until it says `nonisolated` — found by
+  the harness build failing after the package built clean, which is the gap
+  that made the harness build part of the gate.
+- **Commit 2's numbers reproduced.** Inertial delivery 99.45 Hz (10.055 ms,
+  spread 3.9 µs); the tracker `normal` through 24.4 rad/s; the only
+  limited-after-init still `insufficientFeatures` — the scene, not the motion.
+  ARKit warm-up 534 ms, inside the 376–750 ms spread already on record.
