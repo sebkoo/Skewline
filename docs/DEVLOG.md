@@ -142,3 +142,35 @@ of. Now there is one.
 - **A command written into `CLAUDE.md` had never been run as written.** The iOS
   build needs `-scheme Skewline-Package`. Same shape as the `.gitignore`
   misses: a documented claim nobody had executed.
+
+## 2026-08-10 · a second sensor on the same clock
+
+- **ARKit and Core Motion share a monotonic base. Measured, not assumed.**
+  Against one origin: inertial t0 +0.009 s, pose t0 +0.444 s — 5,107 samples
+  beside 3,052 poses, both sequences non-negative. The 435 ms ARKit spends
+  before its first frame is no longer unwitnessed.
+- **The 200 Hz request came back as 99.45 Hz.** The believed ceiling is real
+  and now has a number: delivered interval 10.055 ms. The sensor's own stamps
+  are as tight as the camera's — 3.292 µs of spread across 5,106 gaps, none
+  over 100 ms. Burstiness lives in delivery, not in the timestamps.
+- **The tracker said `normal` at 27.5 rad/s.** A deliberate pan and a 10.1 g
+  shake never fired `limited(excessiveMotion)`; the only `limited` after
+  init was `insufficientFeatures` — the scene, not the motion. Tracking state
+  does not encode motion, which is the sentence this commit exists to say
+  with data rather than as a premise.
+- **`NSMotionUsageDescription` proved unnecessary.** No key in the plist, and
+  nothing died at `startDeviceMotionUpdates`. The defensive key would have
+  been an unexercised claim; the device run made its absence a recorded fact.
+- **A motion error fails the whole capture.** `SensorSource` keeps the pose
+  stream alive when Core Motion errors; the harness joins both drains in one
+  `do`, so either sensor failing writes no file. The brief decided the source's
+  policy and never the harness's. Kept, now as a decision rather than an
+  accident: a file that looks whole while missing a sequence is worse than a
+  loud failure.
+- **"Quoted in the doc comments" became paraphrase.** The units are the
+  headers' — radians per second, G's, the right-hand rule — but nothing is
+  quoted verbatim. Recorded because a quote and a recollection are different
+  claims, and the difference is one this repository keeps insisting on.
+- **`deviceMotionRate` is public API the plan never named.** The 200 Hz probe
+  needed somewhere for its rationale to live; a named `public static let` is
+  where the doc comment went. One symbol of surface outside the plan's manifest.
