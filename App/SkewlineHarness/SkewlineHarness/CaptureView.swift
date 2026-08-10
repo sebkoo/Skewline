@@ -8,7 +8,7 @@ struct CaptureView: View {
     var body: some View {
         VStack(spacing: 24) {
             if SessionRecorder.isSupported {
-                Text("\(recorder.observationCount) / \(recorder.inertialCount)")
+                Text("\(recorder.observationCount) / \(recorder.inertialCount) / \(recorder.frameCount)")
                     .font(.system(.largeTitle, design: .monospaced))
 
                 Text(status)

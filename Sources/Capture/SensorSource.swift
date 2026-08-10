@@ -1,25 +1,78 @@
 #if canImport(ARKit) && os(iOS)
 import ARKit
 import CoreMotion
+import CoreVideo
 import Core
 import QuartzCore
 import Synchronization
 
-/// Vends pose observations from a live `ARSession` by observing frame updates
-/// through `ARSessionDelegate`, and inertial samples from Core Motion's fused
-/// device motion.
+/// Knobs for the camera-frame path -- configuration values, not measurements.
+///
+/// The defaults are starting points for a probe run, not conclusions: encode
+/// cost, payload size and drop rate under them are not measured yet, and v0.4
+/// sets the defaults from device data.
+public struct VideoCaptureConfiguration: Sendable {
+    /// Keep every Nth delivered frame; 1 keeps them all. Applied at the
+    /// source, before the pixel copy, so a strided-out frame costs nothing.
+    public var frameStride: Int
+
+    /// Upper bound on copied frames waiting for the consumer. Bounds the
+    /// path's memory at `bufferDepth` × one frame's bytes; when the buffer is
+    /// full the incoming frame is dropped and counted.
+    public var bufferDepth: Int
+
+    public init(frameStride: Int = 1, bufferDepth: Int = 8) {
+        precondition(frameStride >= 1, "frameStride must be at least 1")
+        precondition(bufferDepth >= 1, "bufferDepth must be at least 1")
+        self.frameStride = frameStride
+        self.bufferDepth = bufferDepth
+    }
+}
+
+/// One camera frame leaving the live path: the frame's capture time on the
+/// session timeline, and its pixels.
+///
+/// `@unchecked Sendable` on the same honesty terms as `SensorSource` itself:
+/// `pixelBuffer` is a deep copy owned by this value, yielded to exactly one
+/// consumer, and never touched by the producer again.
+public struct CameraFrame: @unchecked Sendable {
+    /// Capture time, seconds since the owning session's start -- the same
+    /// timeline as `PoseObservation.timestamp` and `InertialSample.timestamp`,
+    /// normalised against the same origin.
+    public let timestamp: TimeInterval
+
+    /// The frame's pixels, in the camera's own pixel format.
+    public let pixelBuffer: CVPixelBuffer
+
+    public init(timestamp: TimeInterval, pixelBuffer: CVPixelBuffer) {
+        self.timestamp = timestamp
+        self.pixelBuffer = pixelBuffer
+    }
+}
+
+/// Failure modes of the live camera-frame path.
+public enum CameraCaptureError: Error {
+    /// Allocating or filling the deep copy of a `capturedImage` failed.
+    case pixelBufferCopyFailed
+}
+
+/// Vends pose observations and camera frames from a live `ARSession` by
+/// observing frame updates through `ARSessionDelegate`, and inertial samples
+/// from Core Motion's fused device motion.
 ///
 /// Start the session through `run(_:options:)` rather than through the
-/// `ARSession` directly: the same call establishes the timeline both sequences
+/// `ARSession` directly: the same call establishes the timeline all sequences
 /// are measured against, so the two cannot be performed out of order. Nothing
-/// pairs a sample with an observation; sharing that one origin is the whole of
-/// the alignment.
+/// pairs one sequence's element with another's; sharing that one origin is the
+/// whole of the alignment.
 ///
-/// The two sequences arrive on two different threads -- `ARSessionDelegate`
-/// callbacks on `session.delegateQueue`, device motion on a serial
-/// `OperationQueue` owned here -- and at two different rates. Both reach the
-/// same state through the same `Mutex`. This type does no I/O and holds neither
-/// an `ARFrame` nor a `CMDeviceMotion` beyond its callback.
+/// The sequences arrive on two different threads -- `ARSessionDelegate`
+/// callbacks on `session.delegateQueue` carry both the pose and the camera
+/// frame, device motion arrives on a serial `OperationQueue` owned here -- and
+/// at different rates. All reach the same state through the same `Mutex`. This
+/// type does no I/O and holds neither an `ARFrame` nor a `CMDeviceMotion`
+/// beyond its callback; a kept camera frame leaves as a copy this type
+/// allocates, never as ARKit's own buffer.
 ///
 /// `@unchecked Sendable` because `ARSession`, `ARConfiguration`,
 /// `CMMotionManager` and `OperationQueue` are not themselves `Sendable` in the
@@ -29,7 +82,12 @@ public final class SensorSource: NSObject, PoseObservationSource, InertialSample
     private struct Stream {
         var continuation: AsyncThrowingStream<PoseObservation, any Error>.Continuation?
         var motionContinuation: AsyncThrowingStream<InertialSample, any Error>.Continuation?
+        var frameContinuation: AsyncThrowingStream<CameraFrame, any Error>.Continuation?
         var origin: TimeInterval?
+        var frameIndex = 0
+        var keptFrames = 0
+        var droppedFrames = 0
+        var stridedFrames = 0
     }
 
     private let session: ARSession
@@ -43,9 +101,11 @@ public final class SensorSource: NSObject, PoseObservationSource, InertialSample
         return queue
     }()
     private let stream = Mutex(Stream())
+    private let video: VideoCaptureConfiguration
 
-    public init(session: ARSession) {
+    public init(session: ARSession, video: VideoCaptureConfiguration = VideoCaptureConfiguration()) {
         self.session = session
+        self.video = video
         super.init()
         session.delegate = self
     }
@@ -100,11 +160,12 @@ public final class SensorSource: NSObject, PoseObservationSource, InertialSample
         session.run(configuration, options: options)
     }
 
-    /// Ends both streams. Samples delivered afterwards are ignored.
+    /// Ends all three streams. Samples delivered afterwards are ignored.
     public func finish() {
         stopMotion()
         takeContinuation()?.finish()
         takeMotionContinuation()?.finish()
+        takeFrameContinuation()?.finish()
     }
 
     public func observations() -> AsyncThrowingStream<PoseObservation, any Error> {
@@ -117,6 +178,44 @@ public final class SensorSource: NSObject, PoseObservationSource, InertialSample
         AsyncThrowingStream { continuation in
             stream.withLock { $0.motionContinuation = continuation }
         }
+    }
+
+    /// The camera-frame sequence, bounded.
+    ///
+    /// Built with `.bufferingOldest`: at most
+    /// `VideoCaptureConfiguration.bufferDepth` copied frames wait for the
+    /// consumer, so the path's memory is bounded by construction, and when the
+    /// consumer falls behind it is the incoming frame that is refused --
+    /// counted in `droppedCameraFrames` -- rather than the buffer growing.
+    ///
+    /// Every delegate callback that arrives while this stream is live lands in
+    /// exactly one of `keptCameraFrames`, `droppedCameraFrames` or
+    /// `stridedCameraFrames` -- disjoint by construction, so
+    /// `callbacks = kept + dropped + strided` closes and a probe's ceiling
+    /// number can be trusted to distinguish policy from backpressure.
+    public func cameraFrames() -> AsyncThrowingStream<CameraFrame, any Error> {
+        AsyncThrowingStream(bufferingPolicy: .bufferingOldest(video.bufferDepth)) { continuation in
+            stream.withLock { $0.frameContinuation = continuation }
+        }
+    }
+
+    /// Camera frames yielded and accepted by the stream's buffer.
+    public var keptCameraFrames: Int {
+        stream.withLock { $0.keptFrames }
+    }
+
+    /// Camera frames refused by the stream's bounded buffer. Backpressure
+    /// only: a frame skipped by `frameStride` is counted in
+    /// `stridedCameraFrames` instead, never here.
+    public var droppedCameraFrames: Int {
+        stream.withLock { $0.droppedFrames }
+    }
+
+    /// Camera frames skipped by `VideoCaptureConfiguration.frameStride`.
+    /// Policy, not backpressure -- skipped before the pixel copy, so they cost
+    /// nothing -- and neither kept nor dropped.
+    public var stridedCameraFrames: Int {
+        stream.withLock { $0.stridedFrames }
     }
 
     public func session(_ session: ARSession, didUpdate frame: ARFrame) {
@@ -143,6 +242,127 @@ public final class SensorSource: NSObject, PoseObservationSource, InertialSample
                 trackingQuality: trackingQuality
             )
         )
+
+        recordCameraFrame(from: frame)
+    }
+
+    /// The camera side of one `didUpdate` callback: apply the stride, copy the
+    /// kept frame's pixels, yield the copy.
+    private func recordCameraFrame(from frame: ARFrame) {
+        enum Decision {
+            case off
+            case strided
+            case keep(AsyncThrowingStream<CameraFrame, any Error>.Continuation, TimeInterval)
+        }
+
+        // Classified under the lock, so the stride index and the counters
+        // cannot interleave with another callback's.
+        let decision: Decision = stream.withLock { state in
+            guard let continuation = state.frameContinuation, let origin = state.origin else {
+                // No consumer, or no timeline yet: the frame was never a
+                // candidate, and the counters' arithmetic does not include it.
+                return .off
+            }
+            let index = state.frameIndex
+            state.frameIndex += 1
+            guard index.isMultiple(of: video.frameStride) else {
+                state.stridedFrames += 1
+                return .strided
+            }
+            return .keep(continuation, origin)
+        }
+        guard case .keep(let continuation, let origin) = decision else { return }
+
+        // The copy happens before the yield, so a frame the stream refuses has
+        // already paid it. Deliberate: copying only after acceptance would
+        // mean retaining ARKit's own buffer across the yield, the thing the
+        // pose path above exists to avoid.
+        guard let copy = Self.copy(frame.capturedImage) else {
+            // An allocation this size failing mid-capture is not a per-frame
+            // condition to skip past; fail the stream loudly rather than let
+            // the file look whole with frames silently missing.
+            takeFrameContinuation()?.finish(throwing: CameraCaptureError.pixelBufferCopyFailed)
+            return
+        }
+
+        let result = continuation.yield(CameraFrame(timestamp: frame.timestamp - origin, pixelBuffer: copy))
+        stream.withLock { state in
+            switch result {
+            case .enqueued:
+                state.keptFrames += 1
+            case .dropped:
+                // Backpressure, and only backpressure: the buffer was full, so
+                // the incoming frame -- copy already paid -- is discarded.
+                state.droppedFrames += 1
+            case .terminated:
+                // `finish()` won the race against this callback. The frame is
+                // outside the stream's lifetime, like one before `run()`, and
+                // is counted nowhere.
+                break
+            @unknown default:
+                break
+            }
+        }
+    }
+
+    /// A deep copy of `source` in its own pixel format, with its attachments.
+    private static func copy(_ source: CVPixelBuffer) -> CVPixelBuffer? {
+        var created: CVPixelBuffer?
+        let status = CVPixelBufferCreate(
+            kCFAllocatorDefault,
+            CVPixelBufferGetWidth(source),
+            CVPixelBufferGetHeight(source),
+            CVPixelBufferGetPixelFormatType(source),
+            nil,
+            &created
+        )
+        guard status == kCVReturnSuccess, let copy = created else { return nil }
+
+        CVPixelBufferLockBaseAddress(source, .readOnly)
+        CVPixelBufferLockBaseAddress(copy, [])
+        defer {
+            CVPixelBufferUnlockBaseAddress(copy, [])
+            CVPixelBufferUnlockBaseAddress(source, .readOnly)
+        }
+
+        // Plane by plane, row by row: the two buffers can disagree on row
+        // padding, and a single memcpy of the whole allocation would shear the
+        // image whenever they do.
+        let planeCount = CVPixelBufferIsPlanar(source) ? CVPixelBufferGetPlaneCount(source) : 1
+        for plane in 0..<planeCount {
+            let src: UnsafeMutableRawPointer?
+            let dst: UnsafeMutableRawPointer?
+            let srcStride: Int
+            let dstStride: Int
+            let height: Int
+            if CVPixelBufferIsPlanar(source) {
+                src = CVPixelBufferGetBaseAddressOfPlane(source, plane)
+                dst = CVPixelBufferGetBaseAddressOfPlane(copy, plane)
+                srcStride = CVPixelBufferGetBytesPerRowOfPlane(source, plane)
+                dstStride = CVPixelBufferGetBytesPerRowOfPlane(copy, plane)
+                height = CVPixelBufferGetHeightOfPlane(source, plane)
+            } else {
+                src = CVPixelBufferGetBaseAddress(source)
+                dst = CVPixelBufferGetBaseAddress(copy)
+                srcStride = CVPixelBufferGetBytesPerRow(source)
+                dstStride = CVPixelBufferGetBytesPerRow(copy)
+                height = CVPixelBufferGetHeight(source)
+            }
+            guard let src, let dst else { return nil }
+            if srcStride == dstStride {
+                memcpy(dst, src, srcStride * height)
+            } else {
+                let rowBytes = min(srcStride, dstStride)
+                for row in 0..<height {
+                    memcpy(dst.advanced(by: row * dstStride), src.advanced(by: row * srcStride), rowBytes)
+                }
+            }
+        }
+
+        // Color space and the rest of the metadata ride on the buffer, not in
+        // the pixels; without them a consumer would be guessing.
+        CVBufferPropagateAttachments(source, copy)
+        return copy
     }
 
     /// Called on `motionQueue` for every device motion update.
@@ -178,9 +398,12 @@ public final class SensorSource: NSObject, PoseObservationSource, InertialSample
         // The same teardown `finish()` performs. Without it a failed session
         // leaves the inertial stream open and the gyro running, because the
         // owner's stop path is guarded on a state the failure has already left.
+        // The error itself travels on the pose stream; the other two end
+        // cleanly.
         stopMotion()
         takeContinuation()?.finish(throwing: error)
         takeMotionContinuation()?.finish()
+        takeFrameContinuation()?.finish()
     }
 
     private func stopMotion() {
@@ -201,6 +424,14 @@ public final class SensorSource: NSObject, PoseObservationSource, InertialSample
         stream.withLock { stream in
             let continuation = stream.motionContinuation
             stream.motionContinuation = nil
+            return continuation
+        }
+    }
+
+    private func takeFrameContinuation() -> AsyncThrowingStream<CameraFrame, any Error>.Continuation? {
+        stream.withLock { stream in
+            let continuation = stream.frameContinuation
+            stream.frameContinuation = nil
             return continuation
         }
     }

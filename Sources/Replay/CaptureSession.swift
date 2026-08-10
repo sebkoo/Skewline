@@ -14,34 +14,42 @@ public struct CaptureSession: Codable, Equatable, Sendable {
     public var observations: [PoseObservation]
     public var inertialSamples: [InertialSample]
 
+    /// Metadata for the camera frames captured alongside the other sequences.
+    /// The pixel payloads do not fit here; a container stores them beside the
+    /// session, associated by position in this array.
+    public var frames: [FrameRecord]
+
     public init(
         id: UUID = UUID(),
         startDate: Date = Date(),
         observations: [PoseObservation] = [],
-        inertialSamples: [InertialSample] = []
+        inertialSamples: [InertialSample] = [],
+        frames: [FrameRecord] = []
     ) {
         self.id = id
         self.startDate = startDate
         self.observations = observations
         self.inertialSamples = inertialSamples
+        self.frames = frames
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, startDate, observations, inertialSamples
+        case id, startDate, observations, inertialSamples, frames
     }
 
-    /// Hand-written only to let `inertialSamples` be absent.
+    /// Hand-written only to let `inertialSamples` and `frames` be absent.
     ///
     /// Synthesised decoding never falls back to a property's default value -- a
-    /// missing key throws `keyNotFound` -- so sessions recorded before this
-    /// field existed would stop decoding the moment it was added. Encoding
-    /// stays synthesised: everything written from here on has the key.
+    /// missing key throws `keyNotFound` -- so sessions recorded before these
+    /// fields existed would stop decoding the moment one was added. Encoding
+    /// stays synthesised: everything written from here on has the keys.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         startDate = try container.decode(Date.self, forKey: .startDate)
         observations = try container.decode([PoseObservation].self, forKey: .observations)
         inertialSamples = try container.decodeIfPresent([InertialSample].self, forKey: .inertialSamples) ?? []
+        frames = try container.decodeIfPresent([FrameRecord].self, forKey: .frames) ?? []
     }
 }
 

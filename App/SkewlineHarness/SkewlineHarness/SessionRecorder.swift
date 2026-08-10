@@ -6,10 +6,11 @@ import QuartzCore
 import Replay
 
 /// Owns one `ARSession`, drains its `SensorSource` away from the main thread,
-/// and writes what it collected to a session file.
+/// and writes what it collected to a session container.
 ///
-/// This is a harness. Its only job is producing a file that `SessionCodec.read`
-/// can decode on a Mac, and it should not grow a second one.
+/// This is a harness. Its only job is producing a container that
+/// `SessionContainer.Reader` can decode on a Mac, and it should not grow a
+/// second one.
 @MainActor
 @Observable
 final class SessionRecorder {
@@ -24,9 +25,11 @@ final class SessionRecorder {
     private(set) var status: Status = .idle
     private(set) var observationCount = 0
     private(set) var inertialCount = 0
+    private(set) var frameCount = 0
 
-    /// The raw timestamps of both sensors, side by side, built once a session
-    /// has ended.
+    /// The raw timestamps of the sensors, side by side, built once a session
+    /// has ended -- plus the frame probe's numbers, every one of them measured
+    /// on the run that just happened.
     ///
     /// That `ARFrame.timestamp`, `CMDeviceMotion.timestamp` and
     /// `CACurrentMediaTime()` share a monotonic base is an assumption the
@@ -52,13 +55,15 @@ final class SessionRecorder {
         guard status != .recording else { return }
         observationCount = 0
         inertialCount = 0
+        frameCount = 0
         timing = nil
         status = .recording
 
-        // Both streams have to exist before the session starts: anything
+        // All three streams have to exist before the session starts: anything
         // delivered before its continuation is installed has nowhere to go.
         let observations = source.observations()
         let samples = source.inertialSamples()
+        let frames = source.cameraFrames()
         source.run(
             ARWorldTrackingConfiguration(),
             options: [.resetTracking, .removeExistingAnchors]
@@ -66,54 +71,82 @@ final class SessionRecorder {
         let origin = source.timelineOrigin
 
         // Detached, not `Task {}`. A task started from a `@MainActor` method
-        // inherits `MainActor`, which would put `SessionCodec.write` on the
-        // main thread -- I/O that would present as a tracking problem.
+        // inherits `MainActor`, which would put encoding and container I/O on
+        // the main thread -- work that would present as a tracking problem.
         //
         // `self` is captured strongly and deliberately: nothing stores this
         // task, so there is no cycle, and a recorder released mid-write would
-        // abandon the file this harness exists to produce.
+        // abandon the container this harness exists to produce.
         Task.detached(priority: .utility) { [self] in
+            let sessionID = UUID()
+            let name = "session-\(sessionID.uuidString).skewline"
+            let url = URL.documentsDirectory.appending(path: name)
+
             let collected: [PoseObservation]
             let collectedSamples: [InertialSample]
+            let stats: FrameStats
             do {
-                // Two sibling children, each owning its own array. The two
-                // sensors arrive on two threads at two rates and share no
-                // mutable state on this side of the boundary either.
+                // The Writer is deliberately not Sendable. Created here, it is
+                // confined to this task for its whole life.
+                let writer = try SessionContainer.Writer(creatingAt: url)
+                let encoder = FrameEncoder()
+
+                // Two sibling children, each owning its own array; the frame
+                // drain runs inline in this task body, concurrent with both,
+                // so the Writer never crosses a task boundary. Payloads go to
+                // disk the moment they are encoded -- thousands of frames
+                // cannot sit in memory -- and only the records accumulate.
                 async let poses = collectObservations(observations)
                 async let inertial = collectSamples(samples)
+                let (records, frameStats) = try await encodeFrames(
+                    frames,
+                    into: writer,
+                    with: encoder,
+                    origin: origin
+                )
                 (collected, collectedSamples) = try await (poses, inertial)
+                stats = frameStats
+
+                let session = CaptureSession(
+                    id: sessionID,
+                    observations: collected,
+                    inertialSamples: collectedSamples,
+                    frames: records
+                )
+                try writer.finalize(session: session)
             } catch {
+                // One policy for all three sequences, the encoder and the
+                // writer: a container that looks whole while missing part of a
+                // capture is worse than a loud failure, so the whole directory
+                // goes.
+                try? FileManager.default.removeItem(at: url)
                 let message = error.localizedDescription
                 await MainActor.run { self.status = .failed(message) }
                 return
             }
 
-            // Built after both drains rather than from whichever arrived first:
-            // either sequence may be the one that is empty, and an absent
-            // sample is reported as absent rather than invented.
+            // Built after all drains rather than from whichever arrived first:
+            // any sequence may be the one that is empty, and an absent sample
+            // is reported as absent rather than invented.
             let panel = Self.timingPanel(
                 origin: origin,
                 firstObservation: collected.first,
                 firstSample: collectedSamples.first
+            ) + "\n" + Self.framePanel(
+                stats: stats,
+                kept: source.keptCameraFrames,
+                dropped: source.droppedCameraFrames,
+                strided: source.stridedCameraFrames
             )
             print(panel)
 
-            let session = CaptureSession(observations: collected, inertialSamples: collectedSamples)
-            let name = "session-\(session.id.uuidString).json"
-            do {
-                try SessionCodec.write(session, to: URL.documentsDirectory.appending(path: name))
-            } catch {
-                let message = error.localizedDescription
-                await MainActor.run { self.status = .failed(message) }
-                return
-            }
-
             let count = collected.count
             let sampleCount = collectedSamples.count
-            print("wrote \(count) observations and \(sampleCount) inertial samples to \(name)")
+            print("wrote \(count) observations, \(sampleCount) inertial samples and \(stats.encodedCount) frames to \(name)")
             await MainActor.run {
                 self.observationCount = count
                 self.inertialCount = sampleCount
+                self.frameCount = stats.encodedCount
                 self.timing = panel
                 self.status = .wrote(name)
             }
@@ -155,9 +188,83 @@ final class SessionRecorder {
         return collected
     }
 
-    /// The whole point of this commit: the two sensors' raw timestamps beside
-    /// each other, and the normalised values derived from them, so a base
-    /// mismatch is visible rather than silently baked into the file.
+    /// What the frame probe measured on one run. Every field starts at zero
+    /// and only ever holds what this capture observed.
+    private nonisolated struct FrameStats {
+        var encodedCount = 0
+        var totalBytes = 0
+        var totalEncode: Duration = .zero
+        var maxEncode: Duration = .zero
+        var maxLag: TimeInterval = 0
+    }
+
+    private nonisolated func encodeFrames(
+        _ frames: AsyncThrowingStream<CameraFrame, any Error>,
+        into writer: SessionContainer.Writer,
+        with encoder: FrameEncoder,
+        origin: TimeInterval?
+    ) async throws -> ([FrameRecord], FrameStats) {
+        var records: [FrameRecord] = []
+        var stats = FrameStats()
+        let clock = ContinuousClock()
+        for try await frame in frames {
+            // How far behind the encoder is running, read before the encode it
+            // is about to pay for.
+            if let origin {
+                stats.maxLag = max(stats.maxLag, CACurrentMediaTime() - (origin + frame.timestamp))
+            }
+            let encodeStart = clock.now
+            let (record, data) = try encoder.encode(frame)
+            let encodeTime = clock.now - encodeStart
+            try writer.append(data)
+
+            records.append(record)
+            stats.encodedCount += 1
+            stats.totalBytes += data.count
+            stats.totalEncode += encodeTime
+            stats.maxEncode = max(stats.maxEncode, encodeTime)
+            if stats.encodedCount.isMultiple(of: 30) {
+                let count = stats.encodedCount
+                await MainActor.run { self.frameCount = count }
+            }
+        }
+        return (records, stats)
+    }
+
+    /// The frame probe's numbers. The first line is the accounting invariant:
+    /// kept, dropped and strided are disjoint and exhaustive over the
+    /// callbacks the stream saw, so their sum is the callback count -- if a
+    /// ceiling estimate does not close against it, the estimate is wrong, not
+    /// the counters.
+    private nonisolated static func framePanel(
+        stats: FrameStats,
+        kept: Int,
+        dropped: Int,
+        strided: Int
+    ) -> String {
+        func milliseconds(_ duration: Duration) -> String {
+            let ms = Double(duration.components.seconds) * 1000
+                + Double(duration.components.attoseconds) / 1e15
+            return String(format: "%.2f ms", ms)
+        }
+        var panel = "frames          \(kept) kept + \(dropped) dropped + \(strided) strided = \(kept + dropped + strided) callbacks"
+        if stats.encodedCount > 0 {
+            let megabytes = Double(stats.totalBytes) / 1_048_576
+            let meanKilobytes = Double(stats.totalBytes) / Double(stats.encodedCount) / 1024
+            let meanEncode = stats.totalEncode / stats.encodedCount
+            panel += """
+
+                payload         \(String(format: "%.1f MB", megabytes)), mean \(String(format: "%.0f KB", meanKilobytes))/frame
+                encode          mean \(milliseconds(meanEncode)), max \(milliseconds(stats.maxEncode))
+                encode lag max  \(String(format: "%.1f ms", stats.maxLag * 1000))
+                """
+        }
+        return panel
+    }
+
+    /// The two sensors' raw timestamps beside each other, and the normalised
+    /// values derived from them, so a base mismatch is visible rather than
+    /// silently baked into the file.
     private nonisolated static func timingPanel(
         origin: TimeInterval?,
         firstObservation: PoseObservation?,
