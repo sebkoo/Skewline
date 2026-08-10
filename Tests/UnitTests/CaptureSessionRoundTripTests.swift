@@ -16,7 +16,12 @@ import Replay
         covariance: PoseCovariance6x6(values: (0..<36).map { Double($0) * 0.001 }),
         trackingQuality: .limited(.excessiveMotion)
     )
-    let session = CaptureSession(observations: [observation])
+    let sample = InertialSample(
+        timestamp: 12.492,
+        rotationRate: SIMD3(-0.125, 0.5, 2.25),
+        userAcceleration: SIMD3(0.03, -0.98, 0.11)
+    )
+    let session = CaptureSession(observations: [observation], inertialSamples: [sample])
 
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
     defer { try? FileManager.default.removeItem(at: url) }
@@ -28,4 +33,22 @@ import Replay
     // `startDate` and `timestamp`, which the per-field version silently
     // skipped, and it cannot drift out of date as fields are added.
     #expect(decoded == session)
+}
+
+@Test func sessionRecordedBeforeInertialSamplesStillDecodes() throws {
+    // Built by stripping the key from real encoder output rather than pasting a
+    // literal: a hand-written blob would drift the moment the encoder changes,
+    // and the file this protects is a capture that already exists.
+    let session = CaptureSession(observations: [], inertialSamples: [])
+    let encoded = try SessionCodec.encode(session)
+    var object = try #require(
+        try JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+    )
+    #expect(object["inertialSamples"] != nil)
+    object["inertialSamples"] = nil
+
+    let decoded = try SessionCodec.decode(try JSONSerialization.data(withJSONObject: object))
+
+    #expect(decoded == session)
+    #expect(decoded.inertialSamples.isEmpty)
 }

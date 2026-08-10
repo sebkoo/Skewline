@@ -23,12 +23,16 @@ final class SessionRecorder {
 
     private(set) var status: Status = .idle
     private(set) var observationCount = 0
+    private(set) var inertialCount = 0
 
-    /// Set once, from the first observation of a session.
+    /// The raw timestamps of both sensors, side by side, built once a session
+    /// has ended.
     ///
-    /// That `ARFrame.timestamp` and `CACurrentMediaTime()` share a monotonic
-    /// base is an assumption the timeline rests on and nothing here has
-    /// measured, so the raw numbers are shown rather than trusted.
+    /// That `ARFrame.timestamp`, `CMDeviceMotion.timestamp` and
+    /// `CACurrentMediaTime()` share a monotonic base is an assumption the
+    /// timeline rests on and nothing here has measured, so the raw numbers are
+    /// shown rather than trusted. A session whose `inertial t0` is out by
+    /// minutes or hours is a file that looks fine and is wrong.
     private(set) var timing: String?
 
     static var isSupported: Bool { ARWorldTrackingConfiguration.isSupported }
@@ -47,12 +51,14 @@ final class SessionRecorder {
     func start() {
         guard status != .recording else { return }
         observationCount = 0
+        inertialCount = 0
         timing = nil
         status = .recording
 
-        // The stream has to exist before the session starts: a frame delivered
-        // before the continuation is installed has nowhere to go.
+        // Both streams have to exist before the session starts: anything
+        // delivered before its continuation is installed has nowhere to go.
         let observations = source.observations()
+        let samples = source.inertialSamples()
         source.run(
             ARWorldTrackingConfiguration(),
             options: [.resetTracking, .removeExistingAnchors]
@@ -67,34 +73,32 @@ final class SessionRecorder {
         // task, so there is no cycle, and a recorder released mid-write would
         // abandon the file this harness exists to produce.
         Task.detached(priority: .utility) { [self] in
-            var collected: [PoseObservation] = []
-            var timing: String?
-
+            let collected: [PoseObservation]
+            let collectedSamples: [InertialSample]
             do {
-                for try await observation in observations {
-                    if collected.isEmpty, let origin {
-                        let line = """
-                            run origin      \(origin)
-                            first frame     \(observation.timestamp + origin)
-                            now             \(CACurrentMediaTime())
-                            """
-                        print(line)
-                        timing = line
-                    }
-                    collected.append(observation)
-
-                    let count = collected.count
-                    if count.isMultiple(of: 30) {
-                        await MainActor.run { self.observationCount = count }
-                    }
-                }
+                // Two sibling children, each owning its own array. The two
+                // sensors arrive on two threads at two rates and share no
+                // mutable state on this side of the boundary either.
+                async let poses = collectObservations(observations)
+                async let inertial = collectSamples(samples)
+                (collected, collectedSamples) = try await (poses, inertial)
             } catch {
                 let message = error.localizedDescription
                 await MainActor.run { self.status = .failed(message) }
                 return
             }
 
-            let session = CaptureSession(observations: collected)
+            // Built after both drains rather than from whichever arrived first:
+            // either sequence may be the one that is empty, and an absent
+            // sample is reported as absent rather than invented.
+            let panel = Self.timingPanel(
+                origin: origin,
+                firstObservation: collected.first,
+                firstSample: collectedSamples.first
+            )
+            print(panel)
+
+            let session = CaptureSession(observations: collected, inertialSamples: collectedSamples)
             let name = "session-\(session.id.uuidString).json"
             do {
                 try SessionCodec.write(session, to: URL.documentsDirectory.appending(path: name))
@@ -105,11 +109,12 @@ final class SessionRecorder {
             }
 
             let count = collected.count
-            let measured = timing
-            print("wrote \(count) observations to \(name)")
+            let sampleCount = collectedSamples.count
+            print("wrote \(count) observations and \(sampleCount) inertial samples to \(name)")
             await MainActor.run {
                 self.observationCount = count
-                self.timing = measured
+                self.inertialCount = sampleCount
+                self.timing = panel
                 self.status = .wrote(name)
             }
         }
@@ -120,5 +125,59 @@ final class SessionRecorder {
         status = .writing
         arSession.pause()
         source.finish()
+    }
+
+    private nonisolated func collectObservations(
+        _ observations: AsyncThrowingStream<PoseObservation, any Error>
+    ) async throws -> [PoseObservation] {
+        var collected: [PoseObservation] = []
+        for try await observation in observations {
+            collected.append(observation)
+            let count = collected.count
+            if count.isMultiple(of: 30) {
+                await MainActor.run { self.observationCount = count }
+            }
+        }
+        return collected
+    }
+
+    private nonisolated func collectSamples(
+        _ samples: AsyncThrowingStream<InertialSample, any Error>
+    ) async throws -> [InertialSample] {
+        var collected: [InertialSample] = []
+        for try await sample in samples {
+            collected.append(sample)
+            let count = collected.count
+            if count.isMultiple(of: 100) {
+                await MainActor.run { self.inertialCount = count }
+            }
+        }
+        return collected
+    }
+
+    /// The whole point of this commit: the two sensors' raw timestamps beside
+    /// each other, and the normalised values derived from them, so a base
+    /// mismatch is visible rather than silently baked into the file.
+    private nonisolated static func timingPanel(
+        origin: TimeInterval?,
+        firstObservation: PoseObservation?,
+        firstSample: InertialSample?
+    ) -> String {
+        func raw(_ timestamp: TimeInterval?) -> String {
+            guard let timestamp, let origin else { return "none" }
+            return "\(timestamp + origin)"
+        }
+        func relative(_ timestamp: TimeInterval?) -> String {
+            guard let timestamp else { return "none" }
+            return "\(timestamp)"
+        }
+        return """
+            run origin      \(origin.map(String.init(describing:)) ?? "none")
+            first frame     \(raw(firstObservation?.timestamp))
+            first motion    \(raw(firstSample?.timestamp))
+            now             \(CACurrentMediaTime())
+            pose t0         \(relative(firstObservation?.timestamp))
+            inertial t0     \(relative(firstSample?.timestamp))
+            """
     }
 }
