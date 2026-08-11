@@ -42,10 +42,23 @@ public struct FrameRecord: Codable, Equatable, Sendable {
     /// How the payload bytes are encoded.
     public var encoding: FrameEncoding
 
-    public init(timestamp: TimeInterval, width: Int, height: Int, encoding: FrameEncoding) {
+    /// The depth captured from the same `ARFrame`, or `nil` when the frame
+    /// carried none. Optional, so synthesized decoding falls back through
+    /// `decodeIfPresent` and sessions recorded before depth existed -- or on a
+    /// device without the sensor -- keep decoding unchanged.
+    public var depth: DepthRecord?
+
+    public init(
+        timestamp: TimeInterval,
+        width: Int,
+        height: Int,
+        encoding: FrameEncoding,
+        depth: DepthRecord? = nil
+    ) {
         self.timestamp = timestamp
         self.width = width
         self.height = height
         self.encoding = encoding
+        self.depth = depth
     }
 }

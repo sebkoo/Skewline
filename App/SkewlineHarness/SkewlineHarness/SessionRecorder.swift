@@ -40,6 +40,16 @@ final class SessionRecorder {
 
     static var isSupported: Bool { ARWorldTrackingConfiguration.isSupported }
 
+    /// Whether this device's world tracking can deliver `sceneDepth` frames.
+    ///
+    /// The class method is the mandatory gate, not a defensive check: setting
+    /// an unsupported frame semantic throws an Objective-C exception Swift
+    /// cannot catch. Shown in the UI because the answer is a fact about this
+    /// device that decides whether depth capture exists at all.
+    static var supportsSceneDepth: Bool {
+        ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth)
+    }
+
     private let arSession = ARSession()
     private let source: SensorSource
 
@@ -64,10 +74,16 @@ final class SessionRecorder {
         let observations = source.observations()
         let samples = source.inertialSamples()
         let frames = source.cameraFrames()
-        source.run(
-            ARWorldTrackingConfiguration(),
-            options: [.resetTracking, .removeExistingAnchors]
-        )
+        // Guarded because the guard is mandatory, not defensive: setting an
+        // unsupported semantic throws an Objective-C exception Swift cannot
+        // catch. An unsupported device still records -- a session without
+        // depth is a session, not a failure.
+        let configuration = ARWorldTrackingConfiguration()
+        let sceneDepthSupported = Self.supportsSceneDepth
+        if sceneDepthSupported {
+            configuration.frameSemantics.insert(.sceneDepth)
+        }
+        source.run(configuration, options: [.resetTracking, .removeExistingAnchors])
         let origin = source.timelineOrigin
 
         // Detached, not `Task {}`. A task started from a `@MainActor` method
@@ -90,6 +106,7 @@ final class SessionRecorder {
                 // confined to this task for its whole life.
                 let writer = try SessionContainer.Writer(creatingAt: url)
                 let encoder = FrameEncoder()
+                let depthEncoder = DepthEncoder()
 
                 // Two sibling children, each owning its own array; the frame
                 // drain runs inline in this task body, concurrent with both,
@@ -102,6 +119,7 @@ final class SessionRecorder {
                     frames,
                     into: writer,
                     with: encoder,
+                    depthEncoder: depthEncoder,
                     origin: origin
                 )
                 (collected, collectedSamples) = try await (poses, inertial)
@@ -136,7 +154,8 @@ final class SessionRecorder {
                 stats: stats,
                 kept: source.keptCameraFrames,
                 dropped: source.droppedCameraFrames,
-                strided: source.stridedCameraFrames
+                strided: source.stridedCameraFrames,
+                sceneDepthSupported: sceneDepthSupported
             )
             print(panel)
 
@@ -196,12 +215,29 @@ final class SessionRecorder {
         var totalEncode: Duration = .zero
         var maxEncode: Duration = .zero
         var maxLag: TimeInterval = 0
+
+        /// Counted in both branches rather than derived from `encodedCount`,
+        /// so `withDepth + withoutDepth = encodedCount` stays a check on the
+        /// loop and not an identity.
+        var withDepth = 0
+        var withoutDepth = 0
+        var withConfidence = 0
+        var depthPackedBytes = 0
+        var depthWrittenBytes = 0
+        var totalDepthEncode: Duration = .zero
+        var maxDepthEncode: Duration = .zero
+        var confidenceTally = DepthEncoder.ConfidenceTally()
+        /// Every pixel format the run observed, as delivered -- the header
+        /// promises none, so the panel reports rather than assumes.
+        var depthFormats: Set<OSType> = []
+        var confidenceFormats: Set<OSType> = []
     }
 
     private nonisolated func encodeFrames(
         _ frames: AsyncThrowingStream<CameraFrame, any Error>,
         into writer: SessionContainer.Writer,
         with encoder: FrameEncoder,
+        depthEncoder: DepthEncoder,
         origin: TimeInterval?
     ) async throws -> ([FrameRecord], FrameStats) {
         var records: [FrameRecord] = []
@@ -214,9 +250,39 @@ final class SessionRecorder {
                 stats.maxLag = max(stats.maxLag, CACurrentMediaTime() - (origin + frame.timestamp))
             }
             let encodeStart = clock.now
-            let (record, data) = try encoder.encode(frame)
+            let (frameRecord, data) = try encoder.encode(frame)
             let encodeTime = clock.now - encodeStart
-            try writer.append(data)
+
+            // Depth encode timed apart from the pixel encode: the drain's
+            // budget is one frame-time, and a combined number could not say
+            // which encoder spent it.
+            var record = frameRecord
+            var depthPayload: SessionContainer.DepthPayload?
+            if let capturedDepth = frame.depth {
+                let depthStart = clock.now
+                let encoded = try depthEncoder.encode(capturedDepth)
+                let depthTime = clock.now - depthStart
+                record.depth = encoded.record
+                depthPayload = encoded.payload
+
+                stats.withDepth += 1
+                stats.depthPackedBytes += encoded.packedBytes
+                stats.depthWrittenBytes += encoded.payload.depth.count
+                    + (encoded.payload.confidence?.count ?? 0)
+                stats.totalDepthEncode += depthTime
+                stats.maxDepthEncode = max(stats.maxDepthEncode, depthTime)
+                stats.depthFormats.insert(encoded.depthFormat)
+                if let tally = encoded.tally {
+                    stats.withConfidence += 1
+                    stats.confidenceTally.merge(tally)
+                }
+                if let confidenceFormat = encoded.confidenceFormat {
+                    stats.confidenceFormats.insert(confidenceFormat)
+                }
+            } else {
+                stats.withoutDepth += 1
+            }
+            try writer.append(data, depth: depthPayload)
 
             records.append(record)
             stats.encodedCount += 1
@@ -240,24 +306,65 @@ final class SessionRecorder {
         stats: FrameStats,
         kept: Int,
         dropped: Int,
-        strided: Int
+        strided: Int,
+        sceneDepthSupported: Bool
     ) -> String {
         func milliseconds(_ duration: Duration) -> String {
             let ms = Double(duration.components.seconds) * 1000
                 + Double(duration.components.attoseconds) / 1e15
             return String(format: "%.2f ms", ms)
         }
+        func megabytes(_ bytes: Int) -> String {
+            String(format: "%.1f MB", Double(bytes) / 1_048_576)
+        }
+        // The observed format, printable: four ASCII characters when the code
+        // is one, the raw number when it is not.
+        func fourCC(_ type: OSType) -> String {
+            let bytes = (0..<4).map { UInt8((type >> ((3 - $0) * 8)) & 0xFF) }
+            guard bytes.allSatisfy({ (0x20...0x7E).contains($0) }),
+                  let name = String(bytes: bytes, encoding: .ascii) else {
+                return String(format: "0x%08X", type)
+            }
+            return "'\(name)'"
+        }
+        func formats(_ observed: Set<OSType>) -> String {
+            observed.isEmpty ? "none" : observed.map(fourCC).sorted().joined(separator: " ")
+        }
         var panel = "frames          \(kept) kept + \(dropped) dropped + \(strided) strided = \(kept + dropped + strided) callbacks"
         if stats.encodedCount > 0 {
-            let megabytes = Double(stats.totalBytes) / 1_048_576
             let meanKilobytes = Double(stats.totalBytes) / Double(stats.encodedCount) / 1024
             let meanEncode = stats.totalEncode / stats.encodedCount
             panel += """
 
-                payload         \(String(format: "%.1f MB", megabytes)), mean \(String(format: "%.0f KB", meanKilobytes))/frame
+                payload         \(megabytes(stats.totalBytes)), mean \(String(format: "%.0f KB", meanKilobytes))/frame
                 encode          mean \(milliseconds(meanEncode)), max \(milliseconds(stats.maxEncode))
                 encode lag max  \(String(format: "%.1f ms", stats.maxLag * 1000))
                 """
+        }
+        panel += "\nscene depth     \(sceneDepthSupported ? "supported" : "unsupported")"
+        if stats.withDepth > 0 {
+            let meanDepthKilobytes = Double(stats.depthWrittenBytes) / Double(stats.withDepth) / 1024
+            let meanDepthEncode = stats.totalDepthEncode / stats.withDepth
+            let ratio = stats.depthPackedBytes > 0
+                ? String(format: "%.2f", Double(stats.depthWrittenBytes) / Double(stats.depthPackedBytes))
+                : "n/a"
+            panel += """
+
+                depth           \(stats.withDepth) with + \(stats.withoutDepth) without = \(stats.withDepth + stats.withoutDepth) encoded; \(stats.withConfidence) confidence
+                depth formats   depth \(formats(stats.depthFormats)), confidence \(formats(stats.confidenceFormats))
+                depth payload   \(megabytes(stats.depthWrittenBytes)) written, mean \(String(format: "%.0f KB", meanDepthKilobytes))/frame; packed \(megabytes(stats.depthPackedBytes)), ratio \(ratio)
+                depth encode    mean \(milliseconds(meanDepthEncode)), max \(milliseconds(stats.maxDepthEncode))
+                """
+            let tally = stats.confidenceTally
+            if tally.total > 0 {
+                func percent(_ count: Int) -> String {
+                    String(format: "%.1f%%", Double(count) * 100 / Double(tally.total))
+                }
+                panel += "\nconfidence      low \(percent(tally.low)) / medium \(percent(tally.medium)) / high \(percent(tally.high))"
+                if tally.other > 0 {
+                    panel += " / other \(percent(tally.other))"
+                }
+            }
         }
         return panel
     }

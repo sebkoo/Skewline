@@ -17,8 +17,9 @@ public struct VideoCaptureConfiguration: Sendable {
     public var frameStride: Int
 
     /// Upper bound on copied frames waiting for the consumer. Bounds the
-    /// path's memory at `bufferDepth` × one frame's bytes; when the buffer is
-    /// full the incoming frame is dropped and counted.
+    /// path's memory at `bufferDepth` × one frame's bytes -- depth maps
+    /// included, when the frame carries them; when the buffer is full the
+    /// incoming frame is dropped and counted.
     public var bufferDepth: Int
 
     public init(frameStride: Int = 1, bufferDepth: Int = 8) {
@@ -29,8 +30,32 @@ public struct VideoCaptureConfiguration: Sendable {
     }
 }
 
+/// The depth captured beside one camera frame's pixels.
+///
+/// No timestamp: both maps come from the same `ARFrame` as the camera frame
+/// that carries this value, so the frame's timestamp is theirs.
+///
+/// `@unchecked Sendable` in its own right, not by riding inside
+/// `CameraFrame`'s exemption -- an `@unchecked` container merely silences the
+/// check for its members. The terms are the same: both buffers are deep
+/// copies owned by this value, yielded to exactly one consumer, and never
+/// touched by the producer again.
+public struct CapturedDepth: @unchecked Sendable {
+    /// The depth map, in ARKit's own pixel format, as delivered.
+    public let depthMap: CVPixelBuffer
+
+    /// ARKit's per-pixel confidence in `depthMap`, or `nil` when the frame
+    /// delivered none -- `ARDepthData.confidenceMap` is nullable.
+    public let confidenceMap: CVPixelBuffer?
+
+    public init(depthMap: CVPixelBuffer, confidenceMap: CVPixelBuffer?) {
+        self.depthMap = depthMap
+        self.confidenceMap = confidenceMap
+    }
+}
+
 /// One camera frame leaving the live path: the frame's capture time on the
-/// session timeline, and its pixels.
+/// session timeline, its pixels, and the depth captured with them.
 ///
 /// `@unchecked Sendable` on the same honesty terms as `SensorSource` itself:
 /// `pixelBuffer` is a deep copy owned by this value, yielded to exactly one
@@ -44,9 +69,15 @@ public struct CameraFrame: @unchecked Sendable {
     /// The frame's pixels, in the camera's own pixel format.
     public let pixelBuffer: CVPixelBuffer
 
-    public init(timestamp: TimeInterval, pixelBuffer: CVPixelBuffer) {
+    /// The frame's scene depth, or `nil` when the `ARFrame` carried none --
+    /// the semantic was not enabled, the device has no depth sensor, or ARKit
+    /// simply delivered nothing for this frame.
+    public let depth: CapturedDepth?
+
+    public init(timestamp: TimeInterval, pixelBuffer: CVPixelBuffer, depth: CapturedDepth? = nil) {
         self.timestamp = timestamp
         self.pixelBuffer = pixelBuffer
+        self.depth = depth
     }
 }
 
@@ -285,7 +316,30 @@ public final class SensorSource: NSObject, PoseObservationSource, InertialSample
             return
         }
 
-        let result = continuation.yield(CameraFrame(timestamp: frame.timestamp - origin, pixelBuffer: copy))
+        // Depth rides only on a kept frame -- copied here, after the stride
+        // decision, so a strided frame pays for no depth copy. Presence of
+        // `sceneDepth` is the whole condition: whether the semantic is on is
+        // the session configuration's business, not a second knob here.
+        var depth: CapturedDepth?
+        if let sceneDepth = frame.sceneDepth {
+            guard let depthCopy = Self.copy(sceneDepth.depthMap) else {
+                takeFrameContinuation()?.finish(throwing: CameraCaptureError.pixelBufferCopyFailed)
+                return
+            }
+            var confidenceCopy: CVPixelBuffer?
+            if let confidenceMap = sceneDepth.confidenceMap {
+                guard let copied = Self.copy(confidenceMap) else {
+                    takeFrameContinuation()?.finish(throwing: CameraCaptureError.pixelBufferCopyFailed)
+                    return
+                }
+                confidenceCopy = copied
+            }
+            depth = CapturedDepth(depthMap: depthCopy, confidenceMap: confidenceCopy)
+        }
+
+        let result = continuation.yield(
+            CameraFrame(timestamp: frame.timestamp - origin, pixelBuffer: copy, depth: depth)
+        )
         stream.withLock { state in
             switch result {
             case .enqueued:

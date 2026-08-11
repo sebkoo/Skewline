@@ -17,6 +17,11 @@ struct CaptureView: View {
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
 
+                Text("scene depth \(SessionRecorder.supportsSceneDepth ? "supported" : "unsupported")")
+                    .font(.footnote)
+                    .monospaced()
+                    .foregroundStyle(.secondary)
+
                 Button(isRecording ? "Stop" : "Start") {
                     if isRecording {
                         recorder.stop()
