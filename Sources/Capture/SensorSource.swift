@@ -7,14 +7,18 @@ import QuartzCore
 import simd
 import Synchronization
 
-/// Knobs for the camera-frame path -- configuration values, not measurements.
+/// Knobs for the camera-frame path -- configuration values chosen from device
+/// measurements, not starting points.
 ///
-/// The defaults are starting points for a probe run, not conclusions: encode
-/// cost, payload size and drop rate under them are not measured yet, and v0.4
-/// sets the defaults from device data.
+/// v0.4 ran a device matrix against a written criterion -- drops at or below
+/// 1% of callbacks, and no chronic interior drop pattern -- and set every
+/// default below from what passed it. See DEVLOG, "the knobs get their
+/// defaults."
 public struct VideoCaptureConfiguration: Sendable {
     /// Keep every Nth delivered frame; 1 keeps them all. Applied at the
     /// source, before the pixel copy, so a strided-out frame costs nothing.
+    /// Default is 2: stride 1 dropped chronically on this hardware, stride 2
+    /// held the criterion with only an isolated, non-repeating stall.
     public var frameStride: Int
 
     /// Upper bound on copied frames waiting for the consumer. Bounds the
@@ -23,7 +27,7 @@ public struct VideoCaptureConfiguration: Sendable {
     /// incoming frame is dropped and counted.
     public var bufferDepth: Int
 
-    public init(frameStride: Int = 1, bufferDepth: Int = 8) {
+    public init(frameStride: Int = 2, bufferDepth: Int = 8) {
         precondition(frameStride >= 1, "frameStride must be at least 1")
         precondition(bufferDepth >= 1, "bufferDepth must be at least 1")
         self.frameStride = frameStride

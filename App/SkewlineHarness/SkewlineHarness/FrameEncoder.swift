@@ -12,9 +12,14 @@ import simd
 /// Owns its `CIContext`, created once: a context per frame would be setup cost
 /// masquerading as encode cost in the probe's numbers.
 ///
-/// The knobs are configuration values, not decisions. What they cost -- encode
-/// time, bytes per frame -- is not measured yet; the probe run measures it,
-/// and v0.4 sets the defaults from what it finds.
+/// The knobs are chosen from device measurements, not left as starting
+/// points. v0.4 ran a device matrix against the frame-drop criterion in
+/// `VideoCaptureConfiguration`'s doc comment: HEIC failed it chronically --
+/// its own encode cost exceeds the keep budget -- so JPEG held. Quality is
+/// chosen on bytes per frame and a visual check of extracted frames, not a
+/// render-adequacy check -- nothing downstream decodes these pixels today,
+/// so this default is provisional by consumer absence, worth revisiting the
+/// day something reads them. See DEVLOG, "the knobs get their defaults."
 ///
 /// `nonisolated` because the app target defaults to `MainActor`, and this
 /// type belongs to the drain task, not the UI.
@@ -37,7 +42,7 @@ nonisolated struct FrameEncoder {
     private let context = CIContext()
     private let colorSpace: CGColorSpace
 
-    init(encoding: FrameEncoding = .jpeg, quality: Double = 0.7) {
+    init(encoding: FrameEncoding = .jpeg, quality: Double = 0.5) {
         self.encoding = encoding
         // The output file's color space, not a claim about the camera's.
         self.colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()

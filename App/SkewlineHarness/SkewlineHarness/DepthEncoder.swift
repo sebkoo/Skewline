@@ -14,10 +14,16 @@ import Replay
 /// compiler checked against the SDK; whether the device delivers them is what
 /// the verification observes.
 ///
-/// The compression knob is a configuration value, not a decision. What it
-/// costs -- encode time, bytes on disk against bytes packed -- is not
-/// measured yet; the probe run measures it, and v0.4 sets the default from
-/// what it finds.
+/// The compression knob is decided, not a starting point. LZFSE compresses
+/// packed depth+confidence bytes to 0.18-0.20 of their size, reproduced
+/// across three separate captures with different walks (see DEVLOG) --
+/// cross-condition reproduction v0.4 judged stronger evidence than one more
+/// same-walk measurement could add, so this knob was decided without a
+/// matrix cell of its own. What was never isolated: the raw-vs-lzfse
+/// encode-time delta -- every measurement bundles packing, tallying and
+/// compression as one number, and the whole bundle sits well inside the
+/// frame budget regardless, so speed was never the question this default
+/// answers.
 ///
 /// `nonisolated` for the same reason as `FrameEncoder`: this type belongs to
 /// the drain task, not the UI.

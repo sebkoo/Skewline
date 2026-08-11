@@ -547,3 +547,73 @@ own interval, two runs.
 - **The CPU baseline reproduced warm.** 204.3 and 208.3 M points/s against
   commit 2's 200.0 warm — commit 2's cold 57.8 was the file cache, as
   recorded there.
+
+## 2026-08-11 · v0.4 commit 1 — the knobs get their defaults
+
+Four device captures, one walk shape (indoor; 44.9 s for cell A, ~31 s for
+B–D), against the three knobs deferred since the commits that introduced
+them. Cells: A stride 1 / JPEG 0.7; B stride 2 / JPEG 0.7; C stride 2 / HEIC
+0.7; D stride 2 / JPEG 0.5 — each analyzed by a second operator from the
+exported `.skewline` container, not the panel alone. Criterion, fixed before
+the runs: drops at or below 1% of callbacks, and boundary-only drops — any
+chronic interior pattern disqualifies. The second bullet records how that
+second half moved.
+
+- **Stride defaults to 2.** Cell A: 918/2688 = 34.15% dropped, chronic
+  interior alternation ({1:1013, 2:686, 3:47, ≥4:23} in 16.67 ms units) —
+  fails both halves of the criterion. Cell B: 7/1879 = 0.37%, one isolated
+  266.8 ms stall at t=8.537 s co-timed with a 514 ms encode spike, 248 clean
+  frames before it and 684 after — passes rate, and passes pattern under the
+  amendment below. `RenderProbe --png` on both exported containers: A
+  unprojects 86,450,264 points over 1,770 frames, B 45,514,752 over 933 —
+  half the frames — and the two offscreen renders are equally dense and
+  coherent from a comparable viewpoint, so the sparser cloud still meets the
+  render-adequacy bar the brief named.
+- **The pattern criterion gained a third permitted shape, and cell D closed
+  it.** Cell B's isolated stall was neither the chronic `{1,2}`-alternation
+  the original criterion targeted nor a literal boundary position, so an
+  amendment — recorded after cell B's data revealed the shape, before
+  scoring the cell — admitted a third shape: an isolated, non-repeating
+  interior stall bracketed by long clean
+  runs, provisional on the remaining stride-2 cells not repeating it. Cell
+  C's failure doesn't test this — its drops are fully explained by its own
+  encoder, not stride. Cell D, sharing B's stride and JPEG encoder, closed
+  the question: 0/1842 dropped, histogram {1:920}, no interior events at
+  all. The stall was a one-off, not a property of stride 2.
+- **Encoding stays JPEG; HEIC failed chronically.** Cell C: 414/1809 =
+  22.89% dropped (45.7% of keep-classified frames), chronic from t=0.5 s to
+  the end. Mechanism, not a guess: HEIC's own encode mean, 53.31 ms, exceeds
+  the 33.33 ms keep budget stride 2 buys outright — the mean alone caps
+  retention near 62.5%, and encode spikes (max 271.9 ms, lag max 834.7 ms)
+  push the measured loss further. The bytes HEIC would have bought (103
+  KB/frame against JPEG's 201 KB, −48.8%) at 3.59× the encode time are moot:
+  an encoding that cannot hold the budget is not a candidate.
+- **Quality defaults to 0.5, on bytes and an eyeball check — not a render
+  check.** Cells B (0.7) and D (0.5) both pass the drop criterion
+  identically (encode mean 14.84 ms vs 15.13 ms) — quality does not move the
+  frame budget at this stride, so the decision is bytes only: 135 KiB/frame
+  against 201 KiB, −32.8%. `Sources/Render` never imports a camera pixel
+  type — grepped, confirmed — so neither `RenderProbe` nor a rendered PNG
+  can judge this knob; nothing in the pipeline reads JPEG bytes today. The
+  visual basis is a 100% inspection of frames extracted from both
+  containers, including 0.5's own byte-max frame (291 KiB): no blocking,
+  mosquito noise or banding at 100%. Caveat on record: this was
+  not a same-scene comparison across qualities, and the run's hardest case
+  for compression artifacts — the dim/blinds-class lighting commit 5
+  exercised — was only ever captured at 0.7. The default is provisional by
+  consumer absence, not by a settled visual judgment, and is worth
+  re-running the day something downstream decodes RGB.
+- **Depth compression stays LZFSE — decided without a fifth cell.** The
+  0.18–0.20 ratio already reproduced across three separate captures with
+  different walks (commits 4, 5, the intrinsics probe) — cross-condition
+  reproduction judged stronger evidence than one more same-walk measurement
+  could add. The raw-vs-lzfse encode-time delta was never isolated (every
+  measurement bundles packing, tallying and compression as one number), but
+  it cannot flip the decision either: the measured depth-encode bundle,
+  4.96–5.48 ms across the four cells, sits well inside stride 2's 33.33 ms
+  budget regardless of which side of that delta wins.
+
+Session UUIDs, recorded against their cells the moment each capture ended:
+A `17516358…`, B `7BA08EE7…`, C `7FEF8065…`, D `1E2A4BED…`, exported to
+`~/dev/Skewline-captures/`. Full panels live with the second operator's
+per-cell analysis, not here.
