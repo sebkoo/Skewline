@@ -371,3 +371,36 @@ pass.
 - **No new typed-absence API.** `FrameRecord.intrinsics == nil` already says
   "this frame cannot be unprojected" in a typed way; a convenience property
   saying the same thing would be surface with nothing forcing it yet.
+
+## 2026-08-10 · the intrinsics probe
+
+Off-device analysis of a 38.0 s capture: 2,282 poses, 3,847 inertial samples,
+1,556 frames.
+
+- **The four numbers move.** 1,378 distinct fx values across 1,556 frames —
+  continuous focus breathing, not discrete steps. fx spans 1318.38–1410.21, a
+  6.97% swing (minimum at t=1.5 s, maximum at t=38.0 s); cx moved 8.5 px and
+  cy 13.0 px, tracking stabilization. Reference resolution held constant at
+  1920×1440. A session-level intrinsics record would have carried up to 7%
+  focal error into every unprojection, silently — the per-frame placement
+  this commit chose by mirroring `ExposureRecord` is now a decision with a
+  number behind it, not just a copied pattern.
+- **fx equals fy exactly, on all 1,556 frames** (maximum observed difference
+  0.000000): ARKit reports square pixels through one focal scalar on this
+  device. A finding, not a premise the record assumed — `IntrinsicsRecord`
+  rightly keeps both fields rather than compacting further on a guess.
+- **The pinhole check held.** Zero `unexpectedIntrinsicsShape` across every
+  one of the 1,556 frames the encoder saw; the fail-loud policy had nothing
+  to fail loudly about, on this run.
+- **Cleanest pose baseline of five runs.** Poses (2,282) equal frame-path
+  callbacks (2,282) — both of commit 5's stop races stayed dormant this
+  time, consistent with them being races rather than deterministic bugs.
+  Interior gaps 16.6725 ms / 16.6734 ms / 16.6744 ms min/median/max, none
+  over 100 ms, 59.976 Hz. The added per-frame matrix read cost nothing this
+  baseline could detect.
+- **Everything else reproduced.** Inertial 99.45 Hz; identity held, 0 of
+  1,556 frame timestamps outside the pose set; depth 1,546 with + 10
+  warm-up, ratio 0.19, formats 'fdep'/'L008' as before; exposure on every
+  frame, ceiling-pinned (mean 16.65 ms), offset down to −6.52 EV; drops 726
+  of 2,282 (31.8%), chronic {1: 888, 2: 644} plus one 33-frame cold-start
+  hole matching encode max 523.55 ms.
