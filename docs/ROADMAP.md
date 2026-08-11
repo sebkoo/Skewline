@@ -36,7 +36,7 @@ drags along.
 Where the rest attaches:
 
 ```text
-v0.2  sensors    ARKit, camera frames, device motion, depth, into Capture
+v0.2  capture    ARKit, camera frames, device motion, depth, into Capture
 v0.3  Render     reads Core values, shades each point by its confidence
 v0.4  Measure    replays sessions, compares predicted error to observed
 v0.5  Interop    fills Core from a point-cloud file, over Swift ↔ C++
