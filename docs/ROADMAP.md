@@ -133,7 +133,7 @@ outstanding — which is the honest resting state, not a gap.
   .claude/settings.json — the staging and force-push rules that the briefs
   currently state as advice, turned into refusals
 ───────────────────────────────────────────────────────────────────────────
-  v0.3 render is a rung, not a commit list. Nothing below this line is
+  v0.4 measure is a rung, not a commit list. Nothing below this line is
   decided at commit level, and nothing should be.
 ```
 
@@ -147,7 +147,6 @@ because commit 2 discovered that `canImport(ARKit)` is true on macOS.
 
 | Version | Ships | What forces it |
 |---|---|---|
-| **v0.3** render | Accumulated point cloud, each point shaded by its confidence, Metal compute kernel | Tens of millions of points in a thirty-second capture cannot be re-shaded on the CPU per frame. The arithmetic forces the kernel, not the taste |
 | **v0.4** measure | Frame time, upload bandwidth, drift under replay | "A result needs a confidence" is an empty claim until the confidence is calibrated against something observed |
 | **v0.5** interop | Point-cloud / PLY reader over Swift–C++ | A format with dozens of properties per point is the wrong job for Swift, and the interop seam is itself a design question worth answering in public |
 | **v0.6** fit | Offline fit of the uncertainty model from replayed sessions | The model is *fitted*, not measured. Fitting is numpy's job, and it is what closes the thesis |
