@@ -27,7 +27,14 @@ let package = Package(
         ),
         .target(
             name: "Render",
-            dependencies: ["Core", "Replay"]
+            dependencies: ["Core", "Replay"],
+            // The shader ships as source, compiled at runtime. `.msl`, not
+            // `.metal`: xcodebuild claims a `.metal` file for its Metal
+            // compiler even when it is declared `.copy` -- and Xcode 26's
+            // Metal toolchain is a separate download -- while `swift build`
+            // only ever copies it. One extension no build system claims is
+            // what keeps the bundle identical under both.
+            resources: [.copy("Shaders/ConfidenceShaders.msl")]
         ),
         .executableTarget(
             name: "RenderProbe",

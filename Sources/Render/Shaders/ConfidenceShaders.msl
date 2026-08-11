@@ -1,0 +1,99 @@
+// The confidence->color mapping on the GPU, in both candidate stages and
+// both candidate layouts. Every function reads the palette from a buffer the
+// host fills from ConfidencePalette.table -- the constants live in Swift,
+// once, so the CPU reference and these functions cannot drift.
+//
+// Layouts:
+// - aos32: PointAoS32 mirrors Render.ConfidencePoint byte for byte -- float3
+//   is 16-byte aligned, so the struct strides 32 bytes with the confidence at
+//   offset 16. A re-shade drags the whole stride through the cache.
+// - soa: packed_float3 positions in one buffer, bare confidence bytes in
+//   another. A re-shade touches only the confidence plane.
+//
+// Kernels bounds-check and are dispatched with dispatchThreadgroups, so
+// nothing here assumes non-uniform threadgroup support.
+
+#include <metal_stdlib>
+using namespace metal;
+
+struct PointAoS32 {
+    float3 position;
+    uchar confidence;
+};
+
+struct ShadeUniforms {
+    float4x4 viewProjection;
+    float pointSize;
+};
+
+static inline uchar4 shade(uchar confidence, constant uchar4 *palette) {
+    return palette[min(uint(confidence), 3u)];
+}
+
+kernel void reshade_aos32(
+    device const PointAoS32 *points [[buffer(0)]],
+    device uchar4 *colors [[buffer(1)]],
+    constant uchar4 *palette [[buffer(2)]],
+    constant uint &count [[buffer(3)]],
+    uint id [[thread_position_in_grid]]
+) {
+    if (id >= count) {
+        return;
+    }
+    colors[id] = shade(points[id].confidence, palette);
+}
+
+kernel void reshade_soa(
+    device const uchar *confidences [[buffer(0)]],
+    device uchar4 *colors [[buffer(1)]],
+    constant uchar4 *palette [[buffer(2)]],
+    constant uint &count [[buffer(3)]],
+    uint id [[thread_position_in_grid]]
+) {
+    if (id >= count) {
+        return;
+    }
+    colors[id] = shade(confidences[id], palette);
+}
+
+struct PointVarying {
+    float4 position [[position]];
+    float size [[point_size]];
+    half4 color;
+};
+
+static inline PointVarying project(
+    float3 position,
+    uchar confidence,
+    constant ShadeUniforms &uniforms,
+    constant uchar4 *palette
+) {
+    PointVarying out;
+    out.position = uniforms.viewProjection * float4(position, 1.0);
+    out.size = uniforms.pointSize;
+    out.color = half4(shade(confidence, palette)) / 255.0h;
+    return out;
+}
+
+vertex PointVarying point_vertex_aos32(
+    uint id [[vertex_id]],
+    device const PointAoS32 *points [[buffer(0)]],
+    constant ShadeUniforms &uniforms [[buffer(1)]],
+    constant uchar4 *palette [[buffer(2)]]
+) {
+    return project(points[id].position, points[id].confidence, uniforms, palette);
+}
+
+vertex PointVarying point_vertex_soa(
+    uint id [[vertex_id]],
+    device const packed_float3 *positions [[buffer(0)]],
+    constant ShadeUniforms &uniforms [[buffer(1)]],
+    constant uchar4 *palette [[buffer(2)]],
+    device const uchar *confidences [[buffer(3)]]
+) {
+    return project(float3(positions[id]), confidences[id], uniforms, palette);
+}
+
+fragment half4 point_fragment(PointVarying in [[stage_in]]) {
+    return in.color;
+}
