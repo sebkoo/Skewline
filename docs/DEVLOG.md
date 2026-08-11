@@ -323,3 +323,51 @@ inertial samples, 1,669 frames over 41.2 s.
 - **The confidence tally summed to 100.1%, not 100%.** Rounding across three
   percentages, not a counting error — worth the one word so a future reader
   does not go looking for the missing tenth.
+
+## 2026-08-10 · v0.3 commit 1 — the operand v0.2 never recorded
+
+Not a v0.3 commit in the sense the roadmap means it — no Metal, no render
+module, no unprojection arithmetic. v0.3's first arithmetic is unprojection,
+depth pixel → camera ray → world point, via pose and intrinsics; `FrameRecord`
+carried pose and depth and never intrinsics. The ROADMAP's own rule caught it:
+*"Nothing above v0.2 touches Core's shape. If a later rung needs Core to
+change, that is a signal the boundary was drawn wrong."* v0.2 called itself
+done at twelve steps while missing an operand its own successor needs. This
+commit is that correction, and the lesson is worth more than the diff: closing
+a rung does not mean the rung's outputs are complete, only that its own tests
+pass.
+
+- **Four scalars, not the matrix — and checked, not assumed.**
+  `ARCamera.intrinsics` is a pinhole matrix; only fx, fy, cx, cy vary per
+  frame; the rest are the model's own constants. `IntrinsicsRecord` keeps the
+  four. Compaction without a check would be a guess wearing a type, so
+  `FrameEncoder` verifies the other five entries equal their expected
+  constants before building the record and throws
+  `unexpectedIntrinsicsShape` if they do not — the same split `DepthEncoder`
+  already makes for pixel format, applied to a matrix shape instead of an
+  `OSType`.
+- **The reference resolution rides beside the four numbers, in `Core`.**
+  `ARCamera.imageResolution` is the pixel resolution fx/fy/cx/cy are
+  expressed at, and a resolution recorded nowhere is a scale nobody can
+  recover. `IntrinsicsRecord.referenceWidth`/`referenceHeight` are not the
+  same fact as `FrameRecord.width`/`height`: those describe the stored
+  payload, this describes the frame the intrinsics were computed in. The two
+  agree today only because the harness stores full-resolution JPEGs — a
+  downscaled-storage knob later would separate them, and a record that
+  borrowed its reference frame from the payload would drift silently the day
+  it did.
+- **`Capture` still knows nothing about the pinhole model.** `CameraFrame`
+  carries the raw `simd_float3x3` and `CGSize`, the same undecomposed way it
+  already carries `pixelBuffer` and `CapturedDepth`. Decomposition and the
+  shape check live in `FrameEncoder`, in the harness app, not in `Capture` —
+  `Capture`'s job stays shuttling SDK values across the ARKit boundary, never
+  interpreting them.
+- **The panel answers the open question without a new module.**
+  `SessionRecorder`'s frame panel gains an `intrinsics` line: the min/max of
+  fx, fy, cx and cy the run observed, and the reference resolutions seen. It
+  exists to answer, from one capture, whether the four numbers hold constant
+  through a run or move with focus and stabilization — a finding for the
+  device run to make, not a premise to build on.
+- **No new typed-absence API.** `FrameRecord.intrinsics == nil` already says
+  "this frame cannot be unprojected" in a typed way; a convenience property
+  saying the same thing would be surface with nothing forcing it yet.

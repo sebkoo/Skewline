@@ -24,8 +24,8 @@ Three modules, one harness app and the tests that hold them.
 
 - **`Core`** — the measurement records: a pose with the uncertainty beside it
   and the tracker's own trust in that instant, an inertial sample, a camera
-  frame, the depth captured with it and the exposure it was captured under.
-  No I/O.
+  frame, the depth captured with it, the exposure it was captured under and
+  the intrinsics it was captured with. No I/O.
 - **`Replay`** — the on-disk session format. A recorded session replays
   deterministically, which is what makes the pipeline testable on a laptop with
   no device attached.

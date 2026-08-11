@@ -51,7 +51,7 @@ change, that is a signal the boundary was drawn wrong, and it belongs in
 
 ## What has shipped
 
-Twelve steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
+Thirteen steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
 including the ones that were mistakes.
 
 1. **Types.** A pose, a 6×6 covariance beside it, and the tracker's own opinion
@@ -96,6 +96,12 @@ including the ones that were mistakes.
     the blur product's camera-side operand, and the cheapest
     scene-illumination scalar ARKit types — riding `FrameRecord` as an
     optional sub-record, the depth pattern exactly.
+13. **Camera intrinsics.** `ARCamera.intrinsics` — the pinhole focal length
+    and principal point unprojection needs — and the pixel resolution they
+    are expressed at, riding `FrameRecord` as an optional sub-record, the
+    exposure pattern exactly. v0.2 had shipped a container carrying pose and
+    depth without the operand its own v0.3 successor needs; this closes that
+    gap before the render rung opens.
 
 ## Decided but not yet done
 
