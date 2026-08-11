@@ -13,6 +13,8 @@ perpendicular is the residual.
 - `Core` — types only. No I/O, no dependencies.
 - `Replay` — the on-disk session format. Depends on `Core` and nothing else.
 - `Capture` — the ingest boundary. Depends on `Core` and `Replay`.
+- `Render` — replay-side unprojection: depth pixels into world points, each
+  with its confidence. Depends on `Core` and `Replay`, never `Capture`.
 
 Acyclic, `Core` at the root. `Replay` must never depend on `Capture`. Replay is
 what makes the pipeline testable without hardware, so anything it imports

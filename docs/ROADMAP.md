@@ -11,7 +11,7 @@ it is the second, it does not go in.
 
 ## The shape of it
 
-Three modules. The graph is acyclic with `Core` at the root, and it is enforced
+Four modules. The graph is acyclic with `Core` at the root, and it is enforced
 by the compiler rather than by anyone's discipline.
 
 ```text
@@ -22,11 +22,15 @@ Core        done      a pose and its uncertainty, carried as one value.
  │                    nothing else — which is what keeps the whole test
  │                    suite runnable with no device attached.
  │
- └─ Capture done      the ingest boundary. Depends on Core and Replay.
-     │
-     ├─ SensorSource          the live path, iOS only, behind
-     │                        #if canImport(ARKit) && os(iOS)
-     └─ ReplaySessionSource   the recorded path
+ ├─ Capture done      the ingest boundary. Depends on Core and Replay.
+ │   │
+ │   ├─ SensorSource          the live path, iOS only, behind
+ │   │                        #if canImport(ARKit) && os(iOS)
+ │   └─ ReplaySessionSource   the recorded path
+ │
+ └─ Render            depth pixels into world points, each with its
+                      confidence. Depends on Core and Replay, never
+                      Capture — the v0.3 rung, still being climbed.
 ```
 
 `Replay` must never depend on `Capture`. Replay is what makes the pipeline

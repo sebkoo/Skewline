@@ -20,7 +20,7 @@ Most pipelines take the midpoint and throw the width away. This one keeps it.
 
 ## What is here today
 
-Three modules, one harness app and the tests that hold them.
+Four modules, one harness app and the tests that hold them.
 
 - **`Core`** — the measurement records: a pose with the uncertainty beside it
   and the tracker's own trust in that instant, an inertial sample, a camera
@@ -32,6 +32,11 @@ Three modules, one harness app and the tests that hold them.
 - **`Capture`** — the ingest boundary. One consumer written against the protocol
   works unchanged against a recorded session or a live sensor, and there is a
   test that holds it there.
+- **`Render`** — a depth pixel becomes a world point, on the CPU, through the
+  per-frame intrinsics and pose the container already carries — each point
+  born with its sensor's confidence. It exists to measure the arithmetic's
+  bill before any kernel is written. Depends on `Core` and `Replay`, never
+  `Capture`.
 
 The app is `App/SkewlineHarness`: a start button, a stop button and a panel of
 what the run measured. It exists to put the pipeline in front of real sensors
@@ -71,7 +76,8 @@ deliberately never built.
 
 ## What is not here
 
-There is no rendering, no reconstruction — and **no accuracy figures**. Rates,
+There is still no rendering — `Render` unprojects on the CPU and draws
+nothing — no reconstruction, and **no accuracy figures**. Rates,
 budgets and payload sizes are measured and recorded in
 [`docs/DEVLOG.md`](docs/DEVLOG.md); how far the poses sit from the truth is
 not, until v0.4 replays sessions against observed error. A number that has not

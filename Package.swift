@@ -11,6 +11,7 @@ let package = Package(
         .library(name: "Core", targets: ["Core"]),
         .library(name: "Replay", targets: ["Replay"]),
         .library(name: "Capture", targets: ["Capture"]),
+        .library(name: "Render", targets: ["Render"]),
     ],
     targets: [
         .target(
@@ -24,9 +25,17 @@ let package = Package(
             name: "Capture",
             dependencies: ["Core", "Replay"]
         ),
+        .target(
+            name: "Render",
+            dependencies: ["Core", "Replay"]
+        ),
+        .executableTarget(
+            name: "RenderProbe",
+            dependencies: ["Core", "Replay", "Render"]
+        ),
         .testTarget(
             name: "UnitTests",
-            dependencies: ["Core", "Replay", "Capture"]
+            dependencies: ["Core", "Replay", "Capture", "Render"]
         ),
     ]
 )
