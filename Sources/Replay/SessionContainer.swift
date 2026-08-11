@@ -17,6 +17,21 @@ public enum SessionContainerError: Error, Equatable {
     /// A confidence payload was requested for a frame whose record claims
     /// none.
     case noConfidenceRecorded(index: Int)
+    /// One writer was fed both per-frame payloads and video-track appends. A
+    /// session is stored one way or the other; a container holding half of
+    /// each is a layout no record can describe.
+    case mixedFrameStorage
+    /// The session's claim to a video track disagrees with how the frames
+    /// were appended -- a track recorded but every frame appended as a file,
+    /// or video appends sealed under a session that claims none.
+    case videoTrackMismatch(recorded: Bool, appended: Bool)
+    /// The session claims a video track but the movie file is not in the
+    /// container.
+    case missingVideoFile(URL)
+    /// A per-frame payload was requested from a session whose frames live in
+    /// the video track. Deliberately distinct from a file error: the bytes
+    /// exist, but behind `videoFileURL` and a decoder, not behind an index.
+    case frameStoredInVideoTrack(index: Int)
 }
 
 /// The on-disk container for a session that carries camera frames:
@@ -37,12 +52,23 @@ public enum SessionContainerError: Error, Equatable {
 /// Nothing in the records repeats that mapping, so it cannot drift from the
 /// layout.
 ///
+/// When `CaptureSession.videoTrack` is present the pixel payloads live in one
+/// movie file, `video.mov`, instead of `frames/`: sample `i` is frame `i`,
+/// stamped with the presentation time derived from the record's timestamp by
+/// `VideoTrackRecord.presentationTimeValue(of:)`. Depth and confidence stay
+/// per-frame files either way.
+///
 /// `session.json` is written last, atomically, and is the completeness marker:
 /// a directory without one -- a capture that crashed mid-write -- cannot be
 /// read as a session, only inspected.
 public enum SessionContainer {
     public static let pathExtension = "skewline"
     public static let sessionFileName = "session.json"
+    /// The movie file holding every frame payload when
+    /// `CaptureSession.videoTrack` is present. `.mov` because that is the
+    /// container `movieFragmentInterval` fragments; the codec inside it is
+    /// the record's claim, not the filename's.
+    public static let videoFileName = "video.mov"
     static let framesDirectoryName = "frames"
     static let depthDirectoryName = "depth"
     static let confidenceDirectoryName = "confidence"
@@ -87,6 +113,10 @@ public enum SessionContainer {
         url.appending(path: sessionFileName)
     }
 
+    static func videoFile(in url: URL) -> URL {
+        url.appending(path: videoFileName)
+    }
+
     /// Writes one container, frame by frame, then seals it.
     ///
     /// Deliberately not `Sendable`: indices are sequential, so the format
@@ -107,20 +137,32 @@ public enum SessionContainer {
         private var depthIndices: Set<Int> = []
         private var confidenceIndices: Set<Int> = []
 
-        /// Creates the container directory and its `frames/` subdirectory.
-        /// Refuses a URL that already exists rather than appending into it.
+        /// Which append kind this writer has been fed. Both `true` is the
+        /// state `mixedFrameStorage` exists to refuse.
+        private var appendedFiles = false
+        private var appendedVideoFrames = false
+
+        /// Where the movie file belongs when the frames are stored as a video
+        /// track. The producer writes it -- encoding a movie drags
+        /// AVFoundation, the same split that keeps pixel decode out of this
+        /// layer -- and `finalize` checks it exists when the session claims
+        /// it.
+        public var videoFileURL: URL {
+            SessionContainer.videoFile(in: url)
+        }
+
+        /// Creates the container directory. Refuses a URL that already exists
+        /// rather than appending into it.
         ///
-        /// `depth/` and `confidence/` are not created here: they appear on
-        /// the first payload written into them, so a capture without depth
-        /// produces a container laid out exactly as before depth existed.
+        /// No subdirectory is created here: `frames/`, `depth/` and
+        /// `confidence/` each appear on the first payload written into them,
+        /// so a capture without depth -- or one whose frames live in the
+        /// video track -- produces a container carrying only what it stores.
         public init(creatingAt url: URL) throws {
             if FileManager.default.fileExists(atPath: url.path) {
                 throw SessionContainerError.directoryAlreadyExists(url)
             }
-            try FileManager.default.createDirectory(
-                at: SessionContainer.framesDirectory(in: url),
-                withIntermediateDirectories: true
-            )
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
             self.url = url
         }
 
@@ -129,20 +171,45 @@ public enum SessionContainer {
         /// the frame's `FrameRecord` must occupy in the finalized session.
         @discardableResult
         public func append(_ frameData: Data, depth: DepthPayload? = nil) throws -> Int {
+            guard !appendedVideoFrames else {
+                throw SessionContainerError.mixedFrameStorage
+            }
+            appendedFiles = true
             let index = appendedFrameCount
             let name = SessionContainer.frameFileName(at: index)
-            let file = SessionContainer.framesDirectory(in: url).appending(path: name)
-            try frameData.write(to: file)
-            if let depth {
-                try write(depth.depth, named: name, in: SessionContainer.depthDirectory(in: url))
-                depthIndices.insert(index)
-                if let confidence = depth.confidence {
-                    try write(confidence, named: name, in: SessionContainer.confidenceDirectory(in: url))
-                    confidenceIndices.insert(index)
-                }
-            }
+            try write(frameData, named: name, in: SessionContainer.framesDirectory(in: url))
+            try appendDepth(depth, named: name, at: index)
             appendedFrameCount += 1
             return index
+        }
+
+        /// Claims one frame index for a sample in the video track -- and
+        /// writes its depth payloads, when the frame has them -- and returns
+        /// that index. The pixel bytes take no per-frame file: they are
+        /// sample `index` of the movie at `videoFileURL`, stamped with the
+        /// presentation time `VideoTrackRecord.presentationTimeValue(of:)`
+        /// derives from the frame's timestamp. Depth stays per-frame and
+        /// positional exactly as in `append`.
+        @discardableResult
+        public func appendVideoFrame(depth: DepthPayload? = nil) throws -> Int {
+            guard !appendedFiles else {
+                throw SessionContainerError.mixedFrameStorage
+            }
+            appendedVideoFrames = true
+            let index = appendedFrameCount
+            try appendDepth(depth, named: SessionContainer.frameFileName(at: index), at: index)
+            appendedFrameCount += 1
+            return index
+        }
+
+        private func appendDepth(_ depth: DepthPayload?, named name: String, at index: Int) throws {
+            guard let depth else { return }
+            try write(depth.depth, named: name, in: SessionContainer.depthDirectory(in: url))
+            depthIndices.insert(index)
+            if let confidence = depth.confidence {
+                try write(confidence, named: name, in: SessionContainer.confidenceDirectory(in: url))
+                confidenceIndices.insert(index)
+            }
         }
 
         private func write(_ data: Data, named name: String, in directory: URL) throws {
@@ -153,18 +220,30 @@ public enum SessionContainer {
         /// Seals the container by writing `session.json`.
         ///
         /// Throws without writing if the session's `frames` count does not
-        /// match what was appended, or if any frame disagrees with the files
-        /// about having a depth or confidence payload. The depth check is
-        /// positional, not a count: counts can match while the holes sit at
-        /// the wrong indices, and a sealed container whose records point at
-        /// missing files is exactly what the completeness marker exists to
-        /// rule out.
+        /// match what was appended, if the session's claim to a video track
+        /// disagrees with how the frames were appended -- or, when it claims
+        /// one, the movie file is missing -- or if any frame disagrees with
+        /// the files about having a depth or confidence payload. The depth
+        /// check is positional, not a count: counts can match while the holes
+        /// sit at the wrong indices, and a sealed container whose records
+        /// point at missing files is exactly what the completeness marker
+        /// exists to rule out.
         public func finalize(session: CaptureSession) throws {
             guard session.frames.count == appendedFrameCount else {
                 throw SessionContainerError.frameCountMismatch(
                     recorded: session.frames.count,
                     appended: appendedFrameCount
                 )
+            }
+            guard (session.videoTrack != nil) == appendedVideoFrames else {
+                throw SessionContainerError.videoTrackMismatch(
+                    recorded: session.videoTrack != nil,
+                    appended: appendedVideoFrames
+                )
+            }
+            if session.videoTrack != nil,
+               !FileManager.default.fileExists(atPath: videoFileURL.path) {
+                throw SessionContainerError.missingVideoFile(videoFileURL)
             }
             for (index, frame) in session.frames.enumerated() {
                 guard (frame.depth != nil) == depthIndices.contains(index) else {
@@ -197,10 +276,26 @@ public enum SessionContainer {
             self.session = try SessionCodec.read(from: sessionFile)
         }
 
+        /// The movie file holding every frame payload when the session claims
+        /// a video track. The URL is layout knowledge, so it is always
+        /// derivable; whether anything is behind it is
+        /// `session.videoTrack`'s claim.
+        public var videoFileURL: URL {
+            SessionContainer.videoFile(in: url)
+        }
+
         /// The payload for `session.frames[index]`, as written.
+        ///
+        /// For a session whose frames live in the video track this throws
+        /// `frameStoredInVideoTrack` -- a question the session already
+        /// answers -- rather than a file error a caller could mistake for a
+        /// broken container.
         public func frameData(at index: Int) throws -> Data {
             guard session.frames.indices.contains(index) else {
                 throw SessionContainerError.frameIndexOutOfRange(index: index, count: session.frames.count)
+            }
+            guard session.videoTrack == nil else {
+                throw SessionContainerError.frameStoredInVideoTrack(index: index)
             }
             let file = SessionContainer.framesDirectory(in: url)
                 .appending(path: SessionContainer.frameFileName(at: index))

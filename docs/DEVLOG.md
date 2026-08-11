@@ -629,3 +629,16 @@ medium 6,377,862 / high 35,348,540) — the render's own numbers, reproduced
 independently from the container by both operators. fx swung 12.88%
 (1273.12–1437.16), the widest range yet — another replication of the
 per-frame intrinsics decision, not a new one.
+
+## 2026-08-11 · v0.4 commit 2 — the movie path, behind a knob
+
+**Built and gated; every number awaits the walks.** `VideoStoragePolicy`
+routes kept frames to `AVAssetWriter` — HEVC, reordering off, movie and
+input pinned to one nanosecond timescale — as `video.mov` beside the
+unchanged per-frame depth files, every sample stamped by the same pure
+function `StorageProbe` seeks and verifies with, frame-exact by equality
+and never nearest-neighbour, while per-frame files stay the default until
+the criteria registered before any run (the standing drop criterion; byte
+cut ≥ 20%; warm sequential ≤ 2× files; cold seek ≤ 100 ms) are scored on
+device. Movie append time, waits, bytes, seek times and crash-tail loss:
+not measured yet.

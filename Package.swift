@@ -40,6 +40,10 @@ let package = Package(
             name: "RenderProbe",
             dependencies: ["Core", "Replay", "Render"]
         ),
+        .executableTarget(
+            name: "StorageProbe",
+            dependencies: ["Core", "Replay", "Capture"]
+        ),
         .testTarget(
             name: "UnitTests",
             dependencies: ["Core", "Replay", "Capture", "Render"]

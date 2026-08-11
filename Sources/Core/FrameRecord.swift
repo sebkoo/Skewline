@@ -16,6 +16,11 @@ public struct FrameEncoding: RawRepresentable, Codable, Equatable, Hashable, Sen
 
     public static let jpeg = FrameEncoding(rawValue: "jpeg")
     public static let heic = FrameEncoding(rawValue: "heic")
+
+    /// HEVC samples in the session's video track rather than a per-frame
+    /// payload file. Which file holds them is `CaptureSession.videoTrack`'s
+    /// story; this value says only how this frame's pixels are encoded.
+    public static let hevc = FrameEncoding(rawValue: "hevc")
 }
 
 /// One camera frame's measurement record: when it was captured and what shape

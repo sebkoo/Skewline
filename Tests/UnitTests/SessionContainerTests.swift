@@ -354,6 +354,161 @@ private func sampleDepthRecord(confidence: Bool) -> DepthRecord {
     #expect(object["compression"] as? String == "future-codec")
 }
 
+@Test func containerRoundTripsVideoTrackSession() throws {
+    // Depth stays per-frame and positional in the video-track layout, so the
+    // second frame carries one -- and the movie file is stand-in bytes:
+    // existence is the container's check, validity is AVFoundation's domain.
+    var session = sampleSession(frames: [
+        FrameRecord(timestamp: 0, width: 4, height: 3, encoding: .hevc),
+        FrameRecord(
+            timestamp: 0.033, width: 4, height: 3, encoding: .hevc,
+            depth: sampleDepthRecord(confidence: true)
+        ),
+    ])
+    session.videoTrack = VideoTrackRecord(
+        codec: .hevc,
+        timescale: VideoTrackRecord.nanosecondTimescale,
+        fragmentInterval: 1.0
+    )
+    let url = temporaryContainerURL()
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    let writer = try SessionContainer.Writer(creatingAt: url)
+    try writer.appendVideoFrame()
+    try writer.appendVideoFrame(depth: .init(depth: Data([10]), confidence: Data([1, 2])))
+    try Data("stand-in movie bytes".utf8).write(to: writer.videoFileURL)
+    try writer.finalize(session: session)
+
+    let reader = try SessionContainer.Reader(contentsOf: url)
+    #expect(reader.session == session)
+    #expect(reader.session.videoTrack?.fragmentInterval == 1.0)
+    #expect(try reader.depthData(at: 1) == Data([10]))
+    #expect(try reader.confidenceData(at: 1) == Data([1, 2]))
+    #expect(throws: SessionContainerError.frameStoredInVideoTrack(index: 0)) {
+        _ = try reader.frameData(at: 0)
+    }
+    // Spelled out rather than read from the type, like the depth-directory
+    // test above: this pins the layout.
+    #expect(!FileManager.default.fileExists(atPath: url.appending(path: "frames").path))
+}
+
+@Test func sessionRecordedBeforeVideoTrackStillDecodes() throws {
+    // Built by stripping the key from real encoder output, like the frames
+    // test above: the files this protects are captures that already exist.
+    var session = CaptureSession(observations: [], inertialSamples: [])
+    session.videoTrack = VideoTrackRecord(
+        codec: .hevc,
+        timescale: VideoTrackRecord.nanosecondTimescale
+    )
+    let encoded = try SessionCodec.encode(session)
+    var object = try #require(
+        try JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+    )
+    #expect(object["videoTrack"] != nil)
+    object["videoTrack"] = nil
+
+    let decoded = try SessionCodec.decode(try JSONSerialization.data(withJSONObject: object))
+
+    #expect(decoded.videoTrack == nil)
+    session.videoTrack = nil
+    #expect(decoded == session)
+}
+
+@Test func unknownVideoCodecRoundTrips() throws {
+    // Same property as `FrameEncoding`: a codec this code has never heard of
+    // survives decode and encode untouched.
+    let json = Data(#"{"codec":"future-codec","timescale":1000000000}"#.utf8)
+
+    let decoded = try JSONDecoder().decode(VideoTrackRecord.self, from: json)
+    #expect(decoded.codec == VideoCodec(rawValue: "future-codec"))
+    #expect(decoded.timescale == 1_000_000_000)
+    #expect(decoded.fragmentInterval == nil)
+
+    let reencoded = try JSONEncoder().encode(decoded)
+    let object = try #require(
+        try JSONSerialization.jsonObject(with: reencoded) as? [String: Any]
+    )
+    #expect(object["codec"] as? String == "future-codec")
+}
+
+@Test func mixedAppendKindsThrow() throws {
+    // Both orders: a writer fed files refuses a video append, and the
+    // reverse -- the layout no record can describe must fail at the append,
+    // not at a reader.
+    let fileFirst = temporaryContainerURL()
+    defer { try? FileManager.default.removeItem(at: fileFirst) }
+    let writer = try SessionContainer.Writer(creatingAt: fileFirst)
+    try writer.append(Data([1]))
+    #expect(throws: SessionContainerError.mixedFrameStorage) {
+        try writer.appendVideoFrame()
+    }
+
+    let videoFirst = temporaryContainerURL()
+    defer { try? FileManager.default.removeItem(at: videoFirst) }
+    let videoWriter = try SessionContainer.Writer(creatingAt: videoFirst)
+    try videoWriter.appendVideoFrame()
+    #expect(throws: SessionContainerError.mixedFrameStorage) {
+        try videoWriter.append(Data([1]))
+    }
+}
+
+@Test func finalizeRefusesVideoTrackClaimWithoutVideoAppends() throws {
+    let url = temporaryContainerURL()
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    let writer = try SessionContainer.Writer(creatingAt: url)
+    try writer.append(Data([1]))
+    var session = sampleSession(frames: [
+        FrameRecord(timestamp: 0, width: 4, height: 3, encoding: .jpeg)
+    ])
+    session.videoTrack = VideoTrackRecord(
+        codec: .hevc,
+        timescale: VideoTrackRecord.nanosecondTimescale
+    )
+
+    #expect(throws: SessionContainerError.videoTrackMismatch(recorded: true, appended: false)) {
+        try writer.finalize(session: session)
+    }
+    let sessionFile = url.appending(path: SessionContainer.sessionFileName)
+    #expect(!FileManager.default.fileExists(atPath: sessionFile.path))
+}
+
+@Test func finalizeRefusesVideoAppendsWithoutTrackClaim() throws {
+    let url = temporaryContainerURL()
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    let writer = try SessionContainer.Writer(creatingAt: url)
+    try writer.appendVideoFrame()
+    let session = sampleSession(frames: [
+        FrameRecord(timestamp: 0, width: 4, height: 3, encoding: .hevc)
+    ])
+
+    #expect(throws: SessionContainerError.videoTrackMismatch(recorded: false, appended: true)) {
+        try writer.finalize(session: session)
+    }
+}
+
+@Test func finalizeRefusesClaimedButMissingVideoFile() throws {
+    let url = temporaryContainerURL()
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    let writer = try SessionContainer.Writer(creatingAt: url)
+    try writer.appendVideoFrame()
+    var session = sampleSession(frames: [
+        FrameRecord(timestamp: 0, width: 4, height: 3, encoding: .hevc)
+    ])
+    session.videoTrack = VideoTrackRecord(
+        codec: .hevc,
+        timescale: VideoTrackRecord.nanosecondTimescale
+    )
+
+    #expect(throws: SessionContainerError.missingVideoFile(writer.videoFileURL)) {
+        try writer.finalize(session: session)
+    }
+    let sessionFile = url.appending(path: SessionContainer.sessionFileName)
+    #expect(!FileManager.default.fileExists(atPath: sessionFile.path))
+}
+
 @Test func unknownFrameEncodingRoundTrips() throws {
     // The reason `FrameEncoding` is a raw-string struct and not an enum: a
     // value this code has never heard of must survive decode and encode

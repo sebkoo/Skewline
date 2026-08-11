@@ -107,6 +107,11 @@ final class SessionRecorder {
                 let writer = try SessionContainer.Writer(creatingAt: url)
                 let encoder = FrameEncoder()
                 let depthEncoder = DepthEncoder()
+                // The storage knob, a constructor-style default like the two
+                // encoders above: toggled per walk by editing this line, the
+                // matrix practice. Per-frame files remain the measured
+                // default until the storage walks say otherwise.
+                let storage = VideoStoragePolicy.perFrameFiles
 
                 // Two sibling children, each owning its own array; the frame
                 // drain runs inline in this task body, concurrent with both,
@@ -115,11 +120,12 @@ final class SessionRecorder {
                 // cannot sit in memory -- and only the records accumulate.
                 async let poses = collectObservations(observations)
                 async let inertial = collectSamples(samples)
-                let (records, frameStats) = try await encodeFrames(
+                let (records, frameStats, videoTrack) = try await encodeFrames(
                     frames,
                     into: writer,
                     with: encoder,
                     depthEncoder: depthEncoder,
+                    storage: storage,
                     origin: origin
                 )
                 (collected, collectedSamples) = try await (poses, inertial)
@@ -129,7 +135,8 @@ final class SessionRecorder {
                     id: sessionID,
                     observations: collected,
                     inertialSamples: collectedSamples,
-                    frames: records
+                    frames: records,
+                    videoTrack: videoTrack
                 )
                 try writer.finalize(session: session)
             } catch {
@@ -211,10 +218,31 @@ final class SessionRecorder {
     /// and only ever holds what this capture observed.
     private nonisolated struct FrameStats {
         var encodedCount = 0
+        /// Frames encoded to a per-frame payload file. Equal to
+        /// `encodedCount` on the per-frame and dual paths, zero on the movie
+        /// path -- the divisor and gate for the payload and encode rows, so
+        /// a movie run cannot print a JPEG mean it never paid.
+        var fileEncodedCount = 0
         var totalBytes = 0
         var totalEncode: Duration = .zero
         var maxEncode: Duration = .zero
         var maxLag: TimeInterval = 0
+
+        /// The panel's `storage` row, or `nil` on the per-frame default --
+        /// a per-frame run's panel is exactly the pre-knob panel.
+        var storage: String?
+        var videoAppendCount = 0
+        var totalVideoAppend: Duration = .zero
+        var maxVideoAppend: Duration = .zero
+        /// Appends that found the encoder's input not ready, and the longest
+        /// such wait -- drain time the ring pays for, counted rather than
+        /// averaged away.
+        var videoWaits = 0
+        var maxVideoWait: TimeInterval = 0
+        /// The sealed movie's size. One number at finish: per-frame byte
+        /// spread has no movie-path equivalent, and is reported as
+        /// unavailable rather than derived.
+        var videoBytes = 0
 
         /// Counted in both branches rather than derived from `encodedCount`,
         /// so `withDepth + withoutDepth = encodedCount` stays a check on the
@@ -264,20 +292,62 @@ final class SessionRecorder {
         into writer: SessionContainer.Writer,
         with encoder: FrameEncoder,
         depthEncoder: DepthEncoder,
+        storage: VideoStoragePolicy,
         origin: TimeInterval?
-    ) async throws -> ([FrameRecord], FrameStats) {
+    ) async throws -> ([FrameRecord], FrameStats, VideoTrackRecord?) {
         var records: [FrameRecord] = []
         var stats = FrameStats()
+        stats.storage = storage.panelLabel
         let clock = ContinuousClock()
+        // Created up front, but the movie itself starts on the first append
+        // -- the track's dimensions are the first frame's to fix.
+        let movieWriter: MovieFrameWriter? = storage.writesMovie
+            ? MovieFrameWriter(
+                url: writer.videoFileURL,
+                codec: .hevc,
+                fragmentInterval: storage.fragmentInterval
+            )
+            : nil
         for try await frame in frames {
             // How far behind the encoder is running, read before the encode it
             // is about to pay for.
             if let origin {
                 stats.maxLag = max(stats.maxLag, CACurrentMediaTime() - (origin + frame.timestamp))
             }
-            let encodeStart = clock.now
-            let (frameRecord, data) = try encoder.encode(frame)
-            let encodeTime = clock.now - encodeStart
+            let frameRecord: FrameRecord
+            var data: Data?
+            var encodeTime: Duration = .zero
+            if storage.writesPayloadFiles {
+                let encodeStart = clock.now
+                let encoded = try encoder.encode(frame)
+                encodeTime = clock.now - encodeStart
+                frameRecord = encoded.record
+                data = encoded.data
+            } else {
+                // The hardware encoder owns the bytes; the record still owns
+                // the frame's shape, exposure and intrinsics. The encoding is
+                // the movie writer's codec, spelled once.
+                frameRecord = try FrameEncoder.record(
+                    for: frame,
+                    encoding: FrameEncoding(rawValue: (movieWriter?.codec ?? .hevc).rawValue)
+                )
+            }
+            if let movieWriter {
+                // Append time is the movie path's analogue of the encode
+                // time above: what the drain paid before it could move on --
+                // the handoff to the hardware encoder, not the encode
+                // itself, which runs behind `isReadyForMoreMediaData`.
+                let appendStart = clock.now
+                let waited = try movieWriter.append(frame.pixelBuffer, at: frame.timestamp)
+                let appendTime = clock.now - appendStart
+                stats.videoAppendCount += 1
+                stats.totalVideoAppend += appendTime
+                stats.maxVideoAppend = max(stats.maxVideoAppend, appendTime)
+                if waited > 0 {
+                    stats.videoWaits += 1
+                    stats.maxVideoWait = max(stats.maxVideoWait, waited)
+                }
+            }
 
             // Depth encode timed apart from the pixel encode: the drain's
             // budget is one frame-time, and a combined number could not say
@@ -326,19 +396,41 @@ final class SessionRecorder {
                 stats.maxPrincipalPointY = max(stats.maxPrincipalPointY, intrinsics.principalPointY)
                 stats.intrinsicsReferenceSizes.insert("\(intrinsics.referenceWidth)x\(intrinsics.referenceHeight)")
             }
-            try writer.append(data, depth: depthPayload)
+            if let data {
+                try writer.append(data, depth: depthPayload)
+                stats.fileEncodedCount += 1
+                stats.totalBytes += data.count
+                stats.totalEncode += encodeTime
+                stats.maxEncode = max(stats.maxEncode, encodeTime)
+            } else {
+                try writer.appendVideoFrame(depth: depthPayload)
+            }
 
             records.append(record)
             stats.encodedCount += 1
-            stats.totalBytes += data.count
-            stats.totalEncode += encodeTime
-            stats.maxEncode = max(stats.maxEncode, encodeTime)
             if stats.encodedCount.isMultiple(of: 30) {
                 let count = stats.encodedCount
                 await MainActor.run { self.frameCount = count }
             }
         }
-        return (records, stats)
+        if let movieWriter {
+            stats.videoBytes = try await movieWriter.finish()
+        }
+        // Only the movie-track layout claims the track; a dual capture's
+        // movie rides unclaimed beside the canonical per-frame layout, so
+        // the schema never describes a mixed state. A movie run that kept
+        // zero frames wrote no movie and claims nothing.
+        let videoTrack: VideoTrackRecord?
+        if case .movieTrack = storage, let movieWriter, movieWriter.appendedSampleCount > 0 {
+            videoTrack = VideoTrackRecord(
+                codec: movieWriter.codec,
+                timescale: VideoTrackRecord.nanosecondTimescale,
+                fragmentInterval: movieWriter.fragmentInterval
+            )
+        } else {
+            videoTrack = nil
+        }
+        return (records, stats, videoTrack)
     }
 
     /// The frame probe's numbers. The first line is the accounting invariant:
@@ -375,15 +467,34 @@ final class SessionRecorder {
             observed.isEmpty ? "none" : observed.map(fourCC).sorted().joined(separator: " ")
         }
         var panel = "frames          \(kept) kept + \(dropped) dropped + \(strided) strided = \(kept + dropped + strided) callbacks"
-        if stats.encodedCount > 0 {
-            let meanKilobytes = Double(stats.totalBytes) / Double(stats.encodedCount) / 1024
-            let meanEncode = stats.totalEncode / stats.encodedCount
+        if let storage = stats.storage {
+            panel += "\nstorage         \(storage)"
+        }
+        if stats.videoAppendCount > 0 {
+            let meanAppend = stats.totalVideoAppend / stats.videoAppendCount
+            let meanVideoKilobytes = Double(stats.videoBytes) / Double(stats.videoAppendCount) / 1024
+            panel += """
+
+                video append    mean \(milliseconds(meanAppend)), max \(milliseconds(stats.maxVideoAppend))
+                video waits     \(stats.videoWaits), max \(String(format: "%.1f ms", stats.maxVideoWait * 1000))
+                video payload   \(megabytes(stats.videoBytes)), mean \(String(format: "%.0f KB", meanVideoKilobytes))/frame
+                """
+        }
+        // The payload and encode rows are the per-frame file path's; their
+        // divisor and gate is `fileEncodedCount`, so a movie run prints no
+        // JPEG numbers it never paid. Drain lag and the metadata ranges
+        // belong to every path.
+        if stats.fileEncodedCount > 0 {
+            let meanKilobytes = Double(stats.totalBytes) / Double(stats.fileEncodedCount) / 1024
+            let meanEncode = stats.totalEncode / stats.fileEncodedCount
             panel += """
 
                 payload         \(megabytes(stats.totalBytes)), mean \(String(format: "%.0f KB", meanKilobytes))/frame
                 encode          mean \(milliseconds(meanEncode)), max \(milliseconds(stats.maxEncode))
-                encode lag max  \(String(format: "%.1f ms", stats.maxLag * 1000))
                 """
+        }
+        if stats.encodedCount > 0 {
+            panel += "\nencode lag max  \(String(format: "%.1f ms", stats.maxLag * 1000))"
             if stats.exposureDurationSum > 0 || stats.maxExposureDuration > 0 {
                 let meanExposureDuration = stats.exposureDurationSum / Double(stats.encodedCount)
                 panel += "\nexposure        duration \(String(format: "%.2f", stats.minExposureDuration * 1000))"

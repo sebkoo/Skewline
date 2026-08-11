@@ -68,7 +68,16 @@ nonisolated struct FrameEncoder {
             throw Failure.encodeFailed(encoding)
         }
 
-        let record = FrameRecord(
+        return (try Self.record(for: frame, encoding: encoding), data)
+    }
+
+    /// The `FrameRecord` describing `frame` when its pixels are stored as
+    /// `encoding` -- everything but the payload bytes. Static and separate
+    /// from `encode(_:)` because the movie storage path records frames this
+    /// type never encodes: the hardware encoder owns those bytes, but the
+    /// record's shape must not depend on who does.
+    static func record(for frame: CameraFrame, encoding: FrameEncoding) throws -> FrameRecord {
+        FrameRecord(
             timestamp: frame.timestamp,
             width: CVPixelBufferGetWidth(frame.pixelBuffer),
             height: CVPixelBufferGetHeight(frame.pixelBuffer),
@@ -76,14 +85,13 @@ nonisolated struct FrameEncoder {
             exposure: ExposureRecord(duration: frame.exposureDuration, offset: frame.exposureOffset),
             intrinsics: try intrinsicsRecord(from: frame.intrinsics, referenceSize: frame.intrinsicsReferenceSize)
         )
-        return (record, data)
     }
 
     /// Verifies `intrinsics` matches the pinhole model's shape -- the entries
     /// `IntrinsicsRecord` does not keep are checked here rather than assumed,
     /// the same move `DepthEncoder` makes for pixel format -- and returns the
     /// four entries that vary, at the resolution they were computed for.
-    private func intrinsicsRecord(
+    private static func intrinsicsRecord(
         from intrinsics: simd_float3x3,
         referenceSize: CGSize
     ) throws -> IntrinsicsRecord {

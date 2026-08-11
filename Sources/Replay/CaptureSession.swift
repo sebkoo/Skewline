@@ -19,22 +19,29 @@ public struct CaptureSession: Codable, Equatable, Sendable {
     /// session, associated by position in this array.
     public var frames: [FrameRecord]
 
+    /// How the frame payloads are stored when they live in one movie file
+    /// rather than one file per frame, or `nil` for the per-frame layout --
+    /// including every session recorded before this field existed.
+    public var videoTrack: VideoTrackRecord?
+
     public init(
         id: UUID = UUID(),
         startDate: Date = Date(),
         observations: [PoseObservation] = [],
         inertialSamples: [InertialSample] = [],
-        frames: [FrameRecord] = []
+        frames: [FrameRecord] = [],
+        videoTrack: VideoTrackRecord? = nil
     ) {
         self.id = id
         self.startDate = startDate
         self.observations = observations
         self.inertialSamples = inertialSamples
         self.frames = frames
+        self.videoTrack = videoTrack
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, startDate, observations, inertialSamples, frames
+        case id, startDate, observations, inertialSamples, frames, videoTrack
     }
 
     /// Hand-written only to let `inertialSamples` and `frames` be absent.
@@ -43,6 +50,9 @@ public struct CaptureSession: Codable, Equatable, Sendable {
     /// missing key throws `keyNotFound` -- so sessions recorded before these
     /// fields existed would stop decoding the moment one was added. Encoding
     /// stays synthesised: everything written from here on has the keys.
+    /// (`videoTrack` is optional, so its `decodeIfPresent` fallback is what
+    /// synthesis would do anyway; it rides here because the initializer is
+    /// already hand-written.)
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
@@ -50,6 +60,7 @@ public struct CaptureSession: Codable, Equatable, Sendable {
         observations = try container.decode([PoseObservation].self, forKey: .observations)
         inertialSamples = try container.decodeIfPresent([InertialSample].self, forKey: .inertialSamples) ?? []
         frames = try container.decodeIfPresent([FrameRecord].self, forKey: .frames) ?? []
+        videoTrack = try container.decodeIfPresent(VideoTrackRecord.self, forKey: .videoTrack)
     }
 }
 
