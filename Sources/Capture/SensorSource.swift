@@ -74,10 +74,26 @@ public struct CameraFrame: @unchecked Sendable {
     /// simply delivered nothing for this frame.
     public let depth: CapturedDepth?
 
-    public init(timestamp: TimeInterval, pixelBuffer: CVPixelBuffer, depth: CapturedDepth? = nil) {
+    /// `ARCamera.exposureDuration`, in seconds. Not optional: every `ARFrame`
+    /// carries a non-nil `camera`, so unlike depth there is no per-frame
+    /// absence to model.
+    public let exposureDuration: TimeInterval
+
+    /// `ARCamera.exposureOffset`, in EV (exposure value) units.
+    public let exposureOffset: Float
+
+    public init(
+        timestamp: TimeInterval,
+        pixelBuffer: CVPixelBuffer,
+        depth: CapturedDepth? = nil,
+        exposureDuration: TimeInterval,
+        exposureOffset: Float
+    ) {
         self.timestamp = timestamp
         self.pixelBuffer = pixelBuffer
         self.depth = depth
+        self.exposureDuration = exposureDuration
+        self.exposureOffset = exposureOffset
     }
 }
 
@@ -338,7 +354,13 @@ public final class SensorSource: NSObject, PoseObservationSource, InertialSample
         }
 
         let result = continuation.yield(
-            CameraFrame(timestamp: frame.timestamp - origin, pixelBuffer: copy, depth: depth)
+            CameraFrame(
+                timestamp: frame.timestamp - origin,
+                pixelBuffer: copy,
+                depth: depth,
+                exposureDuration: frame.camera.exposureDuration,
+                exposureOffset: frame.camera.exposureOffset
+            )
         )
         stream.withLock { state in
             switch result {

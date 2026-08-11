@@ -60,7 +60,8 @@ nonisolated struct FrameEncoder {
             timestamp: frame.timestamp,
             width: CVPixelBufferGetWidth(frame.pixelBuffer),
             height: CVPixelBufferGetHeight(frame.pixelBuffer),
-            encoding: encoding
+            encoding: encoding,
+            exposure: ExposureRecord(duration: frame.exposureDuration, offset: frame.exposureOffset)
         )
         return (record, data)
     }

@@ -48,17 +48,26 @@ public struct FrameRecord: Codable, Equatable, Sendable {
     /// device without the sensor -- keep decoding unchanged.
     public var depth: DepthRecord?
 
+    /// The camera's exposure settings at capture, or `nil` when the frame's
+    /// source never queried them. Optional for the same reason as `depth`:
+    /// synthesized decoding falls back through `decodeIfPresent`, so sessions
+    /// recorded before this field existed keep decoding unchanged, and a
+    /// metadata-less capture writes JSON with no `exposure` key at all.
+    public var exposure: ExposureRecord?
+
     public init(
         timestamp: TimeInterval,
         width: Int,
         height: Int,
         encoding: FrameEncoding,
-        depth: DepthRecord? = nil
+        depth: DepthRecord? = nil,
+        exposure: ExposureRecord? = nil
     ) {
         self.timestamp = timestamp
         self.width = width
         self.height = height
         self.encoding = encoding
         self.depth = depth
+        self.exposure = exposure
     }
 }

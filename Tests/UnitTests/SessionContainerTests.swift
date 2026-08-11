@@ -242,6 +242,48 @@ private func sampleDepthRecord(confidence: Bool) -> DepthRecord {
     #expect(decoded.depth == nil)
 }
 
+@Test func frameRecordedBeforeExposureStillDecodes() throws {
+    // Built by stripping the key from real encoder output, like the depth
+    // test above: the files this protects are captures that already exist.
+    let record = FrameRecord(
+        timestamp: 0.5, width: 8, height: 6, encoding: .jpeg,
+        exposure: ExposureRecord(duration: 0.008, offset: -0.5)
+    )
+    let encoded = try JSONEncoder().encode(record)
+    var object = try #require(
+        try JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+    )
+    #expect(object["exposure"] != nil)
+    object["exposure"] = nil
+
+    let decoded = try JSONDecoder().decode(
+        FrameRecord.self,
+        from: try JSONSerialization.data(withJSONObject: object)
+    )
+
+    #expect(decoded == FrameRecord(timestamp: 0.5, width: 8, height: 6, encoding: .jpeg))
+    #expect(decoded.exposure == nil)
+}
+
+@Test func containerRoundTripsFrameExposure() throws {
+    let session = sampleSession(frames: [
+        FrameRecord(
+            timestamp: 0, width: 4, height: 3, encoding: .jpeg,
+            exposure: ExposureRecord(duration: 0.016, offset: 0.25)
+        ),
+    ])
+    let url = temporaryContainerURL()
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    let writer = try SessionContainer.Writer(creatingAt: url)
+    try writer.append(Data([1]))
+    try writer.finalize(session: session)
+
+    let reader = try SessionContainer.Reader(contentsOf: url)
+    #expect(reader.session == session)
+    #expect(reader.session.frames[0].exposure == ExposureRecord(duration: 0.016, offset: 0.25))
+}
+
 @Test func unknownDepthEncodingAndCompressionRoundTrip() throws {
     // Same property as `FrameEncoding`, extended to both depth fields: values
     // this code has never heard of survive decode and encode untouched.

@@ -231,6 +231,15 @@ final class SessionRecorder {
         /// promises none, so the panel reports rather than assumes.
         var depthFormats: Set<OSType> = []
         var confidenceFormats: Set<OSType> = []
+
+        /// The exposure operands `ExposureRecord` carries, the range and
+        /// mean this run actually saw -- not stated ahead of the device run
+        /// that exercises them.
+        var minExposureDuration: TimeInterval = .greatestFiniteMagnitude
+        var maxExposureDuration: TimeInterval = 0
+        var exposureDurationSum: TimeInterval = 0
+        var minExposureOffset: Float = .greatestFiniteMagnitude
+        var maxExposureOffset: Float = -.greatestFiniteMagnitude
     }
 
     private nonisolated func encodeFrames(
@@ -281,6 +290,13 @@ final class SessionRecorder {
                 }
             } else {
                 stats.withoutDepth += 1
+            }
+            if let exposure = record.exposure {
+                stats.minExposureDuration = min(stats.minExposureDuration, exposure.duration)
+                stats.maxExposureDuration = max(stats.maxExposureDuration, exposure.duration)
+                stats.exposureDurationSum += exposure.duration
+                stats.minExposureOffset = min(stats.minExposureOffset, exposure.offset)
+                stats.maxExposureOffset = max(stats.maxExposureOffset, exposure.offset)
             }
             try writer.append(data, depth: depthPayload)
 
@@ -340,6 +356,14 @@ final class SessionRecorder {
                 encode          mean \(milliseconds(meanEncode)), max \(milliseconds(stats.maxEncode))
                 encode lag max  \(String(format: "%.1f ms", stats.maxLag * 1000))
                 """
+            if stats.exposureDurationSum > 0 || stats.maxExposureDuration > 0 {
+                let meanExposureDuration = stats.exposureDurationSum / Double(stats.encodedCount)
+                panel += "\nexposure        duration \(String(format: "%.2f", stats.minExposureDuration * 1000))"
+                    + "-\(String(format: "%.2f", stats.maxExposureDuration * 1000)) ms"
+                    + ", mean \(String(format: "%.2f ms", meanExposureDuration * 1000))"
+                    + "; offset \(String(format: "%.2f", stats.minExposureOffset))"
+                    + "-\(String(format: "%.2f", stats.maxExposureOffset)) EV"
+            }
         }
         panel += "\nscene depth     \(sceneDepthSupported ? "supported" : "unsupported")"
         if stats.withDepth > 0 {
