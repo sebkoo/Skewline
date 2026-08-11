@@ -92,11 +92,10 @@ including the ones that were mistakes.
     tight and LZFSE-compressed beside each frame that has it, an optional
     per-frame record so a device without the sensor, or a warm-up frame
     before it, decodes unchanged.
-12. **Camera exposure.** `ARCamera.exposureDuration` and `.exposureOffset`,
-    the two operands the blur product needs — the motion factor's
-    counterpart, and the cheapest scene-illumination scalar ARKit types —
-    riding `FrameRecord` as an optional sub-record, the depth pattern
-    exactly.
+12. **Camera exposure.** `ARCamera.exposureDuration` and `.exposureOffset` —
+    the blur product's camera-side operand, and the cheapest
+    scene-illumination scalar ARKit types — riding `FrameRecord` as an
+    optional sub-record, the depth pattern exactly.
 
 ## Decided but not yet done
 
