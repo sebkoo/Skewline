@@ -280,3 +280,46 @@ of. Now there is one.
   ROADMAP's table; both being wrong together passes. And the ROADMAP's own
   shape block still calls v0.2 "sensors" where its table says "capture" — an
   internal seam no assertion reads.
+
+## 2026-08-10 · commit 5 — exposure enters the frame record
+
+Off-device analysis of the bright/dim/pan capture: 2,469 poses, 4,149
+inertial samples, 1,669 frames over 41.2 s.
+
+- **Exposure landed on every frame.** 1,669 of 1,669 encoded frames carry an
+  `ExposureRecord`; the container's file and the run's panel agree exactly.
+  Duration is quantized, not continuous: 16.67 ms (1,418 — the 60 fps
+  ceiling), 16.39 ms (242), 8.33 ms (9); mean 16.58 ms. Most of the run sat
+  dim-pinned at the ceiling.
+- **The bright/dim design worked.** Offset traversed −6.52 EV (t=22.9 s) to
+  +1.36 EV (t=40.3 s) — a 7.9 EV swing across the capture.
+- **The first blur product, measured.** Duration × angular velocity peaked
+  at 0.523 rad — thirty degrees of rotation inside one exposure — at
+  t=27.2 s, where the run's highest rotation rate yet, 31.37 rad/s, met the
+  exposure ceiling. The tracking-quality label there was
+  `limited(insufficientFeatures)`, not `excessiveMotion`.
+- **The label family stayed scene-conditioned, a third time.** 163
+  `excessiveMotion` observations clustered in the dim section (t=21.7–41.0 s,
+  ≤18.13 rad/s), while the run's fastest rotation, 31.37 rad/s, drew
+  `insufficientFeatures` instead. Commit 4's finding gets richer, not
+  reversed: the label still tracks the scene, not the motion.
+- **The pose baseline held mid-run.** 2,467 interior gaps, 16.6726 ms /
+  16.6734 ms min/median, microsecond spread, none over 100 ms. Reading two
+  scalars off `ARCamera` per frame cost nothing this baseline could detect.
+- **Both stop races fired, and both are boundary artifacts, not bugs.** The
+  one 33.35 ms pose gap sits at the very end — `pause()` swallowing the
+  session's last camera frame. Poses (2,469) outrunning the frame path's
+  callback count (2,468) by one is the `.terminated`/`.off` case
+  `cameraFrames()`'s doc comment excluded from the accounting invariant back
+  at commit 3: predicted there, observed here.
+- **Drops reproduced the chronic pattern, not a stall.** 799 of 2,468
+  callbacks dropped (32.4%), shaped {1: 944, 2: 694} plus one 29-frame
+  cold-start hole matching a 459.00 ms encode max. Budget economics
+  unchanged: 15.56 + 5.38 = 20.9 ms against a 16.67 ms frame.
+- **Depth reproduced too.** 1,657 with depth + 12 warm-up frames without,
+  ratio 0.18, formats 'fdep'/'L008' as before. Identity held: 0 of 1,669
+  frame timestamps outside the pose set. Warm-up 537.7 ms, inside the
+  376–750 ms range commit 4 established.
+- **The confidence tally summed to 100.1%, not 100%.** Rounding across three
+  percentages, not a counting error — worth the one word so a future reader
+  does not go looking for the missing tenth.
