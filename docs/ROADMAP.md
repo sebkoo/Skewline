@@ -55,7 +55,7 @@ change, that is a signal the boundary was drawn wrong, and it belongs in
 
 ## What has shipped
 
-Thirteen steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
+Fourteen steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
 including the ones that were mistakes.
 
 1. **Types.** A pose, a 6×6 covariance beside it, and the tracker's own opinion
@@ -106,6 +106,13 @@ including the ones that were mistakes.
     exposure pattern exactly. v0.2 had shipped a container carrying pose and
     depth without the operand its own v0.3 successor needs; this closes that
     gap before the render rung opens.
+14. **Unprojection.** A fourth module, `Render` — depth pixel → camera ray →
+    world point on the CPU, every point born with its sensor's confidence —
+    with the depth-payload decode landing in `Replay` as the format's
+    inverse, and a probe that replayed four real containers through the
+    arithmetic: 75,988,992 points at a measured 57.8 M points/s, against
+    the 4.56 G points/s a 60 Hz re-shade of that accumulated cloud demands.
+    The kernel's bill, presented rather than assumed.
 
 ## Decided but not yet done
 

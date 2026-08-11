@@ -404,3 +404,82 @@ Off-device analysis of a 38.0 s capture: 2,282 poses, 3,847 inertial samples,
   frame, ceiling-pinned (mean 16.65 ms), offset down to −6.52 EV; drops 726
   of 2,282 (31.8%), chronic {1: 888, 2: 644} plus one 33-frame cold-start
   hole matching encode max 523.55 ms.
+
+## 2026-08-11 · v0.3 commit 2 — unprojection, on the CPU, measured
+
+A fourth module, `Render`, and the rung's first arithmetic: depth pixel →
+camera ray → world point, replayed over four exported containers (1.4 GB,
+three with depth, one with intrinsics) by a `RenderProbe` executable — the
+first analysis in this repository that can be re-run rather than
+reconstructed.
+
+- **The SDK's own words do not exist.** The brief ordered the depth
+  convention verified against them before the math was written; ARKit's
+  entire shipped text on `depthMap` is "per-pixel depth data (in meters)",
+  and nothing in the headers picks planar z over ray distance. The deciding
+  source is Apple's *Displaying a Point Cloud Using Scene Depth* sample,
+  whose shader uses the depth value directly, unnormalized, as camera-space
+  z. `constantDepthMapUnprojectsToConstantCameraZ` locks the choice: a
+  constant map must unproject to exactly constant camera z, and a
+  ray-distance reading fails it. One ambiguity stays recorded rather than
+  resolved: whether the depth grid shares the reference grid's corner or its
+  pixel centers is documented nowhere — at most half a depth pixel, about
+  0.28% of the field angle.
+- **The captures were not on this Mac.** The brief said they were; only the
+  `session.json` manifests had been exported, and every payload byte was
+  still on the phone. The full containers now live outside the repository at
+  `~/dev/Skewline-captures` — captures, not source — and the probe takes
+  paths as arguments.
+- **Three honest zero rows.** Only 88ACAA6A carries intrinsics; the two
+  older depth captures report `no-intrinsics 2382` and `no-intrinsics 1657`
+  — 400 MB of real payload read end to end on the way to a typed absence —
+  and the frames-only capture reports `no-depth 1793`. `no-pose 0` on all
+  four: the frame-timestamp-in-pose-set identity, until now a device-side
+  claim, reproduced through the Mac-side `Reader`.
+- **75,988,992 points, exactly 1,546 × 49,152.** The skip path for invalid
+  depth never fired: no zero, negative or non-finite sample in 76 M. Depth
+  spans 0.035–24.766 m — the sensor reports far beyond its nominal range,
+  it just says how little it believes itself out there.
+- **44% of points are less than fully trusted by their own sensor.** low
+  21.6% / medium 22.4% / high 56.0% — the depth-pixel finding of commit 4,
+  now carried per point, which is the value this module exists to refuse to
+  separate.
+- **The bill: 57.8 M points/s cold, 200.0 M warm.** The first run — cold
+  file cache, minutes after the export — measured 57.8 M points/s (total
+  1.32 s, per-frame 0.24/0.69/2.10 ms min/median/max); a second operator's
+  re-run minutes later measured 200.0 M (0.38 s, 0.20/0.24/0.68). The
+  probe's own label calls the timing block not deterministic, and the
+  range is the honest number. Conversion fits the 16.67 ms budget at
+  either end; re-shading the accumulated cloud is what breaks: 76 M points
+  at 60 Hz demands 4.56 G points/s, 79× to 23× above the measured range.
+  The ROADMAP's sentence — the arithmetic forces the kernel — now has its
+  number at both ends, and it is the accumulation, not the per-frame work,
+  that does the forcing.
+- **The deterministic block reproduced, byte for byte.** Two operators, two
+  runs, one machine: every count, bound and tally identical — and the
+  probe's re-tally of confidence from decompressed payloads matches the
+  harness's capture-time panel exactly (21.6 / 22.4 / 56.0). The property
+  v0.4's replay work stands on ran its first demonstration, and payload
+  integrity gained a third, independent witness.
+- **One capture's cloud is 2.43 GB at rest.** `ConfidencePoint` strides
+  32 bytes, not 17: `SIMD3<Float>` is 16-byte aligned and the confidence
+  byte pays 15 bytes of padding for riding beside it. Whether a render
+  buffer keeps that layout is the kernel's decision, now with the cost on
+  record.
+- **The decoder round-trip was watched failing.** A deliberate ×2 mis-scale
+  went red at the depth expectation and was reverted — the payload is built
+  with the harness encoder's exact `compressed(using: .lzfse)` call, so the
+  test inverts what the device writes, not a re-implementation of it.
+- **Depth decode landed in `Replay`, against an old doc comment.** The
+  container's "decoding is the consumer's job" was written about JPEG, whose
+  decode drags an image framework; depth's inverse is Foundation-only byte
+  arithmetic, and v0.4 will need it without importing `Render`. The comment
+  now says what the split actually follows: imports, not ownership.
+- **The executable built for the device unguarded.** The umbrella scheme
+  compiled `RenderProbe` for `generic/platform=iOS` without the
+  `#if os(macOS)` fallback the plan held in reserve — checked by the gate,
+  not assumed.
+- **"The four-command gate" is written down nowhere.** CLAUDE.md states two
+  commands; the harness build survives only as a permission-file allowance
+  and a DEVLOG sentence, the drift check only in CI. This run used all four;
+  the doc gap is now on record.
