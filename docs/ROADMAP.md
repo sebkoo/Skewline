@@ -96,7 +96,7 @@ because commit 2 discovered that `canImport(ARKit)` is true on macOS.
 
 | Version | Ships | What forces it |
 |---|---|---|
-| **v0.2** capture | ARKit session, its camera frames, Core Motion rates, ImageIO depth and EXIF | Pose uncertainty has no signal without inertial rates and tracking state. Without this rung there is nothing to be uncertain about |
+| **v0.2** capture | ARKit session, its camera frames, Core Motion rates, LiDAR scene depth and EXIF | Pose uncertainty has no signal without inertial rates and tracking state. Without this rung there is nothing to be uncertain about |
 | **v0.3** render | Accumulated point cloud, each point shaded by its confidence, Metal compute kernel | Tens of millions of points in a thirty-second capture cannot be re-shaded on the CPU per frame. The arithmetic forces the kernel, not the taste |
 | **v0.4** measure | Frame time, upload bandwidth, drift under replay | "A result needs a confidence" is an empty claim until the confidence is calibrated against something observed |
 | **v0.5** interop | Point-cloud / PLY reader over Swift–C++ | A format with dozens of properties per point is the wrong job for Swift, and the interop seam is itself a design question worth answering in public |
