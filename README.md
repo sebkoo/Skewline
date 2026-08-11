@@ -24,7 +24,8 @@ Three modules, one harness app and the tests that hold them.
 
 - **`Core`** — the measurement records: a pose with the uncertainty beside it
   and the tracker's own trust in that instant, an inertial sample, a camera
-  frame and the depth captured with it. No I/O.
+  frame, the depth captured with it and the exposure it was captured under.
+  No I/O.
 - **`Replay`** — the on-disk session format. A recorded session replays
   deterministically, which is what makes the pipeline testable on a laptop with
   no device attached.
@@ -53,8 +54,8 @@ Each rung is entered only when the one below it runs.
 
 ```text
 v0.1  foundation   types · replay · ingest boundary · tests · CI       done
-v0.2  capture      ARKit · camera frames · device motion · depth       here
-v0.3  render       a point cloud shaded by its own confidence
+v0.2  capture      ARKit · camera frames · device motion · depth       done
+v0.3  render       a point cloud shaded by its own confidence         here
 v0.4  measure      frame time, and drift under replay
 v0.5  interop      a point-cloud reader over Swift–C++
 v0.6  fit          the uncertainty model, fitted offline
