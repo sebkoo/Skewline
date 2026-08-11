@@ -22,14 +22,20 @@ becomes a thing the tests drag along.
 
 ## The gate
 
-`swift build && swift test`, in the terminal, before staging. Xcode cannot run a
+Four commands, in the terminal, before staging. Xcode cannot run a
 tool-hosted test target against a device destination.
+
+    swift build && swift test
+    xcodebuild -scheme Skewline-Package -destination 'generic/platform=iOS' build
+    xcodebuild -project App/SkewlineHarness/SkewlineHarness.xcodeproj -scheme SkewlineHarness -destination 'generic/platform=iOS' build CODE_SIGNING_ALLOWED=NO
+    swift Scripts/readme-drift.swift
 
 The whole suite runs on a Mac with no device attached. `canImport(ARKit)` is
 **true** on macOS — a stub ships in the SDK — so iOS-only code needs
 `#if canImport(ARKit) && os(iOS)`, and code inside a false branch is not
-type-checked on that host. Confirm it compiles for the device with
-xcodebuild -scheme Skewline-Package -destination 'generic/platform=iOS' build
+type-checked on that host. The second command is what type-checks it for the
+device; the third catches the app target's `MainActor` default the package
+does not share; the fourth is the README drift check CI also runs.
 
 Two Swift 6 facts that bite here: `simd` matrix types are `Sendable` but not
 `Codable`, and a `public` struct gets no implicit `Sendable` (SE-0302) with no
