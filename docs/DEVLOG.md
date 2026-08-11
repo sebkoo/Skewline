@@ -206,3 +206,51 @@ of. Now there is one.
 - **Commit 2's numbers reproduced.** 99.45 Hz (10.055 ms); `normal` through
   24.4 rad/s; `insufficientFeatures` still the scene, not the motion;
   warm-up 534 ms, inside 376–750.
+
+## 2026-08-10 · commit 4 — depth enters the container
+
+- **The fork answered after the build, not before it.** The brief made
+  `supportsFrameSemantics(.sceneDepth)` the gate; the connected phone's model
+  was LiDAR-class, so the depth path was built on that evidence and the call's
+  answer — `supported` — arrived with the probe run. Right on this phone,
+  and still a bet where the brief had ordered a measurement.
+- **LiDAR has its own warm-up, and it is indexed.** The 10 depth-less frames
+  are exactly indices 0–9, t=0.604–0.788 — about 184 ms after ARKit's first
+  frame. `sceneDepth`'s nullability is a state that occurs, not defensiveness.
+- **Every depth map is 256×192 'fdep' float32, every confidence 'L008'
+  uint8** — 2,382 of each, observed where the headers promise nothing. LZFSE
+  pays for itself five times over: 558.3 MB packed → 111.4 MB written, ratio
+  0.20, mean 48 KB/frame beside the 197 KB JPEG. v0.4's raw-vs-lzfse question
+  now has one side measured.
+- **A third of depth pixels are less than fully trusted by their own
+  sensor.** low 14.8% / medium 21.1% / high 64.1%. The thesis in miniature:
+  the map alone would look uniformly authoritative.
+- **The frame budget broke, and the drops say how.** Encode 15.50 + 5.74 =
+  21.2 ms against 16.67; the 1,200 drops are chronic — kept-frame gaps
+  {1:1277, 2:1077, 3:26, ≥4:11} — not stalls. Drain period 59.87 s / 2,392 =
+  25.0 ms/frame, and the ~3.8 ms between the encode sum and the period is
+  append plus overhead that nothing clocks separately — t=5.44's lesson,
+  repeated. At stride 2 the candidate period is 33.3 ms and the drain fits
+  with margin: v0.4's knob data, not this commit's decision.
+- **The pose baseline held through the new ARKit work and the double copy.**
+  59.976 Hz, spread 1.37 µs — tightest yet — max 16.674 ms, none over 100 ms.
+  Re-measured rather than assumed, because "no regression" is a claim about
+  code that no longer exists. Identity: 0 of 2,392 frame timestamps outside
+  the pose set. The accounting closed twice again: 2,392 + 1,200 + 0 = 3,592
+  from the file's holes and from the counters.
+- **`excessiveMotion` finally fired — at 1.28 rad/s.** Twelve observations,
+  immediately after a 5.9 s `insufficientFeatures` stretch, while the run's
+  23.32 rad/s maximum stayed `normal`. The label anti-correlates with
+  measured motion in both directions in this capture; commit 2's sentence
+  now has its converse.
+- **A count check would have blessed misplaced holes.** Depth is optional per
+  frame, so payload-count equality no longer implies position equality;
+  `finalize` checks the per-index biconditional, and the test that keeps it
+  honest appends the one payload at the wrong index and expects red.
+- **`PixelBufferPacking` is public surface the brief never named.** The
+  tight-pack loop sits in `Capture` outside the ARKit gate so the Mac suite
+  can prove it against a padded buffer with poisoned padding — the
+  alternative left the shear-prone loop in the one component `swift test`
+  never compiles.
+- **The roadmap said "ImageIO depth".** Depth shipped as ARKit `sceneDepth`
+  payloads in the container instead; the row now says what happened.
