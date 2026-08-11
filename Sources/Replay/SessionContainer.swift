@@ -25,8 +25,11 @@ public enum SessionContainerError: Error, Equatable {
 /// that captured depth.
 ///
 /// A payload is `Data` to this layer. Encoding pixels -- or depth samples --
-/// is the producer's job and decoding them is the consumer's; keeping both
-/// out of here is what keeps `Replay` depending on `Core` alone.
+/// is the producer's job; decoding pixels is the consumer's, because their
+/// decode drags an image framework. Depth's inverse is Foundation-only byte
+/// arithmetic, so it lives beside the format in `DepthDecoder` -- the split
+/// follows what each half would import, which is what keeps `Replay`
+/// depending on `Core` alone.
 ///
 /// A payload is associated with its `FrameRecord` by position: index `i` in
 /// `CaptureSession.frames` names the file for `frameData(at: i)`, and the
