@@ -39,6 +39,15 @@ Four modules, one harness app and the tests that hold them.
   image, both through one palette that keeps low, medium and high visibly
   distinct. Depends on `Core` and `Replay`, never `Capture`.
 
+![44,973,892 points from one 31-second capture, each shaded by the depth
+sensor's own confidence — blue where it trusts itself, amber where less, red
+where it does not.](docs/media/cloud-confidence.png)
+
+*One capture's accumulated cloud, confidence as color. 21.4% of this scene is
+less than fully trusted — a map alone would have looked uniformly
+authoritative. Reproduce it from any capture:
+`swift run -c release RenderProbe <container> --png <dir>`.*
+
 The app is `App/SkewlineHarness`: a start button, a stop button and a panel of
 what the run measured. It exists to put the pipeline in front of real sensors
 and produce containers a Mac can replay, and it should not grow a second job.

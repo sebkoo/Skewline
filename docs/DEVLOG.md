@@ -617,3 +617,15 @@ Session UUIDs, recorded against their cells the moment each capture ended:
 A `17516358…`, B `7BA08EE7…`, C `7FEF8065…`, D `1E2A4BED…`, exported to
 `~/dev/Skewline-captures/`. Full panels live with the second operator's
 per-cell analysis, not here.
+
+## 2026-08-11 · the README image, and a third clean stride-2 walk
+
+The capture for `docs/media/cloud-confidence.png` — published under the
+operator's recorded exception to the capture-privacy rule — doubled as a
+third consecutive flawless run on the committed stride-2 defaults: 0/1845
+dropped, histogram `{1:922}`, no interior event of any size. 44,973,892
+points over 915 depth frames, 21.4% less than fully trusted (low 3,247,490 /
+medium 6,377,862 / high 35,348,540) — the render's own numbers, reproduced
+independently from the container by both operators. fx swung 12.88%
+(1273.12–1437.16), the widest range yet — another replication of the
+per-frame intrinsics decision, not a new one.
