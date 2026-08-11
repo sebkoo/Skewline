@@ -51,8 +51,8 @@ change, that is a signal the boundary was drawn wrong, and it belongs in
 
 ## What has shipped
 
-Six steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md), including
-the ones that were mistakes.
+Twelve steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
+including the ones that were mistakes.
 
 1. **Types.** A pose, a 6×6 covariance beside it, and the tracker's own opinion
    of itself at that instant — carried as one value, `Codable` and `Sendable`,
@@ -71,6 +71,32 @@ the ones that were mistakes.
    therefore says nothing about the device build, so the device build is a
    second job that builds the `Skewline-Package` umbrella scheme for
    `generic/platform=iOS`.
+7. **The live sensor path.** `SensorSource` streams pose observations and
+   camera frames from a live `ARSession`, established through
+   `run(_:options:)` rather than the session directly — one call that stamps
+   the shared timeline origin every sequence in a capture is measured
+   against.
+8. **The capture harness.** `App/SkewlineHarness`: a start button, a stop
+   button and a panel of what the run measured. It exists to put the
+   pipeline in front of real sensors and produce containers a Mac can
+   replay.
+9. **Device motion.** Core Motion's fused device motion, requested at
+   200 Hz and delivered at a measured 99.45 Hz ceiling, on the same
+   timeline as the pose sequence — two independent sequences aligned only
+   by sharing one origin, never resampled onto each other.
+10. **Camera frames.** JPEG-encoded frames written into the session
+    container beside `session.json`, associated with their `FrameRecord` by
+    position, with a `PixelBufferPacking` step pulled out of the ARKit gate
+    specifically so the Mac test suite can prove it.
+11. **Depth.** LiDAR `sceneDepth` — and its per-pixel confidence — packed
+    tight and LZFSE-compressed beside each frame that has it, an optional
+    per-frame record so a device without the sensor, or a warm-up frame
+    before it, decodes unchanged.
+12. **Camera exposure.** `ARCamera.exposureDuration` and `.exposureOffset`,
+    the two operands the blur product needs — the motion factor's
+    counterpart, and the cheapest scene-illumination scalar ARKit types —
+    riding `FrameRecord` as an optional sub-record, the depth pattern
+    exactly.
 
 ## Decided but not yet done
 
@@ -82,7 +108,7 @@ outstanding — which is the honest resting state, not a gap.
   .claude/settings.json — the staging and force-push rules that the briefs
   currently state as advice, turned into refusals
 ───────────────────────────────────────────────────────────────────────────
-  v0.2 capture is a rung, not a commit list. Nothing below this line is
+  v0.3 render is a rung, not a commit list. Nothing below this line is
   decided at commit level, and nothing should be.
 ```
 
@@ -96,7 +122,6 @@ because commit 2 discovered that `canImport(ARKit)` is true on macOS.
 
 | Version | Ships | What forces it |
 |---|---|---|
-| **v0.2** capture | ARKit session, its camera frames, Core Motion rates, LiDAR scene depth and camera exposure | Pose uncertainty has no signal without inertial rates and tracking state. Without this rung there is nothing to be uncertain about |
 | **v0.3** render | Accumulated point cloud, each point shaded by its confidence, Metal compute kernel | Tens of millions of points in a thirty-second capture cannot be re-shaded on the CPU per frame. The arithmetic forces the kernel, not the taste |
 | **v0.4** measure | Frame time, upload bandwidth, drift under replay | "A result needs a confidence" is an empty claim until the confidence is calibrated against something observed |
 | **v0.5** interop | Point-cloud / PLY reader over Swift–C++ | A format with dozens of properties per point is the wrong job for Swift, and the interop seam is itself a design question worth answering in public |
