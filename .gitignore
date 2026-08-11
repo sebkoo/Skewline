@@ -23,3 +23,5 @@ Package.resolved
 # Never commit
 PRIVATE-*.md
 
+# Transient artifact staging (outside reviewer)
+.tmp-*/
