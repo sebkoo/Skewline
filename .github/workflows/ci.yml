@@ -39,3 +39,13 @@ jobs:
         run: xcodebuild -version && swift --version
       - name: Build for iOS
         run: xcodebuild -scheme Skewline-Package -destination 'generic/platform=iOS' build
+
+  readme-drift:
+    name: README agrees with the repository
+    runs-on: macos-26
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Check
+        run: swift Scripts/readme-drift.swift
