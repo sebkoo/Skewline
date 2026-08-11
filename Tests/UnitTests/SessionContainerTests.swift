@@ -32,6 +32,17 @@ private func temporaryContainerURL() -> URL {
         .appendingPathExtension(SessionContainer.pathExtension)
 }
 
+private func sampleIntrinsicsRecord() -> IntrinsicsRecord {
+    IntrinsicsRecord(
+        focalLengthX: 1470.5,
+        focalLengthY: 1470.5,
+        principalPointX: 960.2,
+        principalPointY: 720.1,
+        referenceWidth: 1920,
+        referenceHeight: 1440
+    )
+}
+
 private func sampleDepthRecord(confidence: Bool) -> DepthRecord {
     DepthRecord(
         width: 4,
@@ -282,6 +293,48 @@ private func sampleDepthRecord(confidence: Bool) -> DepthRecord {
     let reader = try SessionContainer.Reader(contentsOf: url)
     #expect(reader.session == session)
     #expect(reader.session.frames[0].exposure == ExposureRecord(duration: 0.016, offset: 0.25))
+}
+
+@Test func frameRecordedBeforeIntrinsicsStillDecodes() throws {
+    // Built by stripping the key from real encoder output, like the exposure
+    // test above: the files this protects are captures that already exist.
+    let record = FrameRecord(
+        timestamp: 0.5, width: 8, height: 6, encoding: .jpeg,
+        intrinsics: sampleIntrinsicsRecord()
+    )
+    let encoded = try JSONEncoder().encode(record)
+    var object = try #require(
+        try JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+    )
+    #expect(object["intrinsics"] != nil)
+    object["intrinsics"] = nil
+
+    let decoded = try JSONDecoder().decode(
+        FrameRecord.self,
+        from: try JSONSerialization.data(withJSONObject: object)
+    )
+
+    #expect(decoded == FrameRecord(timestamp: 0.5, width: 8, height: 6, encoding: .jpeg))
+    #expect(decoded.intrinsics == nil)
+}
+
+@Test func containerRoundTripsFrameIntrinsics() throws {
+    let session = sampleSession(frames: [
+        FrameRecord(
+            timestamp: 0, width: 4, height: 3, encoding: .jpeg,
+            intrinsics: sampleIntrinsicsRecord()
+        ),
+    ])
+    let url = temporaryContainerURL()
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    let writer = try SessionContainer.Writer(creatingAt: url)
+    try writer.append(Data([1]))
+    try writer.finalize(session: session)
+
+    let reader = try SessionContainer.Reader(contentsOf: url)
+    #expect(reader.session == session)
+    #expect(reader.session.frames[0].intrinsics == sampleIntrinsicsRecord())
 }
 
 @Test func unknownDepthEncodingAndCompressionRoundTrip() throws {

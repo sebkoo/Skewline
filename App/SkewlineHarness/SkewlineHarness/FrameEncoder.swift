@@ -4,6 +4,7 @@ import CoreImage
 import CoreVideo
 import Foundation
 import ImageIO
+import simd
 
 /// Turns one `CameraFrame` into the payload the container stores and the
 /// `FrameRecord` describing it.
@@ -21,6 +22,12 @@ nonisolated struct FrameEncoder {
     enum Failure: Error {
         case encodeFailed(FrameEncoding)
         case unsupportedEncoding(FrameEncoding)
+        /// `CameraFrame.intrinsics` did not match the pinhole model's shape
+        /// -- a non-zero entry where the model guarantees zero, or a last
+        /// diagonal entry other than one. `IntrinsicsRecord` keeps only the
+        /// four entries the model lets vary, so a matrix that fails this
+        /// check is a matrix nothing here should describe.
+        case unexpectedIntrinsicsShape(simd_float3x3)
     }
 
     let encoding: FrameEncoding
@@ -61,8 +68,32 @@ nonisolated struct FrameEncoder {
             width: CVPixelBufferGetWidth(frame.pixelBuffer),
             height: CVPixelBufferGetHeight(frame.pixelBuffer),
             encoding: encoding,
-            exposure: ExposureRecord(duration: frame.exposureDuration, offset: frame.exposureOffset)
+            exposure: ExposureRecord(duration: frame.exposureDuration, offset: frame.exposureOffset),
+            intrinsics: try intrinsicsRecord(from: frame.intrinsics, referenceSize: frame.intrinsicsReferenceSize)
         )
         return (record, data)
+    }
+
+    /// Verifies `intrinsics` matches the pinhole model's shape -- the entries
+    /// `IntrinsicsRecord` does not keep are checked here rather than assumed,
+    /// the same move `DepthEncoder` makes for pixel format -- and returns the
+    /// four entries that vary, at the resolution they were computed for.
+    private func intrinsicsRecord(
+        from intrinsics: simd_float3x3,
+        referenceSize: CGSize
+    ) throws -> IntrinsicsRecord {
+        guard intrinsics[0][1] == 0, intrinsics[0][2] == 0,
+              intrinsics[1][0] == 0, intrinsics[1][2] == 0,
+              intrinsics[2][2] == 1 else {
+            throw Failure.unexpectedIntrinsicsShape(intrinsics)
+        }
+        return IntrinsicsRecord(
+            focalLengthX: intrinsics[0][0],
+            focalLengthY: intrinsics[1][1],
+            principalPointX: intrinsics[2][0],
+            principalPointY: intrinsics[2][1],
+            referenceWidth: Int(referenceSize.width),
+            referenceHeight: Int(referenceSize.height)
+        )
     }
 }

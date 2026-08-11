@@ -240,6 +240,23 @@ final class SessionRecorder {
         var exposureDurationSum: TimeInterval = 0
         var minExposureOffset: Float = .greatestFiniteMagnitude
         var maxExposureOffset: Float = -.greatestFiniteMagnitude
+
+        /// The intrinsics operands `IntrinsicsRecord` carries, the range
+        /// this run actually saw -- whether fx/fy/cx/cy held constant or
+        /// moved (focus, stabilization) is a finding, not an assumption.
+        var minFocalLengthX: Float = .greatestFiniteMagnitude
+        var maxFocalLengthX: Float = -.greatestFiniteMagnitude
+        var minFocalLengthY: Float = .greatestFiniteMagnitude
+        var maxFocalLengthY: Float = -.greatestFiniteMagnitude
+        var minPrincipalPointX: Float = .greatestFiniteMagnitude
+        var maxPrincipalPointX: Float = -.greatestFiniteMagnitude
+        var minPrincipalPointY: Float = .greatestFiniteMagnitude
+        var maxPrincipalPointY: Float = -.greatestFiniteMagnitude
+        /// Every reference resolution the run observed, as `"WxH"` -- the
+        /// same reporting style as `depthFormats`/`confidenceFormats`: the
+        /// header promises nothing, so the panel reports rather than
+        /// assumes.
+        var intrinsicsReferenceSizes: Set<String> = []
     }
 
     private nonisolated func encodeFrames(
@@ -297,6 +314,17 @@ final class SessionRecorder {
                 stats.exposureDurationSum += exposure.duration
                 stats.minExposureOffset = min(stats.minExposureOffset, exposure.offset)
                 stats.maxExposureOffset = max(stats.maxExposureOffset, exposure.offset)
+            }
+            if let intrinsics = record.intrinsics {
+                stats.minFocalLengthX = min(stats.minFocalLengthX, intrinsics.focalLengthX)
+                stats.maxFocalLengthX = max(stats.maxFocalLengthX, intrinsics.focalLengthX)
+                stats.minFocalLengthY = min(stats.minFocalLengthY, intrinsics.focalLengthY)
+                stats.maxFocalLengthY = max(stats.maxFocalLengthY, intrinsics.focalLengthY)
+                stats.minPrincipalPointX = min(stats.minPrincipalPointX, intrinsics.principalPointX)
+                stats.maxPrincipalPointX = max(stats.maxPrincipalPointX, intrinsics.principalPointX)
+                stats.minPrincipalPointY = min(stats.minPrincipalPointY, intrinsics.principalPointY)
+                stats.maxPrincipalPointY = max(stats.maxPrincipalPointY, intrinsics.principalPointY)
+                stats.intrinsicsReferenceSizes.insert("\(intrinsics.referenceWidth)x\(intrinsics.referenceHeight)")
             }
             try writer.append(data, depth: depthPayload)
 
@@ -363,6 +391,17 @@ final class SessionRecorder {
                     + ", mean \(String(format: "%.2f ms", meanExposureDuration * 1000))"
                     + "; offset \(String(format: "%.2f", stats.minExposureOffset))"
                     + "-\(String(format: "%.2f", stats.maxExposureOffset)) EV"
+            }
+            if !stats.intrinsicsReferenceSizes.isEmpty {
+                panel += "\nintrinsics      fx \(String(format: "%.2f", stats.minFocalLengthX))"
+                    + "-\(String(format: "%.2f", stats.maxFocalLengthX))"
+                    + ", fy \(String(format: "%.2f", stats.minFocalLengthY))"
+                    + "-\(String(format: "%.2f", stats.maxFocalLengthY))"
+                    + ", cx \(String(format: "%.2f", stats.minPrincipalPointX))"
+                    + "-\(String(format: "%.2f", stats.maxPrincipalPointX))"
+                    + ", cy \(String(format: "%.2f", stats.minPrincipalPointY))"
+                    + "-\(String(format: "%.2f", stats.maxPrincipalPointY))"
+                    + "; reference \(stats.intrinsicsReferenceSizes.sorted().joined(separator: " "))"
             }
         }
         panel += "\nscene depth     \(sceneDepthSupported ? "supported" : "unsupported")"

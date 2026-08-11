@@ -4,6 +4,7 @@ import CoreMotion
 import CoreVideo
 import Core
 import QuartzCore
+import simd
 import Synchronization
 
 /// Knobs for the camera-frame path -- configuration values, not measurements.
@@ -82,18 +83,36 @@ public struct CameraFrame: @unchecked Sendable {
     /// `ARCamera.exposureOffset`, in EV (exposure value) units.
     public let exposureOffset: Float
 
+    /// `ARCamera.intrinsics`, the pinhole camera matrix at capture -- raw,
+    /// like `pixelBuffer`. Decomposing it into the four measured entries and
+    /// verifying the rest are the pinhole model's constants is
+    /// `FrameEncoder`'s job, the same split `DepthEncoder` makes for pixel
+    /// format.
+    public let intrinsics: simd_float3x3
+
+    /// `ARCamera.imageResolution`, the pixel resolution `intrinsics` is
+    /// expressed at. Not the resolution of `pixelBuffer` or of a depth map
+    /// from the same frame -- those become `FrameRecord.width`/`height`,
+    /// describing the stored payload; this describes the frame the
+    /// intrinsics were computed in.
+    public let intrinsicsReferenceSize: CGSize
+
     public init(
         timestamp: TimeInterval,
         pixelBuffer: CVPixelBuffer,
         depth: CapturedDepth? = nil,
         exposureDuration: TimeInterval,
-        exposureOffset: Float
+        exposureOffset: Float,
+        intrinsics: simd_float3x3,
+        intrinsicsReferenceSize: CGSize
     ) {
         self.timestamp = timestamp
         self.pixelBuffer = pixelBuffer
         self.depth = depth
         self.exposureDuration = exposureDuration
         self.exposureOffset = exposureOffset
+        self.intrinsics = intrinsics
+        self.intrinsicsReferenceSize = intrinsicsReferenceSize
     }
 }
 
@@ -359,7 +378,9 @@ public final class SensorSource: NSObject, PoseObservationSource, InertialSample
                 pixelBuffer: copy,
                 depth: depth,
                 exposureDuration: frame.camera.exposureDuration,
-                exposureOffset: frame.camera.exposureOffset
+                exposureOffset: frame.camera.exposureOffset,
+                intrinsics: frame.camera.intrinsics,
+                intrinsicsReferenceSize: frame.camera.imageResolution
             )
         )
         stream.withLock { state in

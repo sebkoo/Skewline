@@ -55,13 +55,21 @@ public struct FrameRecord: Codable, Equatable, Sendable {
     /// metadata-less capture writes JSON with no `exposure` key at all.
     public var exposure: ExposureRecord?
 
+    /// The camera's pinhole intrinsics at capture, or `nil` when the frame's
+    /// source never queried them. Optional for the same reason as
+    /// `exposure`: synthesized decoding falls back through
+    /// `decodeIfPresent`, so sessions recorded before this field existed
+    /// keep decoding unchanged.
+    public var intrinsics: IntrinsicsRecord?
+
     public init(
         timestamp: TimeInterval,
         width: Int,
         height: Int,
         encoding: FrameEncoding,
         depth: DepthRecord? = nil,
-        exposure: ExposureRecord? = nil
+        exposure: ExposureRecord? = nil,
+        intrinsics: IntrinsicsRecord? = nil
     ) {
         self.timestamp = timestamp
         self.width = width
@@ -69,5 +77,6 @@ public struct FrameRecord: Codable, Equatable, Sendable {
         self.encoding = encoding
         self.depth = depth
         self.exposure = exposure
+        self.intrinsics = intrinsics
     }
 }
