@@ -55,7 +55,7 @@ change, that is a signal the boundary was drawn wrong, and it belongs in
 
 ## What has shipped
 
-Fourteen steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
+Fifteen steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
 including the ones that were mistakes.
 
 1. **Types.** A pose, a 6×6 covariance beside it, and the tracker's own opinion
@@ -113,6 +113,15 @@ including the ones that were mistakes.
     arithmetic: 75,988,992 points at a measured 57.8 M points/s, against
     the 4.56 G points/s a 60 Hz re-shade of that accumulated cloud demands.
     The kernel's bill, presented rather than assumed.
+15. **GPU shading.** The accumulated cloud resident in one shared Metal
+    buffer, a compute re-shade and a full-cloud offscreen render measured
+    over two layouts by the same probe: the 32-byte stride re-shades at
+    3.4 G points/s — below the 4.56 G bill — and the packed split at
+    18–19 G, four times over it; the padding decides, so the render buffer
+    packs. The 60 Hz constraint moved to the draw itself — 17 ms per
+    full-cloud pass — which is v0.4's frame-time problem with a number on
+    it. Confidence became color through one palette: low loud, high calm,
+    undocumented values alarming, in an offscreen image a reader can open.
 
 ## Decided but not yet done
 

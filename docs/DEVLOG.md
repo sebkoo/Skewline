@@ -483,3 +483,67 @@ reconstructed.
   commands; the harness build survives only as a permission-file allowance
   and a DEVLOG sentence, the drift check only in CI. This run used all four;
   the doc gap is now on record.
+
+## 2026-08-11 · v0.3 commit 3 — the cloud on the GPU, measured
+
+The accumulated cloud in one `.storageModeShared` buffer, a compute re-shade
+and a full-cloud offscreen render over two candidate layouts, measured by the
+probe on the 75,988,992-point capture: 21 iterations per configuration, the
+cold first printed apart from the warm rest, wall clock beside the device's
+own interval, two runs.
+
+- **The padding decides, not the arithmetic.** The 32-byte stride re-shades
+  at 3.37 G points/s in both runs (3.40 by the GPU's clock) — below the
+  4.56 G bill. The packed split — 12-byte positions beside bare confidence
+  bytes — re-shades at 18.3–18.4 G wall, 19.2–19.4 gpu-clock: four times the
+  bill, 5.4× past the same kernel over the padded stride, for byte-identical
+  output. The render agrees at smaller scale: 4.42 G packed against
+  3.39–3.46. The layout decision is pack, and it is a traffic decision —
+  3.37 G × 36 B/point ≈ 121 GB/s against 18.4 G × 5 B ≈ 92 GB/s, both passes
+  sitting near the memory system and nowhere near an ALU limit (derived
+  from the measured rates, not measured separately).
+- **The bill is paid — and the constraint moved.** Re-shading 76 M points
+  costs a 4.1 ms median in the packed layout: the 4.56 G points/s demand
+  that stood 79×–23× over the CPU is met with 4× headroom. What misses
+  60 Hz is the draw: the full-cloud render's warm median is 17.2–17.3 ms
+  packed, 20.7–20.9 padded, against the 16.67 ms frame — 4.42 G points/s
+  where the bill says 4.56. Re-shading was never the binding constraint on
+  a GPU; redrawing an unbounded accumulation is, and that is v0.4's
+  frame-time problem stated with this commit's numbers.
+- **The kernel is earned by change, not by shading.** A static-color cloud
+  needs no compute pass per frame — the vertex stage shades at fetch cost;
+  render and re-shade over the padded layout land at the same rate because
+  both are bound by the same bytes. What the kernel buys, measured: re-map
+  the entire cloud — a new palette, a threshold — in 4.1 ms, comfortably
+  inside one frame. The ROADMAP's word "kernel" survives as a capability,
+  not as the per-frame path.
+- **xcodebuild claims a `.metal` file even declared `.copy`** — and Xcode
+  26's Metal compiler is a separately downloaded toolchain this machine did
+  not have, with CI's runners undocumented either way — while `swift build`
+  copies the file verbatim under `.copy` and `.process` alike, observed in
+  the built bundle. The shader therefore ships as `ConfidenceShaders.msl`,
+  an extension no build system claims, compiled at runtime by the one code
+  path every gate command and the test suite exercise. Cost, stated: no
+  compile-time check against the iOS air target until an iOS consumer
+  exists to run it.
+- **The kernel and the CPU agree on every one of 76 M points.** The color
+  tally read back from the kernel's output — low 16,419,243 · medium
+  17,013,207 · high 42,556,542 · out-of-domain 0 — equals the confidence
+  tally mapped through the palette, and the probe now fails loudly if it
+  ever does not. Deterministic blocks reproduced byte-for-byte across both
+  runs, including the three zero-point containers' skip rows.
+- **The artifact shows the thesis.** The viewpoint is the median eligible
+  frame (783, t 20.539157) looking at the sweep it half-built, near/far
+  0.035/43.346 m from the measured span: high-confidence surfaces in blue,
+  amber banding at edges and transitions, the far field solid red — the
+  sensor's own doubt, visible. Low, medium and high separable at a glance
+  was the pass criterion, and the red is not decoration: it is where depth
+  ran past 20 m and the sensor said so.
+- **Colds are real but small beside the story.** First iterations: 22.3 and
+  11.2–12.5 ms for the re-shades, 51–114 ms for the renders — pipeline and
+  residency warm-up, printed apart so the warm numbers never absorb them.
+  Each iteration is one committed-and-awaited command buffer: a latency
+  floor, not a pipelined throughput.
+- **The CPU baseline reproduced warm.** 204.3 and 208.3 M points/s against
+  commit 2's 200.0 warm — commit 2's cold 57.8 was the file cache, as
+  recorded there.
