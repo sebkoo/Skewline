@@ -20,10 +20,11 @@ Most pipelines take the midpoint and throw the width away. This one keeps it.
 
 ## What is here today
 
-Three modules and a handful of tests.
+Three modules, one harness app and the tests that hold them.
 
-- **`Core`** — one observation from a camera frame: the pose, the uncertainty
-  beside it, and how much the tracker trusted itself at that instant. No I/O.
+- **`Core`** — the measurement records: a pose with the uncertainty beside it
+  and the tracker's own trust in that instant, an inertial sample, a camera
+  frame and the depth captured with it. No I/O.
 - **`Replay`** — the on-disk session format. A recorded session replays
   deterministically, which is what makes the pipeline testable on a laptop with
   no device attached.
@@ -31,15 +32,20 @@ Three modules and a handful of tests.
   works unchanged against a recorded session or a live sensor, and there is a
   test that holds it there.
 
+The app is `App/SkewlineHarness`: a start button, a stop button and a panel of
+what the run measured. It exists to put the pipeline in front of real sensors
+and produce containers a Mac can replay, and it should not grow a second job.
+
 ```sh
 swift build && swift test
 ```
 
-Two CI jobs run on every push to `main`. One runs that test suite on macOS. The
-other builds for iOS — because the sensor path is behind
+Three CI jobs run on every push to `main`. One runs that test suite on macOS.
+One builds for iOS — because the sensor path is behind
 `#if canImport(ARKit) && os(iOS)`, and code inside a false branch is never
 type-checked, so the macOS tests can be green while that file is not even valid
-Swift.
+Swift. The third fails when this README contradicts the repository — detection
+only, and the fix stays a human commit.
 
 ## Where this goes
 
@@ -47,7 +53,7 @@ Each rung is entered only when the one below it runs.
 
 ```text
 v0.1  foundation   types · replay · ingest boundary · tests · CI       done
-v0.2  capture      ARKit · camera frames · device motion · depth       next
+v0.2  capture      ARKit · camera frames · device motion · depth       here
 v0.3  render       a point cloud shaded by its own confidence
 v0.4  measure      frame time, and drift under replay
 v0.5  interop      a point-cloud reader over Swift–C++
@@ -64,9 +70,11 @@ deliberately never built.
 
 ## What is not here
 
-No app, no interface, no rendering, no reconstruction — and **no accuracy
-figures**, because nothing has been measured yet. A number that has not been
-measured is worse than no number.
+There is no rendering, no reconstruction — and **no accuracy figures**. Rates,
+budgets and payload sizes are measured and recorded in
+[`docs/DEVLOG.md`](docs/DEVLOG.md); how far the poses sit from the truth is
+not, until v0.4 replays sessions against observed error. A number that has not
+been measured is worse than no number.
 
 Reconstruction is deliberately out of scope. This is the layer underneath it:
 any reconstruction is only as trustworthy as its input, and today that input

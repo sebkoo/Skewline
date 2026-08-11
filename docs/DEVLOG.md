@@ -254,3 +254,29 @@ of. Now there is one.
   never compiles.
 - **The roadmap said "ImageIO depth".** Depth shipped as ARKit `sceneDepth`
   payloads in the container instead; the row now says what happened.
+
+## 2026-08-10 · the drift check
+
+- **The check arrived before the truth it enforces.** Two commits, one push:
+  `ci:` adds the `readme-drift` job, the `docs:` commit after it brings the
+  README true. CI runs on the pushed head, so history shows the enforcement
+  predating the fix without a red push.
+- **Both reds were observed, not assumed.** Against the pre-fix README:
+  `README claims "No app" -- an app project exists at
+  App/SkewlineHarness/SkewlineHarness.xcodeproj` and `README claims "Two CI
+  jobs" -- ci.yml defines 3: test, build-ios, readme-drift`. The second is
+  the check catching its own introduction — adding the job falsified the
+  count, and the demonstration cost nothing.
+- **Negative claims retire on removal; anchors may not.** "No app" is probed
+  only while its text appears verbatim, so deleting the claim is the whole
+  fix. The ladder, the module list and the job-count sentence are required —
+  a check that silently skips when its anchor vanishes is decoration, the
+  commit-msg-hook lesson applied to the new hook itself.
+- **Verbatim matching cuts both ways, and the fix found the edge.** Moving
+  "no rendering" to a sentence start would capitalise it and quietly retire
+  the lowercase probe; the corrected README keeps the claim mid-sentence.
+  Found by writing the fix, not by writing the check.
+- **Agreement is not truth.** The ladder assertion compares the README to the
+  ROADMAP's table; both being wrong together passes. And the ROADMAP's own
+  shape block still calls v0.2 "sensors" where its table says "capture" — an
+  internal seam no assertion reads.
