@@ -61,7 +61,7 @@ change, that is a signal the boundary was drawn wrong, and it belongs in
 
 ## What has shipped
 
-Twenty-three steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
+Twenty-five steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
 including the ones that were mistakes.
 
 1. **Types.** A pose, a 6×6 covariance beside it, and the tracker's own opinion
@@ -215,6 +215,33 @@ including the ones that were mistakes.
     already cross in, so the ratio the previous commit measured is
     unchanged, only the bytes retained for properties that were previously
     free.
+24. **The fit's data seam and the criteria before the data.**
+    `Calibration.analyze` gained an additive `observationSink`, firing only
+    where a sample survives all ten registered filters and lands in the
+    default buckets, held there by three tests (conservation, observation-
+    only equivalence, the occlusion fixture emitting nothing); the
+    decimated, deterministic `--dump-observations` export; Python entering
+    the repo in `Fit/` — `fit.py` and a sixteen-test `unittest` harness,
+    numpy the only dependency, seeded, including per-form synthetic
+    recovery; a fourth CI job running those tests; and, registered before
+    any observation file existed, the fit's candidates (the incumbent
+    table, affine, quadratic, power law), the leave-one-out split, the
+    pinball-loss metric, the unanimous-across-folds adoption bar, and the
+    refusal outcome for any class that fails to clear it.
+25. **The fit the observations measured.** Low and medium classes each
+    adopted a quadratic form (`a + b·d²` — low `a=0.022173, b=0.011175`,
+    medium `a=0.010529, b=0.002781`) that beat the table in all four
+    leave-one-out folds; every candidate for the high class lost at least
+    one fold, by margins small enough that the held-out container flips
+    their sign — exactly the case the unanimity bar exists to refuse
+    rather than average away — so high keeps the table, refit on all four
+    containers pooled. A consistency check found the decimated export's
+    own upper medians within 0.00005 of v0.4's full-population figures,
+    across all four containers. `Fit/model.json` — per-class verdict,
+    coefficients, fold metrics, no raw observation — entered the
+    repository under the standing aggregates-yes/raw-or-reconstructable-
+    never line the calibration medians and the README capture had already
+    cleared.
 
 ## Decided but not yet done
 
@@ -223,7 +250,7 @@ rather than gaining a tick here, so this section is empty when there is nothing
 outstanding — which is the honest resting state, not a gap.
 
 ```text
-  v0.6 fit is a rung, not a commit list. Nothing below this line is
+  v0.7 service is a rung, not a commit list. Nothing below this line is
   decided at commit level, and nothing should be.
 ```
 
@@ -237,15 +264,15 @@ because commit 2 discovered that `canImport(ARKit)` is true on macOS.
 
 | Version | Ships | What forces it |
 |---|---|---|
-| **v0.6** fit | Offline fit of the uncertainty model from replayed sessions | The model is *fitted*, not measured. Fitting is numpy's job, and it is what closes the thesis |
 | **v0.7** service | The fit becomes an endpoint; the client uploads a bundle and gets a model back | Once the fit exists offline, shipping it to the device is the only way it reaches a user |
 | **v0.8** view | A small web dashboard over the same service | Nearly free once v0.7 exists. Drops entirely if v0.7 slips |
 
-Note the chain from v0.6 down. Python does not enter because Python is popular —
-it enters because an uncertainty model has to be fitted somewhere; once it is
-fitted offline the network seam is the only way it reaches the phone; and once
-there is a service a dashboard costs a day. Each rung is pulled in by the one
-below it. That is the difference between a ladder and a checklist.
+Python entered in v0.6 not because it is popular but because an uncertainty
+model had to be fitted somewhere, and step 25 is that fit, done. What is still
+forward-looking: the model exists only offline, so the network seam in v0.7 is
+the only way it reaches the phone; and once there is a service, a dashboard
+costs a day. Each rung is pulled in by the one below it. That is the
+difference between a ladder and a checklist.
 
 ## Deliberately not built
 
@@ -260,7 +287,10 @@ measurement it is decoration.
 
 ## Sequencing
 
-v0.1 is days. v0.2 through v0.4 is where this becomes real or stalls, and
-nothing below v0.4 is worth starting until a device is producing sessions that
-replay deterministically. If time runs short, stopping cleanly at v0.4 with four
-things done properly beats eight things half-wired.
+Written at v0.1 and left verbatim while the ladder climbed past it: v0.1 was
+days. v0.2 through v0.4 was where this became real or stalled, and nothing
+below v0.4 was worth starting until a device was producing sessions that
+replayed deterministically. If time ran short, stopping cleanly at v0.4 with
+four things done properly beat eight things half-wired. It held — v0.4 shipped
+clean, and the ladder kept climbing past it — so this stays as the record of
+that call, not as live advice for the rungs still ahead.
