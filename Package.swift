@@ -12,6 +12,7 @@ let package = Package(
         .library(name: "Replay", targets: ["Replay"]),
         .library(name: "Capture", targets: ["Capture"]),
         .library(name: "Render", targets: ["Render"]),
+        .library(name: "Interop", targets: ["Interop"]),
     ],
     targets: [
         .target(
@@ -36,6 +37,20 @@ let package = Package(
             // what keeps the bundle identical under both.
             resources: [.copy("Shaders/ConfidenceShaders.msl")]
         ),
+        // The PLY parser, C++ behind a pure C header. The C interface is
+        // the seam decision: a Swift target built with C++ interoperability
+        // forces `.interoperabilityMode(.Cxx)` onto every importer -- the
+        // tests, the probes, every later rung -- because an importer
+        // rebuilds this target's clang module in its own language mode.
+        // Keeping the header C keeps the C++ a private fact of this target,
+        // which is why no target below carries `swiftSettings`.
+        .target(
+            name: "PLY"
+        ),
+        .target(
+            name: "Interop",
+            dependencies: ["PLY"]
+        ),
         .executableTarget(
             name: "RenderProbe",
             dependencies: ["Core", "Replay", "Render"]
@@ -48,9 +63,14 @@ let package = Package(
             name: "CalibrationProbe",
             dependencies: ["Core", "Replay", "Render"]
         ),
+        .executableTarget(
+            name: "InteropProbe",
+            dependencies: ["Core", "Replay", "Render", "Interop"]
+        ),
         .testTarget(
             name: "UnitTests",
-            dependencies: ["Core", "Replay", "Capture", "Render"]
+            dependencies: ["Core", "Replay", "Capture", "Render", "Interop"]
         ),
-    ]
+    ],
+    cxxLanguageStandard: .cxx17
 )

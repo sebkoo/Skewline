@@ -11,7 +11,7 @@ it is the second, it does not go in.
 
 ## The shape of it
 
-Four modules. The graph is acyclic with `Core` at the root, and it is enforced
+Five modules. The graph is acyclic with `Core` at the root, and it is enforced
 by the compiler rather than by anyone's discipline.
 
 ```text
@@ -31,6 +31,12 @@ Core        done      a pose and its uncertainty, carried as one value.
  └─ Render  done      depth pixels into world points, each with its
                       confidence. Depends on Core and Replay, never
                       Capture.
+
+Interop     here      a PLY point-cloud file read across a C seam into
+                      the module's own value types. Depends on nothing
+                      above -- the C++ parser is a private target behind
+                      a pure C header, so no importer inherits a
+                      language mode from it.
 ```
 
 `Replay` must never depend on `Capture`. Replay is what makes the pipeline
@@ -43,7 +49,7 @@ Where the rest attaches:
 v0.2  capture    ARKit, camera frames, device motion, depth, into Capture
 v0.3  Render     reads Core values, shades each point by its confidence
 v0.4  Measure    replays sessions, compares predicted error to observed
-v0.5  Interop    fills Core from a point-cloud file, over Swift ↔ C++
+v0.5  Interop    reads a point-cloud file across a C seam, into its own types
 v0.6  Fit        consumes replayed sessions offline and fits the model
 v0.7  Service    serves what Fit produced, back to the device
 v0.8  View       reads Service

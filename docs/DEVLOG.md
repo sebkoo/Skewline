@@ -777,3 +777,80 @@ Containers: M1 `931A8965…`, M2 `1A68AF96…`, D1 `85E5E2F1…`, README
 `2110CDA9…`, all in `~/dev/Skewline-captures/`. Full per-band tables and
 per-filter class×band counts live in the probe output, one command from
 any of them.
+
+## 2026-08-12 · v0.5 commit 1 — the seam, and the reader behind it
+
+**Built and gated; every number awaits a real file.** The rung's charter
+calls the interop seam a design question worth answering in public, so it
+was answered the way the storage default was: candidates built and compared
+before any repository code existed, both ways, on both build jobs.
+
+- **The seam is a C header, not direct C++ interop — measured, not
+  assumed.** Two throwaway packages, each a C++ parser target, a Swift
+  module in front of it, and a flag-less client behind that, built for
+  macOS and `generic/platform=iOS` on Swift 6.3.3 / Xcode 26.6. The direct
+  candidate (`.interoperabilityMode(.Cxx)` on the Swift module) builds and
+  its tests pass — until the client: a target importing only the Swift
+  module fails with `error: 'string' file not found` while rebuilding the
+  C++ target's clang module, because every importer rebuilds that module
+  in its own language mode. Access-level imports were the candidate tool
+  for containing this, and on this toolchain they do not: `internal
+  import` hides the API, not the language mode, and the client compiles
+  only when it too enables C++ interop. So the direct seam's real price is
+  every importer of `Interop`, present and future — `UnitTests`, the
+  probes, whatever consumes imported clouds in v0.6 — carrying the mode
+  forever. That is the Replay argument again: anything a module imports
+  becomes a thing every test drags along. The chosen seam is a pure C
+  header (`Sources/PLY/include/ply.h`) over a C++ implementation, and no
+  target in `Package.swift` carries `swiftSettings` — the absence is the
+  decision.
+- **What crosses: contiguous columns, one copy, C++ owns parse-time
+  memory.** The C API is an opaque handle whose accessors return counts, C
+  strings and pointers into buffers the parser owns; the Swift initializer
+  copies each column into a Swift array and frees the handle before
+  returning, so nothing with a C++ lifetime survives into the public API.
+  Columns cross as `double`, which is lossless for the whole format:
+  PLY's integer types are 32 bits or narrower — inside double's 53-bit
+  integer range — and its floating types are IEEE 754 already. Rejected:
+  zero-copy views (couples ARC to RAII and pushes unsafe types or a
+  lifetime-carrying wrapper into the public API) and per-point accessor
+  calls (one seam crossing per property per point — millions per cloud).
+- **Where imported points land: in Interop's own types, and the ROADMAP
+  attach line was wrong.** `Core` has no point type — its records are
+  pose, inertial, frame, depth, exposure, intrinsics — and `Render`'s
+  `ConfidencePoint` carries an ARKit confidence class, a semantic an
+  arbitrary PLY file does not have. So "fills Core from a point-cloud
+  file", written before v0.3 put the point type in `Render`, could not be
+  done literally without changing `Core`'s shape, which the standing rule
+  forbids. Rather than obey the line or bend the rule, this commit
+  corrects the line: `Interop` owns `PLYFile`/`Element`/`Property`,
+  attaches to the module graph nowhere, and conversion into pipeline
+  types is deferred to the first consumer that needs one.
+- **The subset, stated not implied.** Parsed fully: the header grammar
+  (both spellings of all eight scalar types, `comment` and `obj_info`
+  preserved verbatim), arbitrary elements and property lists, and all
+  three encodings — ASCII line-per-instance with exact token counts,
+  both binary endiannesses byte-walked with bounds checks. Preserved but
+  deferred: list property *values* are decoded — a data-dependent layout
+  cannot be walked otherwise — and only their per-instance counts are
+  retained. Rejected loudly, each with its fixture: bad magic, unknown
+  encoding or version, missing format line, unknown type token,
+  non-integral list count type, property before any element, duplicate
+  property name, unknown header keyword, missing `end_header`, truncated
+  data in either encoding, malformed ASCII lines, a negative binary list
+  count — signed count types are legal at the header, and cast unchecked
+  a negative count would misalign the byte walk silently. A hostile
+  declared count cannot crash the host: the storage reserve is clamped,
+  growth is bounded by the bytes the file actually holds, no C++
+  exception crosses the C boundary, and an absurd count resolves to the
+  truncation refusal. Ignored by declaration: bytes after the last
+  declared instance. Fixtures are
+  synthetic literals written to a temp directory at test time; no `.ply`
+  enters the repository and nothing derives from a capture.
+- **Not measured yet.** Parse throughput, bytes per second, memory —
+  correctness has fixtures, throughput needs a real file, and no real
+  file has been read yet. The subject exists: `InteropProbe --dump
+  <capture.skewline> <out.ply>` writes a probe-local binary PLY from a
+  replayed container (the writer lives in the probe, never the library;
+  the output stays on the Mac). The command that will measure:
+  `swift run -c release InteropProbe <file.ply>`.

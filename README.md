@@ -20,7 +20,7 @@ Most pipelines take the midpoint and throw the width away. This one keeps it.
 
 ## What is here today
 
-Four modules, one harness app and the tests that hold them.
+Five modules, one harness app and the tests that hold them.
 
 - **`Core`** — the measurement records: a pose with the uncertainty beside it
   and the tracker's own trust in that instant, an inertial sample, a camera
@@ -38,6 +38,10 @@ Four modules, one harness app and the tests that hold them.
   one GPU buffer, re-shaded by a compute kernel and drawn to an offscreen
   image, both through one palette that keeps low, medium and high visibly
   distinct. Depends on `Core` and `Replay`, never `Capture`.
+- **`Interop`** — a PLY point-cloud file read into Swift values across a
+  deliberately C seam. The parsing — three encodings, arbitrary per-element
+  property lists — lives in a C++ target behind a pure C header, so no C++
+  type crosses a public signature and no importer inherits a language mode.
 
 ![44,973,892 points from one 31-second capture, each shaded by the depth
 sensor's own confidence — blue where it trusts itself, amber where less, red
