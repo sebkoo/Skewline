@@ -16,6 +16,7 @@ Package.resolved
 # .python-version and the exact numpy pin in Fit/requirements.txt are
 # what is committed)
 .venv/
+__pycache__/
 
 # macOS
 .AppleDouble
