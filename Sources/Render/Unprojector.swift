@@ -120,6 +120,24 @@ public enum Unprojector {
         return SIMD3(rightward, -downward, -depth)
     }
 
+    /// The pixel a camera-space point images at -- the inverse of
+    /// `cameraPoint`, written out in prose beside
+    /// `PinholeProjection.projectionMatrix` since the render commit and
+    /// landed as arithmetic by the calibration commit that needs it per
+    /// pixel: `u = cx + fx*x/d`, `v = cy - fy*y/d` with planar depth
+    /// `d = -z`. Returns nil at or behind the camera plane (`d <= 0`, or a
+    /// non-finite z), where the pinhole maps nothing.
+    public static func imagePoint(
+        camera: SIMD3<Float>,
+        intrinsics: ScaledIntrinsics
+    ) -> (x: Float, y: Float, depth: Float)? {
+        let depth = -camera.z
+        guard depth > 0, depth.isFinite else { return nil }
+        let x = intrinsics.principalPointX + intrinsics.focalLengthX * camera.x / depth
+        let y = intrinsics.principalPointY - intrinsics.focalLengthY * camera.y / depth
+        return (x, y, depth)
+    }
+
     /// Unprojects every valid sample of one frame's depth map into world
     /// space through the frame's intrinsics and the pose that shares its
     /// timestamp.

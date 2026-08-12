@@ -692,3 +692,35 @@ Session UUIDs, recorded against their cells the moment each capture ended:
 M1 `931A8965…`, M2 `1A68AF96…`, D1 `85E5E2F1…`, K1 `AC73C3A0…`,
 K2 `B8B03C5C…`, exported to `~/dev/Skewline-captures/`. Full per-cell
 analysis lives with the second operator, not here.
+
+## 2026-08-11 · v0.4 commit 4 — cross-frame reprojection, behind a probe
+
+**Built and gated; every number awaits the replays.** The observable that
+needs no ground truth: the same surface seen twice. A depth pixel of frame
+i unprojects through pose i and that frame's own intrinsics, projects into
+frame i+k through pose i+k and *its* intrinsics, and predicted depth is
+compared against the depth the sensor reported there — the disagreement,
+binned by the source pixel's confidence class, is the sensor's error
+observed. `Unprojector.imagePoint` lands the pixel-space inverse the render
+commit had only written in prose; `Calibration` in `Render` carries the
+analysis so tests can reach it; `CalibrationProbe` (Core, Replay, Render —
+never Capture) formats and times. Criteria registered before any run, all
+as defaults in `Calibration.Constants`: depth bands [0.5,1)/[1,2)/[2,3)/
+[3,5) m by source depth; separations k = 1, 5, 15, 30 with pair Δt within
+±25% of k × 0.0333 s; upper median and MAD of |Δ| plus the signed median;
+ordering pass at k = 1 per band with ≥ 10,000 samples in every class,
+strict low > medium > high, adjacent classes ≥ 10% apart; drift slope in
+mm/s recorded **without** a verdict — declared now, no principled threshold
+exists yet. Ten filters in registered order, each removal counted per class
+and band, never pooled; three sensitivity variants accumulated in the same
+pass lift the edge mask, the class match and the forward-backward gate one
+at a time, because the fw-bw radius truncates |Δ| near d²/(fx·b) — a bound
+the probe prints beside each band — and an ordering that holds only with a
+filter on is a finding, not a pass. The matched bucket measures class-c-
+against-class-c *joint* disagreement, two same-class readings, not one
+reading against truth. Known floors, recorded not resolved: the half-pixel
+grid ambiguity is common-mode and largely cancels; nearest-neighbour
+rounding converts to depth error through surface slope and does not.
+Calibration table, drift medians, slopes, filter fractions: not measured
+yet. The command that measures:
+`swift run -c release CalibrationProbe <capture.skewline>`.

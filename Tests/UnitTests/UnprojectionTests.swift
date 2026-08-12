@@ -179,6 +179,60 @@ private func constantDepthMap(width: Int, height: Int, depth: Float) -> DecodedD
     }
 }
 
+@Test func imagePointIsTheHandComputedInverse() {
+    let intrinsics = handIntrinsics()
+
+    // The inverse of `unprojectionMatchesAHandComputedPoint`'s witnesses:
+    // (0.25, 0, -2) came from pixel (3, 1), and the sign-flip witness
+    // (0, -0.5, -2) from pixel (2, 3) -- image-down from camera-down.
+    let first = Unprojector.imagePoint(camera: SIMD3(0.25, 0, -2), intrinsics: intrinsics)
+    #expect(first?.x == 3)
+    #expect(first?.y == 1)
+    #expect(first?.depth == 2)
+    let second = Unprojector.imagePoint(camera: SIMD3(0, -0.5, -2), intrinsics: intrinsics)
+    #expect(second?.x == 2)
+    #expect(second?.y == 3)
+}
+
+/// The round trip through `cameraPoint`. Exact on power-of-two intrinsics;
+/// on general intrinsics `((x-cx)·d/fx)·fx/d` can be off by an ulp, so the
+/// claim there is sub-half-pixel -- what the nearest-pixel rounding needs --
+/// and no more.
+@Test func imagePointInvertsCameraPoint() throws {
+    let exact = handIntrinsics()
+    for y in 0..<4 {
+        for x in 0..<5 {
+            let camera = Unprojector.cameraPoint(x: x, y: y, depth: 2, intrinsics: exact)
+            let image = try #require(Unprojector.imagePoint(camera: camera, intrinsics: exact))
+            #expect(image.x == Float(x))
+            #expect(image.y == Float(y))
+            #expect(image.depth == 2)
+        }
+    }
+
+    let general = ScaledIntrinsics(
+        focalLengthX: 190.9,
+        focalLengthY: 191.3,
+        principalPointX: 127.3,
+        principalPointY: 95.7
+    )
+    for depth: Float in [0.37, 1.234, 4.9] {
+        for (x, y) in [(0, 0), (255, 191), (128, 96), (17, 143)] {
+            let camera = Unprojector.cameraPoint(x: x, y: y, depth: depth, intrinsics: general)
+            let image = try #require(Unprojector.imagePoint(camera: camera, intrinsics: general))
+            #expect(abs(image.x - Float(x)) < 0.5)
+            #expect(abs(image.y - Float(y)) < 0.5)
+        }
+    }
+}
+
+@Test func pointsAtOrBehindTheCameraPlaneHaveNoImage() {
+    let intrinsics = handIntrinsics()
+    #expect(Unprojector.imagePoint(camera: SIMD3(0, 0, 1), intrinsics: intrinsics) == nil)
+    #expect(Unprojector.imagePoint(camera: SIMD3(1, 2, 0), intrinsics: intrinsics) == nil)
+    #expect(Unprojector.imagePoint(camera: SIMD3(0, 0, .nan), intrinsics: intrinsics) == nil)
+}
+
 @Test func confidenceRidesEachPointUnchanged() throws {
     let confidences: [UInt8] = [0, 1, 2, 200, 1, 0]
     let map = DecodedDepth(

@@ -44,6 +44,10 @@ let package = Package(
             name: "StorageProbe",
             dependencies: ["Core", "Replay", "Capture"]
         ),
+        .executableTarget(
+            name: "CalibrationProbe",
+            dependencies: ["Core", "Replay", "Render"]
+        ),
         .testTarget(
             name: "UnitTests",
             dependencies: ["Core", "Replay", "Capture", "Render"]
