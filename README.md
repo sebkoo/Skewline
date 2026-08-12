@@ -71,8 +71,8 @@ Each rung is entered only when the one below it runs.
 v0.1  foundation   types · replay · ingest boundary · tests · CI       done
 v0.2  capture      ARKit · camera frames · device motion · depth       done
 v0.3  render       a point cloud shaded by its own confidence         done
-v0.4  measure      frame time, and drift under replay                 here
-v0.5  interop      a point-cloud reader over Swift–C++
+v0.4  measure      frame time, and drift under replay                 done
+v0.5  interop      a point-cloud reader over Swift–C++                here
 v0.6  fit          the uncertainty model, fitted offline
 v0.7  service      the fitted model reaches the device
 v0.8  view         a dashboard over the same service
@@ -87,11 +87,15 @@ deliberately never built.
 ## What is not here
 
 There is no interactive viewer — `Render` draws the cloud to an offscreen
-image, never to a window — no reconstruction, and **no accuracy figures**.
-Rates, budgets and payload sizes are measured and recorded in
-[`docs/DEVLOG.md`](docs/DEVLOG.md); how far the poses sit from the truth is
-not, until v0.4 replays sessions against observed error. A number that has not
-been measured is worse than no number.
+image, never to a window — and no reconstruction. Rates, budgets and payload
+sizes are measured and recorded in [`docs/DEVLOG.md`](docs/DEVLOG.md), and so,
+now, is a first measured error scale: the confidence classes are calibrated
+against observed cross-frame disagreement, high 3.1–10.8 mm and low
+18.9–197.2 mm depending on depth band, ordering held in 16 of 16 comparisons
+with margin. **What is still not here is pose error against ground truth** —
+there is no truth rig, and cross-frame reprojection measures the joint
+pose-and-depth disagreement a replay can observe, not pose accuracy on its
+own. A number that has not been measured is worse than no number.
 
 Reconstruction is deliberately out of scope. This is the layer underneath it:
 any reconstruction is only as trustworthy as its input, and today that input
