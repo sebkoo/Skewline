@@ -15,6 +15,9 @@ perpendicular is the residual.
 - `Capture` — the ingest boundary. Depends on `Core` and `Replay`.
 - `Render` — replay-side unprojection: depth pixels into world points, each
   with its confidence. Depends on `Core` and `Replay`, never `Capture`.
+- `Interop` — a PLY point-cloud file read across a C seam into the module's
+  own value types. Depends on nothing above: the C++ parser is a private
+  target behind a pure C header, so no importer inherits a language mode.
 
 Acyclic, `Core` at the root. `Replay` must never depend on `Capture`. Replay is
 what makes the pipeline testable without hardware, so anything it imports
