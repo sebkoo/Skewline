@@ -65,6 +65,49 @@ public enum Calibration {
         public init() {}
     }
 
+    /// One surviving sample, as the fit's data seam sees it. The emission
+    /// point is part of the registered schema: an observation is delivered
+    /// exactly when a sample survives all ten filters and enters the default
+    /// buckets -- never a sensitivity variant's sample, never anything the
+    /// report does not count. The export is the registered analysis's own
+    /// surviving population, the one the calibration table summarized.
+    public struct Observation: Equatable, Sendable {
+        /// The pair's frame-index separation k.
+        public var separation: Int
+
+        /// The pair's measured Δt in seconds -- not k times the nominal.
+        public var deltaT: Double
+
+        /// The source pixel's confidence class, 0/1/2 = low/medium/high.
+        public var confidenceClass: Int
+
+        /// The source depth's registered band index.
+        public var band: Int
+
+        /// The source depth in meters.
+        public var depth: Float
+
+        /// The signed residual in meters: observed minus predicted depth,
+        /// the exact value the default buckets accumulate.
+        public var residual: Float
+
+        public init(
+            separation: Int,
+            deltaT: Double,
+            confidenceClass: Int,
+            band: Int,
+            depth: Float,
+            residual: Float
+        ) {
+            self.separation = separation
+            self.deltaT = deltaT
+            self.confidenceClass = confidenceClass
+            self.band = band
+            self.depth = depth
+            self.residual = residual
+        }
+    }
+
     /// Robust statistics of one bucket's signed residuals. `medianAbs` and
     /// `mad` describe |Δ|; `medianSigned` keeps the sign so a systematic
     /// bias -- a chain bug, not sensor noise -- stays visible.
@@ -304,9 +347,15 @@ public enum Calibration {
     /// by construction: fixed frame order, sequential folds, dictionary
     /// lookups but never dictionary iteration, no clocks, no randomness --
     /// the same container byte-reproduces the same report.
+    ///
+    /// `observationSink`, when non-nil, receives every surviving sample in
+    /// the deterministic accumulation order -- observation only, and the
+    /// tests hold it there: the report is identical with the sink nil or
+    /// attached, and the sink's samples re-derive the report's own buckets.
     public static func analyze(
         reader: SessionContainer.Reader,
-        constants: Constants = Constants()
+        constants: Constants = Constants(),
+        observationSink: ((Observation) -> Void)? = nil
     ) throws -> Report {
         precondition(constants.pixelStride >= 1)
         precondition(constants.bandEdges.count >= 2)
@@ -392,7 +441,8 @@ public enum Calibration {
                 separation: separation,
                 eligible: eligible,
                 bands: bands,
-                constants: constants
+                constants: constants,
+                observationSink: observationSink
             ))
         }
         return Report(
@@ -407,7 +457,8 @@ public enum Calibration {
         separation k: Int,
         eligible: [EligibleFrame],
         bands: Int,
-        constants: Constants
+        constants: Constants,
+        observationSink: ((Observation) -> Void)? = nil
     ) -> SeparationResult {
         // The k = 1 pass carries the registered edge-mask-off and
         // class-match-off sensitivity variants; every pass carries the
@@ -551,6 +602,14 @@ public enum Calibration {
                         filters.forwardBackward[sourceClass][band] += 1
                     } else {
                         defaultSamples[sourceClass][band].append(residual)
+                        observationSink?(Observation(
+                            separation: k,
+                            deltaT: deltaT,
+                            confidenceClass: sourceClass,
+                            band: band,
+                            depth: depth,
+                            residual: residual
+                        ))
                     }
                     if !sourceMasked, !targetMasked, !mismatched {
                         fwbwOffSamples[sourceClass][band].append(residual)

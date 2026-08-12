@@ -963,3 +963,150 @@ ship.
   properties, so their throughput and memory numbers are unchanged and
   were not re-run. List-heavy throughput is not measured yet: no
   list-heavy real file exists among the calibrated subjects.
+
+## 2026-08-12 · v0.6 commit 1 — the fit's data seam, and the criteria before the data
+
+**Built and gated; every fitted number awaits the export and the fit.**
+The rung's charter: the uncertainty model is *fitted*, not measured —
+numpy's job, offline, what closes the thesis. This commit ships the seam
+the observations will cross, the harness that will fit them, and the
+criteria the fit will be judged by — registered now, before any real
+observation file exists. Real exports derive from home captures and stay
+on the Mac, never committed; nothing in this rung runs on a device.
+
+- **A premise in the brief was stale, and the code's own record overruled
+  it.** The brief placed the observations "inside CalibrationProbe's
+  analysis" and held that libraries do not change. The v0.4 commit 4 entry
+  above records the opposite design, deliberately: the analysis lives in
+  `Calibration` (Render) "so tests can reach it", the probe only formats,
+  and executables cannot be imported by the test target. A probe-local
+  export would therefore re-implement the registered filter chain in
+  untestable code — the silent-drift failure mode. So `Calibration.analyze`
+  gained an additive, default-nil `observationSink` instead, existing
+  callers untouched, and the emission point is itself registered: the sink
+  fires exactly where a sample survives all ten filters and enters the
+  default buckets — never a sensitivity variant, never anything the report
+  does not count. Three tests hold it there: conservation (the sink's
+  samples, grouped per class × band × k and summarized, re-derive the
+  report's own buckets exactly), observation-only (the report is equal
+  with the sink nil and attached), and the occlusion fixture (everything
+  reaches the chain, nothing survives, nothing is delivered).
+- **Both new Swift test families were shown red before being trusted.**
+  Emitting from the fwbw-off site turned the occlusion test red
+  (25 delivered against 0 expected) while conservation stayed green — its
+  fixture has no forward-backward rejections, so the two populations
+  coincide there; the division of labor between the tests is recorded, not
+  hidden. Dropping every second observation turned conservation red
+  (counts and MAD both caught it). Both restored; 120 tests green.
+- **The export, the `--dump` precedent.** `CalibrationProbe
+  --dump-observations <out.csv>` (exactly one container per invocation —
+  two would interleave sessions under one provenance header) with
+  `--observation-decimation N`, registered default 64: one counter per
+  (k × class × band), starting at zero, keep when `counter % N == 0` —
+  systematic-every-Nth over the analysis's deterministic accumulation
+  order, no randomness. The file: a `#` header carrying the schema tag
+  `skewline-observations/1`, the session UUID, every registered constant,
+  the decimation, and the per-bucket pre-decimation survivor counts a
+  decimated file cannot otherwise recover — then bare
+  `k,delta_t,class,depth,delta` rows, floats as Swift's shortest
+  round-trip `description`. Decimated raw export, not binned aggregates,
+  registered with the information loss argued: decimation preserves the
+  per-observation distribution so any later statistic is recomputable,
+  where binning would freeze today's statistics and make pooled baselines
+  inexact; the sampling error of a bucket median at the argued
+  post-decimation scale sits under the ordering margins the calibration
+  already banked. The writer lives in the probe, untestable by the
+  established `InteropProbe --dump` trade; everything statistical is
+  library-side and tested.
+- **The registered criteria.** Data: the k=1 rows of the registered
+  export; three classes fitted and judged independently. Candidates: the
+  banded table (incumbent), affine a + b·d, quadratic a + b·d², power
+  a·d^p with p on the grid [0.5, 3.0] step 0.05 — the table is what must
+  be beaten, affine is first order, d² is the triangulation-noise shape
+  and the fw-bw bound's own, the power law lets the data pick the exponent
+  and nests both. Objective: pinball loss at τ = 0.5 on raw observations —
+  the same objective the metric scores; the power scale is closed-form per
+  grid point (weighted median of |Δ|/dᵖ with weights dᵖ), affine and
+  quadratic run a fixed 50-iteration IRLS with residual floor 1e-9 m from
+  an unweighted least-squares start. The per-band upper median *is* the
+  piecewise-constant L1 minimizer, so the baseline is automatically
+  coherent and a continuous form can only win through within-band depth
+  resolution and generalization. Positivity gate: σ̂(d) ≤ 0 anywhere on a
+  0.01 m grid over [0.5, 5.0] disqualifies before selection. Split:
+  leave-one-out over the four calibrated containers (M1 931A8965…, M2
+  1A68AF96…, D1 85E5E2F1…, README 2110CDA9…), and in each fold BOTH
+  candidates — every form and the table it must beat — are built from the
+  same three fit containers, never from all four. Metric: mean
+  per-observation L1 against σ̂ on the held-out container, per class.
+  Adoption: strictly better than the fold's table in all four folds, ties
+  to the incumbent, per-fold margins reported so a squeaker is visible;
+  among all-fold winners the lowest unweighted mean of per-fold metrics
+  (one container, one vote); the winner refits on all four containers, and
+  those final coefficients are never themselves holdout-validated — only
+  the form is. Any class that clears nothing is REFUSED and keeps the
+  table; a mixed artifact is a legitimate outcome, the refused-low-drift
+  shape. Two properties recorded so the measured numbers cannot be
+  misread: the metric has an irreducible floor (the spread of |Δ| itself,
+  largest for the low class) and selection is a paired comparison
+  unaffected by it; and observations are heavily correlated across
+  neighbouring pixels and frames, so no i.i.d. standard error is claimed —
+  the unanimity bar is the guard, and that is why it exists. Pooling
+  across containers — inside a fold's baseline and in the final refit — is
+  a declared break from the per-container reporting of v0.4/v0.5,
+  justified by one device class and containers as exchangeable scene
+  samples, registered here before any pooled number exists. Fine bins
+  (0.1 m, minimum 100 samples) are diagnostics printed beside the fit,
+  never the fit path. The n = 4 external-validity caveat stands and is not
+  resolved here.
+- **Drift stays recorded-only.** Δt and k ride the schema, but no drift
+  term is fitted this rung: v0.4 refused low-class drift on the fw-bw
+  truncation self-flag, and a drift model fitted through k ≥ 5 data would
+  launder that refusal into a coefficient.
+- **The artifact, registered not produced.** `skewline-fit/1`, JSON, small
+  and aggregate: per class the verdict and either the adopted form with
+  coefficients or the refused class's table, plus every fold's metrics and
+  margins; at the top the estimand with fixed wording — "upper median |Δ|
+  of same-class cross-frame reprojection at k=1 under the registered
+  filter chain, meters, pairwise — not a single-reading sigma" — with
+  `units: meters` and `outsideDomain: refuse`, so no later rung invents
+  what the number means, how to read it off a device, or what to do beyond
+  the domain. Whether a real fitted artifact may ever be committed is not
+  decided here; it derives from home captures even as an aggregate, and
+  the measured commit argues it with the privacy rule in hand.
+- **The Python harness.** `Fit/`: `fit.py` (reader, forms, fitting,
+  selection, artifact I/O — every registered value a module constant),
+  `test_fit.py` on stdlib `unittest` so numpy stays the only dependency,
+  `requirements.txt` pinning numpy==2.5.2 — the version pip resolved at
+  first verified install, not a chosen number — and `.python-version`
+  pinning 3.13.1, which pyenv reads locally and `actions/setup-python`
+  reads in CI: one pin, two readers, where a floating runner interpreter
+  against an exactly pinned numpy breaks the day the image outruns the
+  wheels. Sixteen tests, all seeded: per-form synthetic recovery; a
+  median-not-mean test (asymmetric noise with mean ≈ 3.1× median — a
+  silent mean regression cannot pass); decimation invariance at the scale
+  the seam argues, on the curve rather than the coefficients, because
+  parameters trade off along a fit; adoption of a planted form; refusal on
+  band-constant data; positivity disqualification; artifact round-trip
+  including the mixed outcome; schema-tag rejection on both file kinds.
+- **The Python red, on the highest-stakes invariant.** Inverting the
+  beats-the-table comparison in selection turned three tests red at once,
+  including refused-on-band-constant — a fabricated *adoption* is exactly
+  what the suite must be able to catch, and now demonstrably can.
+  Restored; 16 tests green.
+- **CI and the gate grew together.** A fourth job runs the harness's tests
+  on macos-26 with the runner's Python printed rather than assumed;
+  README's counted sentence became "Four CI jobs" in the same commit,
+  which Assertion 4 enforces mechanically; the pre-staging gate is five
+  commands now, the Python tests fourth and the drift check still last,
+  and CLAUDE.md's gate section says so. `.venv` joined the drift script's
+  tree-walk skips beside `.build`.
+- **Not measured yet.** The registered export's row counts, file sizes
+  and runtime; every fold metric, margin and coefficient; every verdict.
+  One stride-8 smoke dump of a single container did run, to prove the
+  plumbing end-to-end — probe writes, `fit.py` reads, all three classes
+  cross — and was deleted; its numbers are not the registered export's
+  and none is recorded. The command that will export:
+  `swift run -c release CalibrationProbe --separations 1
+  --dump-observations <out.csv> <capture.skewline>`. The command that
+  will fit: `.venv/bin/python Fit/fit.py <model.json> <m1.csv> <m2.csv>
+  <d1.csv> <readme.csv>`.

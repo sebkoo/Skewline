@@ -464,6 +464,133 @@ private func attributed(_ result: Calibration.SeparationResult) -> Int {
     #expect(Calibration.slope([(x: 1, y: 1)]) == nil)
 }
 
+// MARK: - The observation sink, the fit's data seam
+
+private struct SinkKey: Hashable {
+    let separation: Int
+    let confidenceClass: Int
+    let band: Int
+}
+
+/// Conservation: the sink's samples, grouped and summarized, must re-derive
+/// the report's own buckets exactly -- count, medians and MAD -- across every
+/// separation. The export provably is the analysis, not a sibling of it.
+@Test func sinkObservationsReDeriveTheReportsOwnBuckets() throws {
+    let step = 1.0 / 30.0
+    var f0 = SceneFrame(timestamp: 0, depth: 1)
+    var f1 = SceneFrame(timestamp: step, depth: 1)
+    // A class-1 block mirrored in both frames, so a second class survives
+    // the match filter; the later pair sits in a different depth band.
+    for y in 2...3 {
+        for x in 3...4 {
+            f0.confidences[y * mapWidth + x] = 1
+            f1.confidences[y * mapWidth + x] = 1
+        }
+    }
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+        .appendingPathExtension(SessionContainer.pathExtension)
+    defer { try? FileManager.default.removeItem(at: url) }
+    try write([
+        f0, f1,
+        SceneFrame(timestamp: 2 * step, depth: 2.5),
+        SceneFrame(timestamp: 3 * step, depth: 2.5, pose: translation(0, 0, -0.25)),
+    ], to: url)
+
+    let constants = testConstants(separations: [1, 2])
+    var observations: [Calibration.Observation] = []
+    let report = try Calibration.analyze(
+        reader: try SessionContainer.Reader(contentsOf: url),
+        constants: constants,
+        observationSink: { observations.append($0) }
+    )
+
+    var grouped: [SinkKey: [Float]] = [:]
+    for observation in observations {
+        #expect(Calibration.bandIndex(observation.depth, edges: constants.bandEdges)
+            == observation.band)
+        grouped[
+            SinkKey(
+                separation: observation.separation,
+                confidenceClass: observation.confidenceClass,
+                band: observation.band
+            ),
+            default: []
+        ].append(observation.residual)
+    }
+
+    var total = 0
+    for result in report.separations {
+        for classIndex in 0..<3 {
+            for band in 0..<(constants.bandEdges.count - 1) {
+                let bucket = result.buckets[classIndex][band]
+                total += bucket.count
+                let key = SinkKey(
+                    separation: result.separation,
+                    confidenceClass: classIndex,
+                    band: band
+                )
+                let samples = grouped[key] ?? []
+                #expect(samples.count == bucket.count)
+                #expect(Calibration.summarize(samples) == bucket)
+            }
+        }
+    }
+    #expect(observations.count == total)
+    // The fixture must exercise more than one bucket for the grouping to
+    // mean anything: two classes, two bands, two separations.
+    #expect(grouped.keys.count >= 4)
+}
+
+/// Observation only: the same container analyzed with the sink nil and
+/// attached must produce equal reports -- the sink cannot change a number.
+@Test func sinkCannotChangeTheReport() throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+        .appendingPathExtension(SessionContainer.pathExtension)
+    defer { try? FileManager.default.removeItem(at: url) }
+    try write([
+        SceneFrame(timestamp: 0, depth: 1),
+        SceneFrame(timestamp: 1.0 / 30.0, depth: 1, pose: translation(0, 0, -0.25)),
+        SceneFrame(timestamp: 2.0 / 30.0, depth: 1, pose: translation(0.03, 0.01, -0.5)),
+    ], to: url)
+    let withoutSink = try Calibration.analyze(
+        reader: try SessionContainer.Reader(contentsOf: url)
+    )
+    var delivered = 0
+    let withSink = try Calibration.analyze(
+        reader: try SessionContainer.Reader(contentsOf: url),
+        observationSink: { _ in delivered += 1 }
+    )
+    #expect(withoutSink == withSink)
+    #expect(delivered > 0)
+}
+
+/// The occlusion fixture: every interior sample reaches the filter chain and
+/// none survives it, so the sink must deliver nothing -- it observes the
+/// default buckets, never a sensitivity variant's samples.
+@Test func sinkStaysSilentWhenEverySampleIsFiltered() throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+        .appendingPathExtension(SessionContainer.pathExtension)
+    defer { try? FileManager.default.removeItem(at: url) }
+    var far = SceneFrame(timestamp: 0, depth: 2)
+    far.depths = [Float](repeating: 2, count: mapWidth * mapHeight)
+    var near = SceneFrame(timestamp: 1.0 / 30.0, depth: 0.5, pose: translation(0.5, 0, 0))
+    near.depths = [Float](repeating: 0.5, count: mapWidth * mapHeight)
+    try write([far, near], to: url)
+
+    var delivered = 0
+    let report = try Calibration.analyze(
+        reader: try SessionContainer.Reader(contentsOf: url),
+        constants: testConstants(),
+        observationSink: { _ in delivered += 1 }
+    )
+    let k1 = try #require(report.separations.first)
+    #expect(k1.bucketsWithoutForwardBackward[2][2].count == 25)
+    #expect(delivered == 0)
+}
+
 // MARK: - Determinism
 
 @Test func analysisByteReproducesItsOwnReport() throws {

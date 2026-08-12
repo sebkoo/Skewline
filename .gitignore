@@ -12,6 +12,11 @@ xcuserdata/
 .swiftpm/
 Package.resolved
 
+# Python (the fit harness's virtual environment; the interpreter pin in
+# .python-version and the exact numpy pin in Fit/requirements.txt are
+# what is committed)
+.venv/
+
 # macOS
 .AppleDouble
 .LSOverride

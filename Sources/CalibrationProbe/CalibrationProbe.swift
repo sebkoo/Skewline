@@ -24,6 +24,8 @@ struct CalibrationProbe {
     static func main() {
         var paths: [String] = []
         var constants = Calibration.Constants()
+        var dumpPath: String?
+        var decimation = 64
         let arguments = Array(CommandLine.arguments.dropFirst())
         var index = 0
         var usageError = false
@@ -46,15 +48,36 @@ struct CalibrationProbe {
                 } else {
                     usageError = true
                 }
+            case "--dump-observations":
+                index += 1
+                if index < arguments.count {
+                    dumpPath = arguments[index]
+                } else {
+                    usageError = true
+                }
+            case "--observation-decimation":
+                index += 1
+                if index < arguments.count, let parsed = Int(arguments[index]), parsed >= 1 {
+                    decimation = parsed
+                } else {
+                    usageError = true
+                }
             default:
                 paths.append(arguments[index])
             }
             index += 1
         }
+        // A dump binds one provenance header to one session: two containers
+        // through one file would interleave sessions silently.
+        if dumpPath != nil, paths.count != 1 {
+            usageError = true
+        }
         guard !paths.isEmpty, !usageError else {
-            FileHandle.standardError.write(Data(
-                "usage: CalibrationProbe [--separations 1,5,15,30] [--pixel-stride N] <capture.skewline> ...\n".utf8
-            ))
+            let usage = "usage: CalibrationProbe [--separations 1,5,15,30] [--pixel-stride N]"
+                + " [--dump-observations <out.csv> [--observation-decimation N]]"
+                + " <capture.skewline> ...\n"
+                + "       --dump-observations requires exactly one container\n"
+            FileHandle.standardError.write(Data(usage.utf8))
             exit(64)
         }
         #if DEBUG
@@ -63,7 +86,11 @@ struct CalibrationProbe {
         var failed = false
         for path in paths {
             do {
-                try report(on: URL(filePath: path), constants: constants)
+                try report(
+                    on: URL(filePath: path),
+                    constants: constants,
+                    dump: dumpPath.map { (output: URL(filePath: $0), decimation: decimation) }
+                )
             } catch {
                 FileHandle.standardError.write(Data("error: \(path): \(error)\n".utf8))
                 failed = true
@@ -74,12 +101,18 @@ struct CalibrationProbe {
         }
     }
 
-    static func report(on url: URL, constants: Calibration.Constants) throws {
+    static func report(
+        on url: URL,
+        constants: Calibration.Constants,
+        dump: (output: URL, decimation: Int)? = nil
+    ) throws {
+        let collector = dump.map { ObservationCollector(decimation: $0.decimation) }
         let clock = ContinuousClock()
         let start = clock.now
         let report = try Calibration.analyze(
             reader: try SessionContainer.Reader(contentsOf: url),
-            constants: constants
+            constants: constants,
+            observationSink: collector.map { c in { c.consume($0) } }
         )
         let elapsed = start.duration(to: clock.now)
 
@@ -106,6 +139,15 @@ struct CalibrationProbe {
             printSeparation(result, medianFx: report.medianFocalLengthX, constants: constants)
         }
         printDriftSummary(report.separations)
+
+        if let dump, let collector {
+            try writeObservations(
+                collector,
+                to: dump.output,
+                sessionID: report.sessionID,
+                constants: constants
+            )
+        }
 
         #if DEBUG
         let build = "debug build"
@@ -274,5 +316,92 @@ struct CalibrationProbe {
 
     private static func row(_ label: String, _ value: String) -> String {
         "  " + label.padding(toLength: 26, withPad: " ", startingAt: 0) + value
+    }
+
+    /// The fit's data seam, probe-side: decimates the sink's stream and keeps
+    /// the pre-decimation survivor counts a decimated file cannot recover.
+    /// Registered phase: one counter per (k × class × band), starting at
+    /// zero, keep when `counter % N == 0` -- systematic-every-Nth over the
+    /// analysis's deterministic accumulation order, no randomness.
+    final class ObservationCollector {
+        struct Bucket: Hashable, Comparable {
+            let separation: Int
+            let confidenceClass: Int
+            let band: Int
+
+            static func < (lhs: Bucket, rhs: Bucket) -> Bool {
+                (lhs.separation, lhs.confidenceClass, lhs.band)
+                    < (rhs.separation, rhs.confidenceClass, rhs.band)
+            }
+        }
+
+        let decimation: Int
+        var survivors: [Bucket: Int] = [:]
+        var rows: [String] = []
+
+        init(decimation: Int) {
+            self.decimation = decimation
+        }
+
+        func consume(_ observation: Calibration.Observation) {
+            let bucket = Bucket(
+                separation: observation.separation,
+                confidenceClass: observation.confidenceClass,
+                band: observation.band
+            )
+            let seen = survivors[bucket, default: 0]
+            survivors[bucket] = seen + 1
+            guard seen % decimation == 0 else { return }
+            // Shortest-round-trip `description` for every float: lossless,
+            // deterministic and locale-independent, where a fixed decimal
+            // format would drop low bits of near samples for nothing.
+            rows.append(
+                "\(observation.separation),\(observation.deltaT),"
+                    + "\(observation.confidenceClass),\(observation.depth),\(observation.residual)"
+            )
+        }
+    }
+
+    /// One container, one file: `#` provenance header -- schema tag, session,
+    /// every registered constant, decimation, per-bucket survivor counts --
+    /// then bare `k,delta_t,class,depth,delta` rows a numpy `loadtxt` reads
+    /// with `comments='#'`. The writer lives in the probe, never the library:
+    /// the `InteropProbe --dump` precedent.
+    static func writeObservations(
+        _ collector: ObservationCollector,
+        to output: URL,
+        sessionID: UUID,
+        constants: Calibration.Constants
+    ) throws {
+        var lines: [String] = [
+            "# skewline-observations/1",
+            "# session \(sessionID.uuidString)",
+            "# separations \(constants.separations.map(String.init).joined(separator: ","))",
+            "# nominal-frame-interval \(constants.nominalFrameInterval)",
+            "# delta-t-tolerance \(constants.deltaTTolerance)",
+            "# band-edges \(constants.bandEdges.map { "\($0)" }.joined(separator: ","))",
+            "# edge-mask-relative-threshold \(constants.edgeMaskRelativeThreshold)",
+            "# forward-backward-radius \(constants.forwardBackwardRadius)",
+            "# minimum-ordering-samples \(constants.minimumOrderingSamples)",
+            "# ordering-margin \(constants.orderingMargin)",
+            "# pixel-stride \(constants.pixelStride)",
+            "# decimation \(collector.decimation)",
+        ]
+        for bucket in collector.survivors.keys.sorted() {
+            lines.append(
+                "# survivors k=\(bucket.separation) class=\(bucket.confidenceClass)"
+                    + " band=\(bucket.band) \(collector.survivors[bucket]!)"
+            )
+        }
+        lines.append("# columns k,delta_t,class,depth,delta")
+        lines.append(contentsOf: collector.rows)
+        lines.append("")
+        try lines.joined(separator: "\n").write(to: output, atomically: true, encoding: .utf8)
+
+        print("  --- observations (deterministic) ---")
+        print(row("decimation", "\(collector.decimation)"))
+        print(row("survivors", "\(collector.survivors.values.reduce(0, +))"))
+        print(row("rows kept", "\(collector.rows.count)"))
+        print(row("wrote", output.path))
     }
 }

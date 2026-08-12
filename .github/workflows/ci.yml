@@ -49,3 +49,25 @@ jobs:
         uses: actions/checkout@v7
       - name: Check
         run: swift Scripts/readme-drift.swift
+
+  fit:
+    name: Fit harness tests (Python)
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      # One pin, two readers: setup-python reads the same .python-version
+      # pyenv reads locally, so the interpreter matches by construction
+      # instead of floating with the runner image against an exactly
+      # pinned numpy.
+      - name: Select Python
+        uses: actions/setup-python@v7
+        with:
+          python-version-file: .python-version
+      - name: Toolchain
+        run: python3 --version && python3 -m pip --version
+      - name: Install
+        run: python3 -m venv .venv && .venv/bin/pip install -r Fit/requirements.txt
+      - name: Test
+        run: .venv/bin/python -m unittest discover -s Fit -v

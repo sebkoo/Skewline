@@ -49,7 +49,7 @@ func firstPath(withExtension ext: String) -> String? {
     while let url = enumerator?.nextObject() as? URL {
         let relative = url.path.dropFirst(root.path.count + 1)
         let components = relative.split(separator: "/")
-        if components.first == ".git" || components.contains(".build") || components.contains("DerivedData") {
+        if components.first == ".git" || components.contains(".build") || components.contains("DerivedData") || components.contains(".venv") {
             enumerator?.skipDescendants()
             continue
         }

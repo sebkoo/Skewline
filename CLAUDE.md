@@ -25,12 +25,13 @@ becomes a thing the tests drag along.
 
 ## The gate
 
-Four commands, in the terminal, before staging. Xcode cannot run a
+Five commands, in the terminal, before staging. Xcode cannot run a
 tool-hosted test target against a device destination.
 
     swift build && swift test
     xcodebuild -scheme Skewline-Package -destination 'generic/platform=iOS' build
     xcodebuild -project App/SkewlineHarness/SkewlineHarness.xcodeproj -scheme SkewlineHarness -destination 'generic/platform=iOS' build CODE_SIGNING_ALLOWED=NO
+    .venv/bin/python -m unittest discover -s Fit -v
     swift Scripts/readme-drift.swift
 
 The whole suite runs on a Mac with no device attached. `canImport(ARKit)` is
@@ -38,7 +39,9 @@ The whole suite runs on a Mac with no device attached. `canImport(ARKit)` is
 `#if canImport(ARKit) && os(iOS)`, and code inside a false branch is not
 type-checked on that host. The second command is what type-checks it for the
 device; the third catches the app target's `MainActor` default the package
-does not share; the fourth is the README drift check CI also runs.
+does not share; the fourth is the fit harness's tests (one-time setup:
+`python3 -m venv .venv && .venv/bin/pip install -r Fit/requirements.txt`);
+the fifth is the README drift check CI also runs.
 
 Two Swift 6 facts that bite here: `simd` matrix types are `Sendable` but not
 `Codable`, and a `public` struct gets no implicit `Sendable` (SE-0302) with no

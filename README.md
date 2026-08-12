@@ -60,12 +60,15 @@ and produce containers a Mac can replay, and it should not grow a second job.
 swift build && swift test
 ```
 
-Three CI jobs run on every push to `main`. One runs that test suite on macOS.
+Four CI jobs run on every push to `main`. One runs that test suite on macOS.
 One builds for iOS — because the sensor path is behind
 `#if canImport(ARKit) && os(iOS)`, and code inside a false branch is never
 type-checked, so the macOS tests can be green while that file is not even valid
 Swift. The third fails when this README contradicts the repository — detection
-only, and the fix stays a human commit.
+only, and the fix stays a human commit. The fourth runs the fit harness in
+`Fit/` — Python and numpy, because an uncertainty model has to be fitted
+somewhere — whose tests plant known model parameters in synthetic data and
+require the fit to recover them, or to refuse.
 
 ## Where this goes
 
