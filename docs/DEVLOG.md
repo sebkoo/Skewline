@@ -724,3 +724,56 @@ rounding converts to depth error through surface slope and does not.
 Calibration table, drift medians, slopes, filter fractions: not measured
 yet. The command that measures:
 `swift run -c release CalibrationProbe <capture.skewline>`.
+
+## 2026-08-11 · v0.4 commit 5 — the calibration the replays measured
+
+**The confidence classes are real, measured in meters.** Four containers —
+the three movie walks and the README capture — replayed through the
+registered analysis; every number below re-derives from
+`swift run -c release CalibrationProbe <container>`, whose deterministic
+block byte-reproduced across two runs before any number was transcribed,
+and the second operator's re-derivation precedes the push, the standing
+rhythm.
+
+- **Ordering, the thesis gate: 16 of 16.** At k=1 every band of every
+  container scores *ordered with margin* — and stays 16/16 with the edge
+  mask lifted, 16/16 with the class match lifted. The ordering is not the
+  filters' artifact.
+- **Per-class scale, [1,2) band at k=1, median |Δ| in meters:** low
+  0.0437 / 0.0444 / 0.0614 / 0.0646, medium 0.0155 / 0.0181 / 0.0203 /
+  0.0205, high 0.0036 / 0.0043 / 0.0041 / 0.0042 (85E5E2F1 / 2110CDA9 /
+  931A8965 / 1A68AF96; the same rank order in every walk). Across bands
+  the high class runs 3.1–3.5 mm at [0.5,1) to 7.8–10.8 mm at [3,5); the
+  low class 18.9–31.0 mm to 159.7–197.2 mm — an error bar per color,
+  7–20× between the classes the palette separates. High-class signed
+  medians stay within ±1.7 mm at k=1: no systematic chain bias above the
+  rounding floor.
+- **Drift, recorded without a verdict as registered.** High-class pooled
+  slope +15.6 / +16.3 / +16.7 / +18.0 mm per second of separation
+  (fwbw-off +18.3 / +22.0 / +20.6 / +28.7), four walks inside a
+  2.4 mm/s spread; medium +8.2 to +27.2. The per-band medians corroborate:
+  [1,2) high 4.1 → 6.6 → 11.4 mm across k = 1/5/15 on 931A8965. The map
+  is not flat over time; its best class degrades at roughly 16 mm per
+  second of separation under replay.
+- **The truncation self-flag fired; the low-class drift is refused.** The
+  printed bound d²/(fx·b) falls below the low-class medians from k = 5 on
+  (0.031 m in [1,2) against 0.035–0.051 m measured), and the gated low
+  slopes go negative on three of four walks (−25.7 / −51.8 / −53.5 mm/s) —
+  survivorship, not physics. The fwbw-off low slopes (+123 to +280 mm/s)
+  are occlusion-inflated upper bounds. Between the two, low-class drift is
+  recorded as not measurable by this gate. One calibration caveat rides
+  along: [0.5,1) low at k=1 sits at 0.71× its bound on 2110CDA9, with the
+  pooled fwbw-off median 17% above the gated one.
+- **Filters, counted never silent.** At k=1 on 2110CDA9 the fw-bw gate
+  removes 21.5% of low-class [0.5,1) candidates (36,035 of 167,224)
+  against 0.008% of high — the rejection rate itself orders by class, an
+  independent witness. Δt exclusions: 0–5 pairs per walk and separation;
+  M2's 0.100 s gap and the start-anchored windows are handled by count,
+  never special-cased.
+- **Cost.** 54.8–61.5 s per container, release build, single-threaded
+  (timing block, not deterministic).
+
+Containers: M1 `931A8965…`, M2 `1A68AF96…`, D1 `85E5E2F1…`, README
+`2110CDA9…`, all in `~/dev/Skewline-captures/`. Full per-band tables and
+per-filter class×band counts live in the probe output, one command from
+any of them.
