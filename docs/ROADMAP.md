@@ -28,9 +28,9 @@ Core        done      a pose and its uncertainty, carried as one value.
  │   │                        #if canImport(ARKit) && os(iOS)
  │   └─ ReplaySessionSource   the recorded path
  │
- └─ Render            depth pixels into world points, each with its
+ └─ Render  done      depth pixels into world points, each with its
                       confidence. Depends on Core and Replay, never
-                      Capture — the v0.3 rung, still being climbed.
+                      Capture.
 ```
 
 `Replay` must never depend on `Capture`. Replay is what makes the pipeline
@@ -55,7 +55,7 @@ change, that is a signal the boundary was drawn wrong, and it belongs in
 
 ## What has shipped
 
-Fifteen steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
+Twenty steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
 including the ones that were mistakes.
 
 1. **Types.** A pose, a 6×6 covariance beside it, and the tracker's own opinion
@@ -119,9 +119,53 @@ including the ones that were mistakes.
     3.4 G points/s — below the 4.56 G bill — and the packed split at
     18–19 G, four times over it; the padding decides, so the render buffer
     packs. The 60 Hz constraint moved to the draw itself — 17 ms per
-    full-cloud pass — which is v0.4's frame-time problem with a number on
-    it. Confidence became color through one palette: low loud, high calm,
-    undocumented values alarming, in an offscreen image a reader can open.
+    full-cloud pass — a bill that is measured and recorded, though no rung
+    currently spends it; if an interactive viewer ever enters, the number
+    is waiting. Confidence became color through one palette: low loud, high
+    calm, undocumented values alarming, in an offscreen image a reader can
+    open.
+16. **Capture defaults.** The A–D matrix — stride, JPEG quality, depth
+    codec — scored against the registered drop criterion: at or below 1%
+    of callbacks, boundary-only. Cell A (stride 1) dropped 34.15%, chronic
+    and interior; cell C (stride 2, HEIC) dropped 22.89%, HEIC's own
+    53.31 ms encode mean exceeding the 33.33 ms keep budget stride 2 buys
+    outright. Cells B and D (stride 2, JPEG) both passed, and JPEG 0.5 cut
+    bytes 32.8% at no cost to the frame budget over 0.7, so the defaults
+    became stride 2, JPEG 0.5, depth LZFSE.
+17. **The movie path, behind a knob.** `VideoStoragePolicy` routes kept
+    frames to `AVAssetWriter` as `video.mov` — HEVC, reordering off, movie
+    and input pinned to one nanosecond timescale, the session started at
+    `.zero`, fragmented output behind the knob. Every sample is stamped by
+    the same pure function `StorageProbe` seeks and verifies with,
+    frame-exact by equality and never nearest-neighbour. Built and gated;
+    every number waited on the walks.
+18. **The storage default.** Five cells — two movie walks, a dual-write
+    walk and two desk kills — scored the movie path against per-frame
+    files: drops at or below 1%, byte cut ≥20%, warm sequential ≤2×
+    files, cold seek ≤100 ms. Identical frames cut −46.7%
+    (68.3 → 36.4 KiB/frame); the scene bracket ran −46.7% to −72.9/−73.0%;
+    warm replay came back 6× faster. A fragmented kill recovered 423 of
+    445 kept frames through the last closed fragment boundary; the same
+    kill unfragmented left 16,131,338 bytes on disk and nothing
+    recoverable — no moov, zero tracks. The rule resolved without
+    discretion: the harness defaults to `.movieTrack(fragmentInterval: 1)`,
+    per-frame files behind the knob.
+19. **Cross-frame reprojection, behind a probe.** The observable that needs
+    no ground truth: a depth pixel of frame i unprojects through pose i,
+    projects into frame i+k through pose i+k, and predicted depth is
+    compared against what the sensor reported there. `Calibration` carries
+    the analysis, `CalibrationProbe` replays it — Δ binned by confidence
+    class, depth band and frame gap, ten registered filters and three
+    sensitivity variants. Built and gated; every number waited on the
+    replays.
+20. **The calibration.** The confidence classes, measured in meters: high
+    class disagrees with itself 3.1–10.8 mm across depth bands, low class
+    18.9–197.2 mm, ordering held in 16 of 16 band comparisons with margin —
+    including with the edge mask and the class match each turned off. A
+    high-class drift slope of roughly 16 mm per second of separation is
+    recorded without a verdict, no principled threshold existing yet; the
+    low-class drift number is refused outright, the probe's own truncation
+    bound flagging it as unmeasurable rather than small.
 
 ## Decided but not yet done
 
@@ -130,10 +174,7 @@ rather than gaining a tick here, so this section is empty when there is nothing
 outstanding — which is the honest resting state, not a gap.
 
 ```text
-  .claude/settings.json — the staging and force-push rules that the briefs
-  currently state as advice, turned into refusals
-───────────────────────────────────────────────────────────────────────────
-  v0.4 measure is a rung, not a commit list. Nothing below this line is
+  v0.5 interop is a rung, not a commit list. Nothing below this line is
   decided at commit level, and nothing should be.
 ```
 
@@ -147,7 +188,6 @@ because commit 2 discovered that `canImport(ARKit)` is true on macOS.
 
 | Version | Ships | What forces it |
 |---|---|---|
-| **v0.4** measure | Frame time, upload bandwidth, drift under replay | "A result needs a confidence" is an empty claim until the confidence is calibrated against something observed |
 | **v0.5** interop | Point-cloud / PLY reader over Swift–C++ | A format with dozens of properties per point is the wrong job for Swift, and the interop seam is itself a design question worth answering in public |
 | **v0.6** fit | Offline fit of the uncertainty model from replayed sessions | The model is *fitted*, not measured. Fitting is numpy's job, and it is what closes the thesis |
 | **v0.7** service | The fit becomes an endpoint; the client uploads a bundle and gets a model back | Once the fit exists offline, shipping it to the device is the only way it reaches a user |
