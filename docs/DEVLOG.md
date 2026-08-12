@@ -854,3 +854,60 @@ before any repository code existed, both ways, on both build jobs.
   replayed container (the writer lives in the probe, never the library;
   the output stays on the Mac). The command that will measure:
   `swift run -c release InteropProbe <file.ply>`.
+
+## 2026-08-12 · v0.5 commit 2 — the reader the containers measured
+
+**Parse throughput and memory are measured, against real files.** The four
+containers v0.4 commit 5 already calibrated against were dumped through
+`InteropProbe --dump` and each dumped PLY read back twice: `swift build -c
+release` once, unmeasured, then `/usr/bin/time -l .build/release/InteropProbe
+<file.ply>` per read — the built binary invoked directly, never through
+`swift run`, so the reported memory is the probe's own process and not the
+SwiftPM driver wrapping it.
+
+- **The four containers, both runs.** M1 `931A8965…` (556,548,325 bytes,
+  42,811,392 vertices) reads at 4465.0 ms · 124.6 MB/s · 9.6 M points/s then
+  3101.9 ms · 179.4 MB/s · 13.8 M points/s, peak RSS 5,933,318,144 B
+  (5.53 GiB) then 5,125,193,728 B (4.77 GiB). M2 `1A68AF96…` (547,602,661
+  bytes, 42,123,264 vertices): 3145.4 ms · 174.1 MB/s · 13.4 M points/s then
+  2945.1 ms · 185.9 MB/s · 14.3 M points/s, RSS 6,245,187,584 B (5.82 GiB)
+  then 6,563,446,784 B (6.11 GiB). D1 `85E5E2F1…` (552,075,493 bytes,
+  42,467,328 vertices): 2940.8 ms · 187.7 MB/s · 14.4 M points/s then
+  2908.2 ms · 189.8 MB/s · 14.6 M points/s, RSS 6,134,415,360 B (5.71 GiB)
+  then 6,686,932,992 B (6.23 GiB). README `2110CDA9…` (584,660,825 bytes,
+  44,973,892 vertices): 3139.3 ms · 186.2 MB/s · 14.3 M points/s then
+  3254.7 ms · 179.6 MB/s · 13.8 M points/s, RSS 6,011,355,136 B (5.60 GiB)
+  then 5,972,705,280 B (5.56 GiB). Every deterministic block — encoding,
+  byte count, element and property layout, vertex count — byte-reproduced
+  across its two runs; timing and memory did not and are reported as the
+  pair each run printed, never averaged into one number.
+- **What the timing covers.** `report(on:)`'s `ContinuousClock` wraps only
+  `PLYFile(contentsOf:)` — the parse and the column copies from the C++
+  side into Swift arrays — not `positions()`, which runs afterward and
+  builds the vertex count printed just below it. `MB/s` and `M points/s`
+  are the parse-and-copy bill, not a file-to-positions number.
+- **Memory ran 9.2–12.1× the file it read across these eight reads, and
+  that scale is the architecture, not a leak.** Every scalar column,
+  including `confidence` (a `uchar` in the file), is materialized as
+  `double` inside the C++ parser, then copied a second time into Swift
+  arrays before `ply_free` runs — two full in-memory materializations of a
+  widened representation, on top of the whole file first read into one
+  `std::string` buffer. A few hundred megabytes of file became 5.1–6.7 GB
+  of peak resident memory across all four containers in these runs.
+  Whether that bill motivates a streaming reader or narrower in-memory
+  types is a later commit's decision, not this one's.
+- **The cross-anchor holds.** README `2110CDA9…`'s dump reports exactly
+  44,973,892 points over 915 of 923 depth frames — the accumulated-cloud
+  count the "README image" entry already recorded for this capture,
+  reproduced independently by the dump and confirmed again on read.
+- **Dump cost, probe-local, context only.** `InteropProbe --dump` itself:
+  M1 871/878 frames unprojected → 42,811,392 points, 556,548,325 bytes; M2
+  857/866 → 42,123,264 points, 547,602,661 bytes; D1 864/873 → 42,467,328
+  points, 552,075,493 bytes; README 915/923 → 44,973,892 points,
+  584,660,825 bytes. The writer lives in the probe, never the library; the
+  reader above is the shipped artifact under measurement, this is only
+  what produced its input.
+
+Containers: M1 `931A8965…`, M2 `1A68AF96…`, D1 `85E5E2F1…`, README
+`2110CDA9…`, all in `~/dev/Skewline-captures/`. The dumped PLYs live beside
+them, never staged, never committed.
