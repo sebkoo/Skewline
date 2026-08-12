@@ -642,3 +642,53 @@ the criteria registered before any run (the standing drop criterion; byte
 cut ≥ 20%; warm sequential ≤ 2× files; cold seek ≤ 100 ms) are scored on
 device. Movie append time, waits, bytes, seek times and crash-tail loss:
 not measured yet.
+
+## 2026-08-11 · v0.4 commit 3 — the storage default the walks measured
+
+**Movie storage becomes the default, measured.** Five cells — two movie
+walks, one dual-write walk scoring both paths on identical frames, two desk
+kills — were scored against the criteria registered before any run, and the
+rule fixed in advance resolves without discretion: both gates hold, no
+replay ceiling is breached, so bytes decide and the harness defaults to
+`.movieTrack(fragmentInterval: 1)`, per-frame files staying behind the knob.
+Every number below is the second operator's re-derivation from the exported
+containers, not the panel's.
+
+- **Drain, the gate.** M1 0/1756 dropped; M2 9/1750 = 0.51%; D1 10/1766 =
+  0.57% (dual double-writes both paths — recorded, not gating). The movie
+  path's one systematic cost: a start-anchored non-delivery window at
+  first-append encoder spin-up (append max 1499/1814/1601 ms), measured
+  1.47/2.10/1.83 s, remainder clean all three times (870/852/871
+  consecutive clean gaps) — admitted under a treatment amended twice,
+  each time registered before the cell it scored, never after. Window size
+  varies; scene light is a candidate variable (n=2, not concluded). Encoder
+  prewarm — the writer started before capture — is the engineering path
+  that likely deletes the window: future work, recorded not assumed, and it
+  does not move this decision.
+- **Bytes.** The movie is scene-invariant at ~36.4 KiB/frame across all
+  three movie walks; JPEG 0.5 is not (135 KiB/frame bright, 68.3 dark). The
+  cut brackets −46.7% (identical frames, dark walk) to −72.9/−73.0% (vs the
+  inherited bright baseline) — the ≥20% bar cleared everywhere, and the
+  narrowed dark-scene gap is JPEG shrinking, not the movie growing.
+- **Replay.** Presentation times exact by equality on 878/866/873 samples,
+  nanosecond timescale round-tripped; decoded pixels byte-reproduce across
+  two decodes on all three movie containers (analysis Mac; cross-device
+  decode stability untested, claimed neither way). Warm sequential
+  2.07/2.36/2.20 ms/frame against the file path's 12.54/13.27 — six times
+  faster, 0.165–0.19× the 2× ceiling. Cold random 20.87–23.61 ms mean
+  against files 14.62 — files 1.4× faster cold, both far under the 100 ms
+  ceiling: exactly the split the registered rule resolved in advance, so
+  bytes ruled.
+- **Failure.** Fragmented at 1 s, a kill at ~15.5 s recovered 423 of 445
+  keeps — complete through the last closed fragment boundary, a 0.73 s
+  tail lost — with depth/confidence files surviving to the final ingested
+  frame. Unfragmented, the same kill left 16,131,338 bytes on disk and
+  nothing recoverable: no moov, zero tracks. `fragmentInterval` 1 s is the
+  measured default, and every passing drain number above already includes
+  the fragment cost. Either way a kill leaves no `session.json` — neither
+  layout yields a *session*; this axis scored payload survivability.
+
+Session UUIDs, recorded against their cells the moment each capture ended:
+M1 `931A8965…`, M2 `1A68AF96…`, D1 `85E5E2F1…`, K1 `AC73C3A0…`,
+K2 `B8B03C5C…`, exported to `~/dev/Skewline-captures/`. Full per-cell
+analysis lives with the second operator, not here.

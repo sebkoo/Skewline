@@ -1,7 +1,9 @@
 import Foundation
 
 /// How a capture stores its kept frames' pixels -- the knob the v0.4 storage
-/// walks measure. Toggled per walk by editing the default in
+/// walks measured: `.movieTrack(fragmentInterval: 1)` is the default those
+/// walks chose, and `.perFrameFiles` stays behind the knob because keeping
+/// it costs `Replay` nothing. Toggled by editing the default in
 /// `SessionRecorder.start()`, the same practice as the capture matrix; a
 /// settings UI would be a second job the harness must not grow.
 ///
@@ -40,7 +42,7 @@ nonisolated enum VideoStoragePolicy {
         }
     }
 
-    /// The panel's `storage` row, or `nil` for the per-frame default -- the
+    /// The panel's `storage` row, or `nil` for the per-frame path -- the
     /// panel a per-frame run prints is exactly the one it printed before
     /// this knob existed.
     var panelLabel: String? {

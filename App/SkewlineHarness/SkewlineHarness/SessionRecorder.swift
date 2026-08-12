@@ -108,10 +108,15 @@ final class SessionRecorder {
                 let encoder = FrameEncoder()
                 let depthEncoder = DepthEncoder()
                 // The storage knob, a constructor-style default like the two
-                // encoders above: toggled per walk by editing this line, the
-                // matrix practice. Per-frame files remain the measured
-                // default until the storage walks say otherwise.
-                let storage = VideoStoragePolicy.perFrameFiles
+                // encoders above, chosen from device measurements: the movie
+                // path held the drop criterion on both full walks, wrote
+                // scene-invariant ~36 KiB/frame against JPEG's 68-135, and
+                // replays 6x faster sequentially; 1 s fragments were measured
+                // to bound a mid-capture kill's video loss at the last closed
+                // fragment boundary, where an unfragmented file lost
+                // everything. Per-frame files stay behind the knob. See
+                // DEVLOG, "the storage default the walks measured."
+                let storage = VideoStoragePolicy.movieTrack(fragmentInterval: 1)
 
                 // Two sibling children, each owning its own array; the frame
                 // drain runs inline in this task body, concurrent with both,

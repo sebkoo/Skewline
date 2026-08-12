@@ -56,7 +56,12 @@ public final class MovieFrameWriter {
     public let url: URL
     public let codec: VideoCodec
     /// Seconds between movie fragments, or `nil` for an unfragmented file --
-    /// the value `VideoTrackRecord.fragmentInterval` records.
+    /// the value `VideoTrackRecord.fragmentInterval` records. Measured, not
+    /// theoretical: a mid-capture kill left an unfragmented file's
+    /// 16,131,338 bytes entirely unrecoverable -- no moov was ever written
+    /// -- while 1 s fragments bounded the loss at the last closed fragment
+    /// boundary. The harness passes 1 s; `nil` here is a caller's explicit
+    /// choice, not a recommendation.
     public let fragmentInterval: TimeInterval?
     public private(set) var appendedSampleCount = 0
 
