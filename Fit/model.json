@@ -1,0 +1,292 @@
+{
+  "classes": {
+    "high": {
+      "folds": [
+        {
+          "forms": {
+            "affine": {
+              "margin": 3.3886965416958514e-06,
+              "metric": 0.004849378580184767
+            },
+            "power": {
+              "margin": -3.246857696303021e-06,
+              "metric": 0.004856014134422766
+            },
+            "quadratic": {
+              "margin": -1.3117466606893738e-06,
+              "metric": 0.004854079023387152
+            }
+          },
+          "holdout": "931A8965-D191-4A08-B6D9-DC60EA2AA606",
+          "table": 0.004852767276726463
+        },
+        {
+          "forms": {
+            "affine": {
+              "margin": 1.3503173940735726e-05,
+              "metric": 0.0053746799311168774
+            },
+            "power": {
+              "margin": 8.03986359686204e-06,
+              "metric": 0.005380143241460751
+            },
+            "quadratic": {
+              "margin": 3.1614786639468095e-06,
+              "metric": 0.005385021626393666
+            }
+          },
+          "holdout": "1A68AF96-C045-4EFD-AD0E-9CEDA9B041A1",
+          "table": 0.005388183105057613
+        },
+        {
+          "forms": {
+            "affine": {
+              "margin": -1.0132315907223494e-05,
+              "metric": 0.004450421156743224
+            },
+            "power": {
+              "margin": -1.7942320235272285e-05,
+              "metric": 0.004458231161071273
+            },
+            "quadratic": {
+              "margin": 1.1009948243536835e-05,
+              "metric": 0.0044292788925924635
+            }
+          },
+          "holdout": "85E5E2F1-4F41-4421-B540-E4E598105BDF",
+          "table": 0.004440288840836
+        },
+        {
+          "forms": {
+            "affine": {
+              "margin": 5.4502362987199e-06,
+              "metric": 0.004930915633699665
+            },
+            "power": {
+              "margin": 6.431706500769664e-06,
+              "metric": 0.004929934163497615
+            },
+            "quadratic": {
+              "margin": -7.65202938944002e-06,
+              "metric": 0.004944017899387825
+            }
+          },
+          "holdout": "2110CDA9-59D2-4197-A545-14EA9356A355",
+          "table": 0.004936365869998385
+        }
+      ],
+      "table": {
+        "edges": [
+          0.5,
+          1.0,
+          2.0,
+          3.0,
+          5.0
+        ],
+        "medians": [
+          0.0032641888,
+          0.004096031,
+          0.0062491894,
+          0.008943319
+        ]
+      },
+      "verdict": "refused"
+    },
+    "low": {
+      "coefficients": {
+        "a": 0.022172998299025772,
+        "b": 0.011175427694503325
+      },
+      "folds": [
+        {
+          "forms": {
+            "affine": {
+              "margin": 0.0009218102631050051,
+              "metric": 0.4153380730447526
+            },
+            "power": {
+              "margin": 0.0005931412158850513,
+              "metric": 0.4156667420919726
+            },
+            "quadratic": {
+              "margin": 5.954689422882353e-06,
+              "metric": 0.41625392861843474
+            }
+          },
+          "holdout": "931A8965-D191-4A08-B6D9-DC60EA2AA606",
+          "table": 0.4162598833078576
+        },
+        {
+          "forms": {
+            "affine": {
+              "margin": 0.0014087699297871403,
+              "metric": 0.20164117744803808
+            },
+            "power": {
+              "margin": 0.0014011636748176293,
+              "metric": 0.2016487837030076
+            },
+            "quadratic": {
+              "margin": 0.0017092067411223488,
+              "metric": 0.20134074063670288
+            }
+          },
+          "holdout": "1A68AF96-C045-4EFD-AD0E-9CEDA9B041A1",
+          "table": 0.20304994737782522
+        },
+        {
+          "forms": {
+            "affine": {
+              "margin": 0.0011838073914564318,
+              "metric": 0.12600926528411763
+            },
+            "power": {
+              "margin": 0.0018497906084859461,
+              "metric": 0.1253432820670881
+            },
+            "quadratic": {
+              "margin": 0.002589810596585279,
+              "metric": 0.12460326207898878
+            }
+          },
+          "holdout": "85E5E2F1-4F41-4421-B540-E4E598105BDF",
+          "table": 0.12719307267557406
+        },
+        {
+          "forms": {
+            "affine": {
+              "margin": 0.0013723288748655749,
+              "metric": 0.14055031747194502
+            },
+            "power": {
+              "margin": 0.0013891014152548065,
+              "metric": 0.1405335449315558
+            },
+            "quadratic": {
+              "margin": 0.001227622415720414,
+              "metric": 0.14069502393109018
+            }
+          },
+          "holdout": "2110CDA9-59D2-4197-A545-14EA9356A355",
+          "table": 0.1419226463468106
+        }
+      ],
+      "form": "quadratic",
+      "verdict": "adopted"
+    },
+    "medium": {
+      "coefficients": {
+        "a": 0.010529262553736412,
+        "b": 0.0027808342256225803
+      },
+      "folds": [
+        {
+          "forms": {
+            "affine": {
+              "margin": 0.0002642140392091451,
+              "metric": 0.02880455446493746
+            },
+            "power": {
+              "margin": 0.00024439489496048614,
+              "metric": 0.02882437360918612
+            },
+            "quadratic": {
+              "margin": 8.058417555877745e-05,
+              "metric": 0.028988184328587827
+            }
+          },
+          "holdout": "931A8965-D191-4A08-B6D9-DC60EA2AA606",
+          "table": 0.029068768504146605
+        },
+        {
+          "forms": {
+            "affine": {
+              "margin": 0.00015860940057179154,
+              "metric": 0.03123775335316804
+            },
+            "power": {
+              "margin": 8.972273862333652e-05,
+              "metric": 0.031306640015116495
+            },
+            "quadratic": {
+              "margin": 6.0939440813687074e-05,
+              "metric": 0.031335423312926144
+            }
+          },
+          "holdout": "1A68AF96-C045-4EFD-AD0E-9CEDA9B041A1",
+          "table": 0.03139636275373983
+        },
+        {
+          "forms": {
+            "affine": {
+              "margin": 9.008126660142723e-05,
+              "metric": 0.02319553206256022
+            },
+            "power": {
+              "margin": 0.0001460278983591995,
+              "metric": 0.023139585430802447
+            },
+            "quadratic": {
+              "margin": 0.0004503082581823123,
+              "metric": 0.022835305070979334
+            }
+          },
+          "holdout": "85E5E2F1-4F41-4421-B540-E4E598105BDF",
+          "table": 0.023285613329161646
+        },
+        {
+          "forms": {
+            "affine": {
+              "margin": 0.0002581569298799394,
+              "metric": 0.027898680767580505
+            },
+            "power": {
+              "margin": 0.00024545141181508967,
+              "metric": 0.027911386285645354
+            },
+            "quadratic": {
+              "margin": 0.0003105119704726392,
+              "metric": 0.027846325726987805
+            }
+          },
+          "holdout": "2110CDA9-59D2-4197-A545-14EA9356A355",
+          "table": 0.028156837697460444
+        }
+      ],
+      "form": "quadratic",
+      "verdict": "adopted"
+    }
+  },
+  "depthDomain": [
+    0.5,
+    5.0
+  ],
+  "estimand": "upper median |delta| of same-class cross-frame reprojection at k=1 under the registered filter chain, meters, pairwise -- not a single-reading sigma",
+  "export": [
+    {
+      "decimation": 64,
+      "session": "931A8965-D191-4A08-B6D9-DC60EA2AA606"
+    },
+    {
+      "decimation": 64,
+      "session": "1A68AF96-C045-4EFD-AD0E-9CEDA9B041A1"
+    },
+    {
+      "decimation": 64,
+      "session": "85E5E2F1-4F41-4421-B540-E4E598105BDF"
+    },
+    {
+      "decimation": 64,
+      "session": "2110CDA9-59D2-4197-A545-14EA9356A355"
+    }
+  ],
+  "outsideDomain": "refuse",
+  "schema": "skewline-fit/1",
+  "trainedOn": [
+    "931A8965-D191-4A08-B6D9-DC60EA2AA606",
+    "1A68AF96-C045-4EFD-AD0E-9CEDA9B041A1",
+    "85E5E2F1-4F41-4421-B540-E4E598105BDF",
+    "2110CDA9-59D2-4197-A545-14EA9356A355"
+  ],
+  "units": "meters"
+}

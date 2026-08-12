@@ -1110,3 +1110,104 @@ on the Mac, never committed; nothing in this rung runs on a device.
   --dump-observations <out.csv> <capture.skewline>`. The command that
   will fit: `.venv/bin/python Fit/fit.py <model.json> <m1.csv> <m2.csv>
   <d1.csv> <readme.csv>`.
+
+## 2026-08-12 · v0.6 commit 2 — the fit the observations measured
+
+**The fit split: two classes beat the table, the third didn't.** Both
+registered commands ran, twice each, against the same four containers
+v0.4 commit 5 and v0.5 commit 2 already measured — M1 `931A8965…`, M2
+`1A68AF96…`, D1 `85E5E2F1…`, README `2110CDA9…` — with nothing about the
+criteria touched: same candidates, same power grid, same IRLS settings,
+same leave-one-out split, same adoption bar. No code defect surfaced, so
+this is a docs-plus-artifact commit, no source changes.
+
+- **Low: adopted, quadratic.** `a=0.022173, b=0.011175` for `a + b·d²`.
+  Table / quadratic per holdout fold: 931A8965 0.416260 / 0.416254
+  (margin +0.000006), 1A68AF96 0.203050 / 0.201341 (+0.001709), 85E5E2F1
+  0.127193 / 0.124603 (+0.002590), 2110CDA9 0.141923 / 0.140695
+  (+0.001228) — quadratic beats the table in every fold. Affine and power
+  also cleared every fold (affine margins +0.000922 / +0.001409 /
+  +0.001184 / +0.001372; power +0.000593 / +0.001401 / +0.001850 /
+  +0.001389) but quadratic's mean per-fold metric was the lowest among
+  all-fold winners, so it won the form comparison.
+- **Medium: adopted, quadratic.** `a=0.010529, b=0.002781` for `a +
+  b·d²`. Table / quadratic per fold: 931A8965 0.029069 / 0.028988
+  (+0.000081), 1A68AF96 0.031396 / 0.031335 (+0.000061), 85E5E2F1
+  0.023286 / 0.022835 (+0.000450), 2110CDA9 0.028157 / 0.027846
+  (+0.000311). Affine and power also swept every fold (affine +0.000264 /
+  +0.000159 / +0.000090 / +0.000258; power +0.000244 / +0.000090 /
+  +0.000146 / +0.000245); quadratic's mean metric was again lowest.
+- **High: refused.** No form beat the table in all four folds — every
+  candidate lost at least one, and by margins an order of magnitude
+  smaller than low or medium's: affine lost 85E5E2F1 (table 0.004440 vs
+  0.004450, margin -0.000010) despite beating the other three; quadratic
+  lost 931A8965 (0.004853 vs 0.004854, -0.000001) and 2110CDA9 (0.004936
+  vs 0.004944, -0.000008); power lost 931A8965 (-0.000003) and 85E5E2F1
+  (-0.000018). Whichever container is held out flips the sign of a margin
+  this small — which is exactly the case the unanimity bar exists to
+  refuse rather than average away. High keeps the table: edges `[0.5, 1,
+  2, 3, 5]`, medians `[0.0032641888, 0.004096031, 0.0062491894,
+  0.008943319]`, refit on all four containers pooled.
+- **Determinism, both stages.** Every export ran twice into separate
+  files and byte-compared identical: M1, M2, D1, README all `diff`-empty
+  across their two runs. `fit.py` ran twice into separate output paths;
+  the two `model.json`s are byte-identical (`diff` empty) — the only
+  difference between the two stdout transcripts is the echoed output
+  path on the final line. Sixteen Python tests green
+  (`.venv/bin/python -m unittest discover -s Fit -v`), matching commit
+  1's count exactly — no discrepancy to record.
+- **Consistency observation (recorded, not gated).** The exported,
+  decimated CSV's own `[1,2)`-band, `k=1`, high-class upper median beside
+  v0.4's full-population figure for the same band, with the bucket's
+  pre-decimation survivor count (`# survivors k=1 class=2 band=1`) and
+  the decimated row count actually used: D1 `85E5E2F1` 0.003631 vs 0.0036
+  (Δ 0.000031; 9,912,725 survivors, 154,887 decimated rows), README
+  `2110CDA9` 0.004327 vs 0.0043 (Δ 0.000027; 13,427,266 survivors,
+  209,802 rows), M1 `931A8965` 0.004125 vs 0.0041 (Δ 0.000025;
+  12,077,059 survivors, 188,705 rows), M2 `1A68AF96` 0.004233 vs 0.0042
+  (Δ 0.000033; 12,122,014 survivors, 189,407 rows). Every difference is
+  under 0.00005 — the quantization width of v0.4's own 4-decimal-place
+  figures — so each reads as agreement, full stop; none needed the
+  bucket's raw survivor count to explain it. The bare
+  `1/sqrt(survivors)` heuristic (~0.03%) undershoots the observed
+  relative gap (0.6–0.9%) by roughly 20–30×, which is expected once
+  v0.4's rounding is the binding constraint rather than sampling noise —
+  not a finding, and not investigated further.
+- **Export stats, per container (both runs identical).** M1 `931A8965`:
+  32,268,881 survivors, 504,208 rows kept, 23,898,130 bytes, analysis
+  32.43 s then 32.91 s. M2 `1A68AF96`: 29,991,724 survivors, 468,627 rows
+  kept, 22,221,228 bytes, 29.95 s then 29.55 s. D1 `85E5E2F1`: 29,827,060
+  survivors, 466,054 rows kept, 22,019,410 bytes, 31.67 s then 30.37 s.
+  README `2110CDA9`: 31,200,020 survivors, 487,505 rows kept, 23,055,038
+  bytes, 40.76 s then 32.11 s (timing not deterministic, reported as
+  printed, never averaged). Spot-checked the header's own arithmetic on
+  M1's `k=1 class=2 band=1` bucket: 12,077,059 survivors, 188,705 rows
+  kept — matches `⌈survivors/64⌉` exactly.
+- **The artifact enters the repository.** `Fit/model.json` is staged
+  alongside this entry. The framing that git history is harder to walk
+  back than a DEVLOG paragraph is a false asymmetry: this entry is
+  itself committed to git history, and it already discloses every
+  verdict, every fold's coefficients and metrics, and the refused
+  class's band medians in prose. `model.json` is a strict subset of that
+  same disclosure, only machine-readable — withholding the JSON while
+  committing the prose containing the same numbers would be privacy
+  theater, not privacy. The line this repository has actually drawn,
+  twice, is aggregates yes, raw-or-reconstructable never: DEVLOG's
+  per-band medians (v0.4 commit 5) and the `cloud-confidence.png`
+  capture (published under the operator's recorded exception to the
+  capture-privacy rule) both cleared it; the PLY bundles, RGB frames, and
+  the observation CSVs themselves never do and stay local regardless, no
+  exception, as registered. `model.json` sits on the aggregate side:
+  per-class verdict, coefficients, four fold metrics — no raw observation
+  appears in it. One thing worth saying plainly rather than burying: the
+  artifact's `trainedOn` field lists all four session UUIDs, so the n=4
+  provenance stays machine-visible to any consumer of the committed
+  file, exactly as it's already human-visible above.
+- **Not measured yet.** `fit.py`'s own wall-clock runtime — no `time`
+  wrapper around either run, though both completed well within the
+  session (observationally fast, not timed).
+
+Containers: M1 `931A8965…`, M2 `1A68AF96…`, D1 `85E5E2F1…`, README
+`2110CDA9…`, all in `~/dev/Skewline-captures/`. The exported CSVs stay
+local beside them, never staged, as registered; `Fit/model.json` is the
+one derived file this rung commits, for the reasoning above.
