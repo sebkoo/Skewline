@@ -32,7 +32,7 @@ Core        done      a pose and its uncertainty, carried as one value.
                       confidence. Depends on Core and Replay, never
                       Capture.
 
-Interop     here      a PLY point-cloud file read across a C seam into
+Interop     done      a PLY point-cloud file read across a C seam into
                       the module's own value types. Depends on nothing
                       above -- the C++ parser is a private target behind
                       a pure C header, so no importer inherits a
@@ -61,7 +61,7 @@ change, that is a signal the boundary was drawn wrong, and it belongs in
 
 ## What has shipped
 
-Twenty steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
+Twenty-three steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
 including the ones that were mistakes.
 
 1. **Types.** A pose, a 6×6 covariance beside it, and the tracker's own opinion
@@ -172,6 +172,49 @@ including the ones that were mistakes.
     recorded without a verdict, no principled threshold existing yet; the
     low-class drift number is refused outright, the probe's own truncation
     bound flagging it as unmeasurable rather than small.
+21. **The interop seam.** Two candidate seams, both built and both build
+    jobs run before any library code existed: direct C++ interop
+    (`.interoperabilityMode(.Cxx)`) builds and its own tests pass, but a
+    client importing only the Swift module in front of it fails — `error:
+    'string' file not found` — because every importer rebuilds the C++
+    target's clang module in its own language mode, and `internal import`
+    hides the API, not the mode, on Swift 6.3.3 / Xcode 26.6. The chosen
+    seam is a pure C header over the C++ parser instead, so no importer of
+    `Interop`, present or future, carries C++ interop forward. The attach
+    line's "fills Core from a point-cloud file" could not be honored
+    literally — `Core` has no point type, and changing its shape to gain one
+    breaks the standing rule — so imported points land in `Interop`'s own
+    `PLYFile`/`Element`/`Property` types instead, attached to the module
+    graph nowhere.
+22. **The reader, measured.** The four containers v0.4's calibration already
+    used were dumped through `InteropProbe --dump` and each dumped PLY read
+    back twice with `/usr/bin/time -l .build/release/InteropProbe
+    <file.ply>`, the built binary invoked directly rather than through
+    `swift run`. Across the eight reads: 2908.2–4465.0 ms, 124.6–189.8 MB/s,
+    9.6–14.6 M points/s, and peak RSS running 9.2–12.1× the file each read —
+    two full in-memory materializations of a `double`-widened representation
+    on top of the whole file first read into one buffer, the architecture's
+    bill rather than a leak. The README capture's dump reproduced the
+    accumulated-cloud count the "README image" entry already recorded,
+    independently: 44,973,892 points. Every deterministic block — encoding,
+    byte count, layout, vertex count — byte-reproduced across each
+    container's two reads; timing and memory did not, and are reported as
+    the pair each run printed, never averaged into one number.
+23. **List values, retained.** Closes the interop seam's deferral, forced by
+    the rung's own charter rather than v0.6's: v0.6 consumes only vertex
+    positions and confidence, already fully retained, so an offline fit
+    gives it no reason to force this. What forces it instead is "a format
+    with dozens of properties per point is the wrong job for Swift" — a list
+    property's per-instance layout is exactly that job, and the walk already
+    crossed every list entry before this commit without keeping anything.
+    The seam commit's "decoded ... but not retained" was only ever true of
+    the ASCII path; the binary path never decoded a single list value, only
+    skipped past each entry by `count * valueSize`. Both paths now decode
+    and retain, crossing as one flattened `[Double]` column per list
+    property rather than nested per instance — the same shape scalar columns
+    already cross in, so the ratio the previous commit measured is
+    unchanged, only the bytes retained for properties that were previously
+    free.
 
 ## Decided but not yet done
 
@@ -180,7 +223,7 @@ rather than gaining a tick here, so this section is empty when there is nothing
 outstanding — which is the honest resting state, not a gap.
 
 ```text
-  v0.5 interop is a rung, not a commit list. Nothing below this line is
+  v0.6 fit is a rung, not a commit list. Nothing below this line is
   decided at commit level, and nothing should be.
 ```
 
@@ -194,12 +237,11 @@ because commit 2 discovered that `canImport(ARKit)` is true on macOS.
 
 | Version | Ships | What forces it |
 |---|---|---|
-| **v0.5** interop | Point-cloud / PLY reader over Swift–C++ | A format with dozens of properties per point is the wrong job for Swift, and the interop seam is itself a design question worth answering in public |
 | **v0.6** fit | Offline fit of the uncertainty model from replayed sessions | The model is *fitted*, not measured. Fitting is numpy's job, and it is what closes the thesis |
 | **v0.7** service | The fit becomes an endpoint; the client uploads a bundle and gets a model back | Once the fit exists offline, shipping it to the device is the only way it reaches a user |
 | **v0.8** view | A small web dashboard over the same service | Nearly free once v0.7 exists. Drops entirely if v0.7 slips |
 
-Note the chain from v0.5 down. Python does not enter because Python is popular —
+Note the chain from v0.6 down. Python does not enter because Python is popular —
 it enters because an uncertainty model has to be fitted somewhere; once it is
 fitted offline the network seam is the only way it reaches the phone; and once
 there is a service a dashboard costs a day. Each rung is pulled in by the one
