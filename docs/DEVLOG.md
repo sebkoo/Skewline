@@ -911,3 +911,55 @@ SwiftPM driver wrapping it.
 Containers: M1 `931A8965…`, M2 `1A68AF96…`, D1 `85E5E2F1…`, README
 `2110CDA9…`, all in `~/dev/Skewline-captures/`. The dumped PLYs live beside
 them, never staged, never committed.
+
+## 2026-08-12 · v0.5 commit 3 — the values the counts were standing in for
+
+**List property values are retained, closing commit 1's deferral — on the
+rung's own terms, not v0.6's.** The ROADMAP's test for anything below the
+v0.5 line is whether the rung below forces a change or it would merely
+look good. v0.6 (fit) consumes vertex positions and confidence, scalar
+columns already fully retained; list properties are conventionally face
+indices, and an offline fit over point uncertainty has no use for them.
+So v0.6 does not force this commit, and it is not offered as if it did.
+What forces it instead is v0.5's own charter: "a format with dozens of
+properties per point is the wrong job for Swift." A list property's
+per-instance layout is the data-dependent part of that job — you cannot
+skip one without decoding it first, which is exactly why `parseBinary`
+already walked every list value byte-for-byte before this commit. That
+walk was the expensive, C++-shaped work the seam exists to absorb; a
+reader that pays it and then discards the result gives a caller who wants
+face indices nothing, for the one property type the seam is most suited
+to handle. Retaining the values completes what v0.5 already promised to
+ship.
+
+- **The old wording was half right.** Commit 1 recorded "list property
+  *values* are decoded ... but not retained." That was true of the ASCII
+  path (`parseASCII` already called `parseDouble` per entry and dropped
+  the result) but not of the binary path, which only ever advanced past
+  each list entry by `count * valueSize` — it never decoded a single list
+  value. This commit makes decoding, and retention, true of both paths.
+- **What crosses: a flattened column, same shape as scalar properties.**
+  `ply_list_values` returns one contiguous `double` buffer per list
+  property, flattened across every instance in file order; the paired
+  `ply_list_value_count` is an explicit length so the Swift side never
+  sums `ply_list_counts` itself to size a read through a raw pointer. The
+  Swift-side shape is flat `[Double]`, not nested `[[Double]]`: a
+  face-heavy file can have millions of list instances, and nesting would
+  be one heap allocation per instance on top of the widening cost commit
+  2 already measured. Flat mirrors exactly how `ply_scalar_column`
+  already crosses — one allocation per property — so this does not change
+  the *ratio* commit 2 measured, only the absolute bytes retained for
+  properties that were previously free.
+  `Element.listValues(_:)` slices per instance using the running sum of
+  the existing `listEntryCounts(_:)`.
+  The existing negative-count guard and truncation bounds check are
+  unchanged; the binary path's single skip became a per-entry decode loop
+  inside the same, already-validated bounds.
+- **Coverage gap closed alongside it.** List properties had ASCII and
+  binary-little-endian fixtures but no binary-big-endian one, unlike
+  scalar columns. A new test exercises the byte-swap path for list values
+  the same way the scalar big-endian test already does.
+- **Not re-measured.** Commit 2's four dumped containers carry no list
+  properties, so their throughput and memory numbers are unchanged and
+  were not re-run. List-heavy throughput is not measured yet: no
+  list-heavy real file exists among the calibrated subjects.

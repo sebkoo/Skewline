@@ -29,8 +29,8 @@ public struct PLYReadError: Error, Equatable, Sendable {
 /// A parsed PLY file as Swift values: the declared layout in full, every
 /// scalar property as a column of `Double` -- lossless, because PLY's
 /// integer types are 32 bits or narrower and its floating types are IEEE 754
-/// already -- and list properties preserved by layout and per-instance
-/// count, their values a recorded deferral.
+/// already -- and list properties preserved by layout, per-instance count,
+/// and a flattened value column.
 ///
 /// The parsing lives in the `PLY` C++ target behind a pure C header, and
 /// nothing with a C or C++ lifetime survives this initializer: every column
@@ -73,12 +73,23 @@ public struct PLYFile: Sendable {
         /// Parallel to `properties`; a scalar property's slot is `nil`.
         private let entryCounts: [[Int]?]
 
-        init(name: String, count: Int, properties: [Property], columns: [[Double]?], entryCounts: [[Int]?]) {
+        /// Parallel to `properties`; a scalar property's slot is `nil`.
+        private let entryValues: [[Double]?]
+
+        init(
+            name: String,
+            count: Int,
+            properties: [Property],
+            columns: [[Double]?],
+            entryCounts: [[Int]?],
+            entryValues: [[Double]?]
+        ) {
             self.name = name
             self.count = count
             self.properties = properties
             self.columns = columns
             self.entryCounts = entryCounts
+            self.entryValues = entryValues
         }
 
         /// A scalar property's instances, `count` of them in file order;
@@ -91,6 +102,13 @@ public struct PLYFile: Sendable {
         /// property has that name.
         public func listEntryCounts(_ property: String) -> [Int]? {
             properties.firstIndex { $0.name == property }.flatMap { entryCounts[$0] }
+        }
+
+        /// A list property's values, flattened across every instance in file
+        /// order; `nil` when no list property has that name. Slice per
+        /// instance using the running sum of `listEntryCounts`.
+        public func listValues(_ property: String) -> [Double]? {
+            properties.firstIndex { $0.name == property }.flatMap { entryValues[$0] }
         }
     }
 
@@ -153,6 +171,7 @@ public struct PLYFile: Sendable {
             var properties: [Property] = []
             var columns: [[Double]?] = []
             var entryCounts: [[Int]?] = []
+            var entryValues: [[Double]?] = []
             for propertyIndex in 0..<ply_property_count(parser, elementIndex) {
                 let isList = ply_property_is_list(parser, elementIndex, propertyIndex) == 1
                 properties.append(Property(
@@ -168,8 +187,14 @@ public struct PLYFile: Sendable {
                     entryCounts.append(counts.map {
                         UnsafeBufferPointer(start: $0, count: instanceCount).map(Int.init)
                     } ?? [])
+                    let valueCount = Int(ply_list_value_count(parser, elementIndex, propertyIndex))
+                    let values = ply_list_values(parser, elementIndex, propertyIndex)
+                    entryValues.append(values.map {
+                        Array(UnsafeBufferPointer(start: $0, count: valueCount))
+                    } ?? [])
                 } else {
                     entryCounts.append(nil)
+                    entryValues.append(nil)
                     let column = ply_scalar_column(parser, elementIndex, propertyIndex)
                     columns.append(column.map {
                         Array(UnsafeBufferPointer(start: $0, count: instanceCount))
@@ -181,7 +206,8 @@ public struct PLYFile: Sendable {
                 count: instanceCount,
                 properties: properties,
                 columns: columns,
-                entryCounts: entryCounts
+                entryCounts: entryCounts,
+                entryValues: entryValues
             )
         }
     }

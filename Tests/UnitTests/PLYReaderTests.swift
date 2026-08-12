@@ -167,7 +167,7 @@ private func binaryVertexFixture(bigEndian: Bool) -> Data {
     ])
 }
 
-@Test func asciiListsAreCountedSkippedAndWalkedPast() throws {
+@Test func asciiListsAreCountedRetainedAndWalkedPast() throws {
     let file = try parsed("""
     ply
     format ascii 1.0
@@ -189,6 +189,7 @@ private func binaryVertexFixture(bigEndian: Bool) -> Data {
         PLYFile.Property(name: "vertex_indices", valueType: .int32, listCountType: .uint8),
     ])
     #expect(face.listEntryCounts("vertex_indices") == [3, 4])
+    #expect(face.listValues("vertex_indices") == [0, 1, 2, 0, 1, 2, 3])
     #expect(face.column("vertex_indices") == nil)
     // The element after the lists reads back exactly: the walk stayed
     // aligned through data-dependent instance sizes.
@@ -215,6 +216,31 @@ private func binaryVertexFixture(bigEndian: Bool) -> Data {
     }
     let file = try PLYFile(contentsOf: try written(fixture))
     #expect(file.element("face")?.listEntryCounts("vertex_indices") == [3, 1])
+    #expect(file.element("face")?.listValues("vertex_indices") == [0, 1, 2, 9])
+    #expect(file.element("tail")?.column("marker") == [42.5])
+}
+
+@Test func binaryBigEndianListsRetainValues() throws {
+    let header = """
+    ply
+    format binary_big_endian 1.0
+    element face 2
+    property list uchar short vertex_indices
+    element tail 1
+    property double marker
+    end_header
+
+    """
+    let fixture = binaryFixture(header: header, bigEndian: true) { body in
+        body.append(UInt8(3))
+        for value in [Int16(0), 1, 2] { body.append(value) }
+        body.append(UInt8(1))
+        body.append(Int16(9))
+        body.append(Double(42.5))
+    }
+    let file = try PLYFile(contentsOf: try written(fixture))
+    #expect(file.element("face")?.listEntryCounts("vertex_indices") == [3, 1])
+    #expect(file.element("face")?.listValues("vertex_indices") == [0, 1, 2, 9])
     #expect(file.element("tail")?.column("marker") == [42.5])
 }
 

@@ -90,9 +90,19 @@ ply_scalar ply_property_count_type(const ply_parser* parser, size_t element, siz
 const double* ply_scalar_column(const ply_parser* parser, size_t element, size_t property);
 
 // A list property's per-instance entry counts, ply_instance_count of them;
-// NULL when the property is a scalar. The list *values* are decoded --
-// binary layout cannot be walked without decoding them -- but not retained.
+// NULL when the property is a scalar. See ply_list_values for the values
+// themselves.
 const uint32_t* ply_list_counts(const ply_parser* parser, size_t element, size_t property);
+
+// A list property's values, flattened across every instance in file
+// order -- ply_list_value_count(...) of them; NULL when the property is
+// a scalar. Slice per instance with the running sum of ply_list_counts.
+const double* ply_list_values(const ply_parser* parser, size_t element, size_t property);
+
+// The flattened length of ply_list_values -- the sum of every instance's
+// entry count for this property. An explicit accessor so the caller
+// never sums ply_list_counts itself to size a read.
+size_t ply_list_value_count(const ply_parser* parser, size_t element, size_t property);
 
 #ifdef __cplusplus
 }

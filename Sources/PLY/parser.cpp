@@ -25,10 +25,12 @@ struct Element {
     std::string name;
     uint64_t count = 0;
     std::vector<Property> properties;
-    // Parallel to `properties`: a scalar property fills its `columns` slot,
-    // a list property fills its `listCounts` slot, the other stays empty.
+    // Parallel to `properties`: a scalar property fills its `columns` slot;
+    // a list property fills its `listCounts` slot and its `listValues`
+    // slot (flattened across every instance); the unused slot stays empty.
     std::vector<std::vector<double>> columns;
     std::vector<std::vector<uint32_t>> listCounts;
+    std::vector<std::vector<double>> listValues;
 };
 
 size_t scalarSize(ply_scalar type) {
@@ -273,10 +275,13 @@ void parseHeader(ply_parser& parser, const std::string& buffer, size_t& cursor) 
 void prepareStorage(Element& element) {
     element.columns.resize(element.properties.size());
     element.listCounts.resize(element.properties.size());
+    element.listValues.resize(element.properties.size());
     // The reserve is advisory and clamped: a hostile declared count must
     // not make it throw. The vectors still grow to their true size, and
     // every append consumes file bytes, so growth is bounded by the file
     // and an absurd count falls through to the truncation rejection.
+    // `listValues` gets no reserve: unlike one-count-per-instance, the
+    // number of values per list property isn't known ahead of time.
     const uint64_t reserved = std::min<uint64_t>(element.count, uint64_t{1} << 20);
     for (size_t index = 0; index < element.properties.size(); index += 1) {
         if (element.properties[index].isList) {
@@ -324,6 +329,7 @@ void parseASCII(ply_parser& parser, const std::string& buffer, size_t& cursor) {
                             parser.fail(PLY_ERROR_MALFORMED_LINE, "unreadable value on: " + line);
                             return;
                         }
+                        element.listValues[index].push_back(value);
                         token += 1;
                     }
                     element.listCounts[index].push_back(static_cast<uint32_t>(count));
@@ -347,8 +353,8 @@ void parseASCII(ply_parser& parser, const std::string& buffer, size_t& cursor) {
 
 // Binary data: a bounds-checked byte walk. List values must be decoded to
 // know where the next instance begins -- the layout is data-dependent --
-// which is exactly why they are consumed here even though only their counts
-// are retained.
+// and now that they are decoded anyway, they are retained rather than
+// discarded.
 void parseBinary(ply_parser& parser, const std::string& buffer, size_t cursor) {
     const bool swap = (parser.encoding == PLY_BINARY_BIG_ENDIAN) != hostIsBigEndian();
     const unsigned char* bytes = reinterpret_cast<const unsigned char*>(buffer.data());
@@ -385,8 +391,11 @@ void parseBinary(ply_parser& parser, const std::string& buffer, size_t cursor) {
                         parser.fail(PLY_ERROR_TRUNCATED, "file ends inside a list of " + element.name);
                         return;
                     }
-                    head += count * valueSize;
-                    remaining -= count * valueSize;
+                    for (uint64_t entry = 0; entry < count; entry += 1) {
+                        element.listValues[index].push_back(decodeScalar(head, property.valueType, swap));
+                        head += valueSize;
+                        remaining -= valueSize;
+                    }
                     element.listCounts[index].push_back(static_cast<uint32_t>(count));
                 } else {
                     const size_t size = scalarSize(property.valueType);
@@ -514,6 +523,22 @@ const uint32_t* ply_list_counts(const ply_parser* parser, size_t element, size_t
         return nullptr;
     }
     return owner.listCounts[property].data();
+}
+
+const double* ply_list_values(const ply_parser* parser, size_t element, size_t property) {
+    const Element& owner = parser->elements[element];
+    if (!owner.properties[property].isList) {
+        return nullptr;
+    }
+    return owner.listValues[property].data();
+}
+
+size_t ply_list_value_count(const ply_parser* parser, size_t element, size_t property) {
+    const Element& owner = parser->elements[element];
+    if (!owner.properties[property].isList) {
+        return 0;
+    }
+    return owner.listValues[property].size();
 }
 
 } // extern "C"
