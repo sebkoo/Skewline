@@ -2261,3 +2261,42 @@ again.
 - **Not measured yet.** Unchanged from the commit before: request latency,
   throughput, behavior under concurrent requests, the per-request
   read-and-render cost, startup. Nothing here runs, and nothing here measures.
+
+## 2026-08-13 · v0.9 commit 4 — the scale belongs to the reader
+
+**Built and gated.** The registered sentence said "disagreed by about 0.004096 m",
+and that is two claims that cannot both be right: either the digits matter, in
+which case the hedge is noise, or a person is reading it, in which case the
+digits are. This commit is the one that changes what a registered string prints,
+and it is separate from the move for exactly that reason — a commit typed as a
+pure move must not carry an output change hiding inside it.
+
+- **One sentence, two scales, and the caller states which.**
+  `Sighting.Precision` is `.meters` (six decimals, unhedged) or `.millimeters`
+  (whole millimetres, hedged). The probe takes the first because `ModelProbe`
+  and `fit.py` compare it digit for digit; the phone takes the second because
+  this repository's own measured range runs from about 3 mm to about 200 mm, so
+  a millimetre is the last digit a person can act on.
+- **No default parameter, and that turned out to matter more than expected.**
+  A default is how a screen ends up printing the machine's scale because nobody
+  chose. Making it required meant the eight tests from the commit before failed
+  to *compile* rather than failing to match — every caller was named by the
+  compiler and none could keep the old scale by accident. A default would have
+  turned the same edit into eight silent string mismatches.
+- **The half-millimetre test found a real bug, and the fix is a rule this
+  repository has already written once.** The guard was `millimeters < 0.5` on
+  the raw value. `%.0f` rounds half to even, so exactly 0.5 mm cleared the guard
+  and then printed `about 0 mm` — the one reading this number must never
+  produce, since "0 mm" says the two views agreed. The guard now runs on the
+  rounded value, which is the same correction `DepthMapGrid`'s clamp makes:
+  a rule about the output has to be enforced on the output. Found by a test
+  written for the boundary rather than by reading the code.
+- **"under 1 mm" drops the hedge, because "about under" is not a quantity.**
+  The bound is a statement, not an estimate.
+- **A silence renders identically at both scales, and a test says so.**
+  Precision is a property of a quantity and a refusal has none, so the four
+  refusal sentences are scale-independent by construction. Pinning it stops a
+  later edit from threading a number into a branch that has none.
+- **The gate did not grow.** Five commands, unchanged. Swift 188 → **192**.
+  Python 76 unchanged. Both iOS builds succeeded. Drift green.
+- **Not measured yet.** Unchanged. No number here came from a run.

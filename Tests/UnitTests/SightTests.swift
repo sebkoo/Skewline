@@ -252,9 +252,14 @@ private func fourSessionModel(classes: String = ModelFixture.classes()) throws -
 @Test func anAdoptedFormNamesTheSessionsItWasFittedFrom() throws {
     let model = try fourSessionModel()
     // low is quadratic a=0.02 b=0.01, so 0.02 + 0.01 * 4 at two metres.
-    #expect(model.sighting(depthMeters: 2.0, rawConfidence: 0).sentence(from: model)
+    #expect(model.sighting(depthMeters: 2.0, rawConfidence: 0)
+        .sentence(from: model, precision: .meters)
         == "on the 4 sessions this was fitted from, two views of a point like this"
-        + " disagreed by about 0.060000 m")
+        + " disagreed by 0.060000 m")
+    #expect(model.sighting(depthMeters: 2.0, rawConfidence: 0)
+        .sentence(from: model, precision: .millimeters)
+        == "on the 4 sessions this was fitted from, two views of a point like this"
+        + " disagreed by about 60 mm")
 }
 
 /// A refused class still answers, and the sentence has to say both halves:
@@ -263,9 +268,10 @@ private func fourSessionModel(classes: String = ModelFixture.classes()) throws -
 @Test func aRefusedClassSaysSoAndStillAnswers() throws {
     let model = try fourSessionModel()
     // high is the refused fixture, band [2.0, 3.0) holding 0.003.
-    let sentence = model.sighting(depthMeters: 2.0, rawConfidence: 2).sentence(from: model)
+    let sentence = model.sighting(depthMeters: 2.0, rawConfidence: 2)
+        .sentence(from: model, precision: .meters)
     #expect(sentence == "no form was adopted for this class; on the 4 sessions this was"
-        + " fitted from, its band disagreed by about 0.003000 m")
+        + " fitted from, its band disagreed by 0.003000 m")
     #expect(sentence.contains("no form was adopted"))
     #expect(sentence.contains("0.003000"))
 }
@@ -278,27 +284,38 @@ private func fourSessionModel(classes: String = ModelFixture.classes()) throws -
     )
     let model = try fourSessionModel(classes: sparse)
 
-    #expect(model.sighting(depthMeters: 6.0, rawConfidence: 0).sentence(from: model)
-        == "refused: outside the depths this was fitted over, nothing answers")
-    #expect(model.sighting(depthMeters: 1.5, rawConfidence: 2).sentence(from: model)
-        == "refused: inside the fitted depths, but this band had no samples")
-    #expect(model.sighting(depthMeters: 0, rawConfidence: 0).sentence(from: model)
-        == "refused: the sensor returned no depth at this pixel")
-    #expect(model.sighting(depthMeters: 2.0, rawConfidence: 7).sentence(from: model)
-        == "refused: the sensor reported class 7, which no fold was fitted over")
+    // A silence carries no number, so both scales say the same thing. That is
+    // the point rather than a coincidence: precision is a property of a
+    // quantity, and a refusal has none to render.
+    for precision: Sighting.Precision in [.meters, .millimeters] {
+        #expect(model.sighting(depthMeters: 6.0, rawConfidence: 0)
+            .sentence(from: model, precision: precision)
+            == "refused: outside the depths this was fitted over, nothing answers")
+        #expect(model.sighting(depthMeters: 1.5, rawConfidence: 2)
+            .sentence(from: model, precision: precision)
+            == "refused: inside the fitted depths, but this band had no samples")
+        #expect(model.sighting(depthMeters: 0, rawConfidence: 0)
+            .sentence(from: model, precision: precision)
+            == "refused: the sensor returned no depth at this pixel")
+        #expect(model.sighting(depthMeters: 2.0, rawConfidence: 7)
+            .sentence(from: model, precision: precision)
+            == "refused: the sensor reported class 7, which no fold was fitted over")
+    }
 }
 
 /// The scene guard, stated as the property rather than as four string
 /// comparisons: the artifact cannot guard scene, so every sentence that hands
 /// back a number has to name the sessions it came from. A future branch that
-/// answers without that clause goes red here.
+/// answers without that clause goes red here, at either scale.
 @Test func noSentenceHandsBackANumberWithoutItsProvenance() throws {
     let model = try fourSessionModel()
     for raw in [UInt8(0), 1, 2] {
-        let sighting = model.sighting(depthMeters: 2.0, rawConfidence: raw)
-        let sentence = sighting.sentence(from: model)
-        #expect(sighting.medianPairwiseDisagreementMeters != nil)
-        #expect(sentence.contains("4 sessions this was fitted from"))
+        for precision: Sighting.Precision in [.meters, .millimeters] {
+            let sighting = model.sighting(depthMeters: 2.0, rawConfidence: raw)
+            #expect(sighting.medianPairwiseDisagreementMeters != nil)
+            #expect(sighting.sentence(from: model, precision: precision)
+                .contains("4 sessions this was fitted from"))
+        }
     }
 }
 
@@ -309,5 +326,56 @@ private func fourSessionModel(classes: String = ModelFixture.classes()) throws -
         ModelFixture.artifact(trainedOn: #"["A", "B"]"#).utf8
     ))
     #expect(two.sighting(depthMeters: 2.0, rawConfidence: 0)
-        .sentence(from: two).contains("on the 2 sessions"))
+        .sentence(from: two, precision: .meters).contains("on the 2 sessions"))
+}
+
+// MARK: - The two scales
+
+/// The machine's scale is unhedged, because `ModelProbe` and `fit.py` compare
+/// it digit for digit and "about" would claim an imprecision that comparison
+/// depends on not having.
+@Test func theMachinesScaleCarriesNoHedge() throws {
+    let model = try fourSessionModel()
+    let sentence = model.sighting(depthMeters: 2.0, rawConfidence: 0)
+        .sentence(from: model, precision: .meters)
+    #expect(sentence.contains("0.060000 m"))
+    #expect(!sentence.contains("about"))
+}
+
+/// The person's scale hedges and rounds, because a millimetre is the last
+/// digit anyone holding the phone can act on.
+@Test func thePersonsScaleHedgesAndRoundsToMillimeters() throws {
+    let model = try fourSessionModel()
+    let sentence = model.sighting(depthMeters: 2.0, rawConfidence: 0)
+        .sentence(from: model, precision: .millimeters)
+    #expect(sentence.contains("about 60 mm"))
+    #expect(!sentence.contains("0.060000"))
+}
+
+/// Rounding to "0 mm" would read as "these two views agreed", which is the one
+/// thing this number never says. Unreachable from the committed artifact and
+/// reachable from a better one, so it is written and held rather than assumed
+/// away.
+@Test func aSubMillimetreDisagreementSaysItsBoundRatherThanZero() throws {
+    let tiny = ModelFixture.classes(
+        low: ModelFixture.adopted(form: "affine", coefficients: #"{"a": 0.0001, "b": 0.0}"#)
+    )
+    let model = try fourSessionModel(classes: tiny)
+    let sentence = model.sighting(depthMeters: 2.0, rawConfidence: 0)
+        .sentence(from: model, precision: .millimeters)
+    #expect(sentence.hasSuffix("disagreed by under 1 mm"))
+    #expect(!sentence.contains("0 mm"))
+    // The bound is not a hedge, and "about under" is not a quantity.
+    #expect(!sentence.contains("about"))
+}
+
+/// Half a millimetre is the edge of that guard, and it rounds up rather than
+/// down: at exactly 0.5 mm there is a number to state.
+@Test func theSubMillimetreGuardIsHalfOpenAtHalfAMillimetre() throws {
+    let half = ModelFixture.classes(
+        low: ModelFixture.adopted(form: "affine", coefficients: #"{"a": 0.0005, "b": 0.0}"#)
+    )
+    let model = try fourSessionModel(classes: half)
+    #expect(model.sighting(depthMeters: 2.0, rawConfidence: 0)
+        .sentence(from: model, precision: .millimeters).hasSuffix("about 1 mm"))
 }

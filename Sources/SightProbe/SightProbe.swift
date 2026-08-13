@@ -147,7 +147,7 @@ struct SightProbe {
             let raw = confidences[pixel.index]
             print(row(label, "pixel \(pixel.column),\(pixel.row)  "
                 + "depth \(bound(Double(depth))) m  class \(raw)"))
-            print(row("", model.sighting(depthMeters: depth, rawConfidence: raw).sentence(from: model)))
+            print(row("", model.sighting(depthMeters: depth, rawConfidence: raw).sentence(from: model, precision: .meters)))
         }
 
         #if DEBUG
