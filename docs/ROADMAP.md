@@ -291,7 +291,7 @@ rather than gaining a tick here, so this section is empty when there is nothing
 outstanding — which is the honest resting state, not a gap.
 
 ```text
-  v0.7 service is a rung, not a commit list. Nothing below this line is
+  v0.8 view is a rung, not a commit list. Nothing below this line is
   decided at commit level, and nothing should be.
 ```
 
@@ -305,15 +305,17 @@ because commit 2 discovered that `canImport(ARKit)` is true on macOS.
 
 | Version | Ships | What forces it |
 |---|---|---|
-| **v0.7** service | The fitted model becomes an endpoint a client reads; nothing from a capture travels the other way | Once the fit exists offline, shipping it to the device is the only way it reaches a user |
-| **v0.8** view | A small web dashboard over the same service | Nearly free once v0.7 exists. Drops entirely if v0.7 slips |
+| **v0.8** view | A small web dashboard over the same service | The endpoint already has a reader; a dashboard is nearly free as one more |
 
 Python entered in v0.6 not because it is popular but because an uncertainty
-model had to be fitted somewhere, and step 25 is that fit, done. What is still
-forward-looking: the model exists only offline, so the network seam in v0.7 is
-the only way it reaches the phone; and once there is a service, a dashboard
-costs a day. Each rung is pulled in by the one below it. That is the
-difference between a ladder and a checklist.
+model had to be fitted somewhere; step 25 is that fit, and steps 26 and 27 are
+the seam that carries it, so the model now reaches a reader without a capture
+ever leaving the machine. One rung is still forward-looking: once there is a
+service, a dashboard costs a day. It would also be the first consumer whose
+experience request latency, throughput and behavior under concurrent requests
+would describe, which is why those stay on the not-measured-yet list. Each
+rung is pulled in by the one below it. That is the difference between a
+ladder and a checklist.
 
 ## Deliberately not built
 
