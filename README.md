@@ -18,6 +18,27 @@ lines in space that neither meet nor run parallel are called **skew lines**. The
 width of that gap is the measurement's own account of how wrong it might be.
 Most pipelines take the midpoint and throw the width away. This one keeps it.
 
+## What the model says
+
+Fitted from four recorded sessions, the model says how far two views of the same
+point tend to disagree at a given distance. For two of the depth sensor's three
+confidence levels a short formula fitted that disagreement on every trial and was
+adopted; for the third, no formula won every trial, so it kept the plain lookup
+table it started with — and that table still answers. Outside 0.5 to 5 metres
+nothing answers at all, for any level. The refusal is the part worth looking at:
+a result that declines to hand you a curve is still a result, and the page the
+service renders shows it as plainly as it shows the numbers.
+
+![The high confidence level, refused: no formula, no coefficients, and the
+banded table it kept still answering — 0.003264 m at half a metre — beside four
+folds whose margins change sign from one held-out session to the
+next.](docs/media/model-refusal.png)
+
+*One class the fit refused, and what refusing looks like. Every candidate lost
+at least one fold by a margin the held-out session flips the sign of, which is
+the case the adoption bar exists to refuse rather than average away. Read it
+from the committed model: `.venv/bin/python Fit/serve.py Fit/model.json`.*
+
 ## What is here today
 
 Six modules, one harness app and the tests that hold them.
