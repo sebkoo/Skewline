@@ -1587,3 +1587,216 @@ commit 1 proposed stands unchanged, so nothing is owed here for it.
   because one local run against loopback describes no consumer's experience
   and there is still no consumer. Caching is not built either: the client
   fetches when asked, exactly as the service re-reads when asked.
+
+## 2026-08-13 · v0.8 commit 1 — the page the service renders, and the reader that does not exist
+
+**Built and gated.** The rung opens with a second route and no curve. The
+question it had to answer first was where the page's reader lives, and the
+answer is that there is not one.
+
+- **The premise the rung opened on was wrong, and discarding it discarded
+  the whole fork.** The framing was: a browser cannot import `fit.py` or
+  `Sources/Model`, so a page that evaluates the model is a **third**
+  independent implementation of one schema, and the rung must choose how to
+  hold it honest — CI with a node job, a manual check recorded here, or no
+  evaluation at all. Every branch assumes the browser reads the artifact. It
+  does not have to. **The same service renders the HTML in Python, through
+  `fit.read_artifact`, and the browser is handed a finished document.** There
+  is no third reader to pin, so the three options were not weighed and
+  rejected on their merits; they were built on an assumption that turned out
+  to be optional. This is the v0.6 lesson one rung up: `serve.py` refused a
+  second parser of the same schema, and the cheapest way to refuse a third is
+  to not create one.
+- **What that buys, stated so the cost of the alternative is visible.** Every
+  refusal requirement became assertable in the existing `discover -s Fit`
+  suite. The gate stays five commands and CI stays four jobs, so README's
+  "Four CI jobs" never moved and drift Assertion 4 stayed quiet; Assertion 3
+  too, because no `.library` was added. No node, no `.gitignore` entry, no
+  toolchain pin. The node branch would have cost all five.
+- **The page is served at `/`, off the version prefix, and that was argued
+  rather than defaulted.** v0.7 registered two versions of two things:
+  `skewline-fit/1` tags the payload, `/v1/` tags the endpoint set and the
+  error shape, because "an error body has no `schema` field to read." An HTML
+  document has no payload version either, so `/v1/view` would promise a
+  stability nothing in this repository enforces. Two facts settled it: the
+  `/v1/` error shape is already service-wide rather than path-scoped — an
+  unknown path has always answered in it, which `test_an_unknown_path_is_404`
+  has proved since v0.7 by hitting `/model` — and serving the page outside the
+  prefix keeps `/v1/` a set of exactly one endpoint. `/` is also what a person
+  types.
+- **Which clause of the privacy line acquired an exception, quoted rather
+  than paraphrased.** v0.7 commit 1 wrote: "there is no evaluation endpoint
+  and no query surface — the whole artifact goes down and the consumer
+  evaluates locally, which is why the API is one GET." Read clause by clause
+  after this commit: *no evaluation endpoint and no query surface* is still
+  true, on both routes; *the API is one GET* is still true of the data api,
+  which is exactly why the page sits off `/v1/`. The clause that acquired an
+  exception is **the consumer evaluates locally** — the page is the first
+  consumer here that does not. It is safe for a reason the sentence does not
+  give, and that reason is the one worth carrying forward: **no depth a client
+  picked ever travels up.** Every depth on the page is the repository's own,
+  fixed in the tree, whether the consumer is Swift evaluating locally or a
+  browser being handed a finished document. README's version of the paragraph
+  was rewritten around that; this entry is where the reasoning lives.
+- **This log is append-only, and that is recorded here once because it was
+  questioned.** The instruction for this commit was to correct the v0.7
+  passage in place. It was not corrected. Of the 31 commits that have touched
+  this file, the only two with deletions are `cd930e6` and `986f6a3`, both
+  inside the first eleven; the last twenty are additions without exception.
+  Nothing wrote that down, but it is what the history does, and the log's
+  stated job — recording mistakes, not only decisions — cannot survive a file
+  that gets edited when a sentence becomes inconvenient. Entries here are
+  dated and are not edited to stay true. **README is the document kept true,
+  and four mechanical assertions police it.**
+- **A depth slider is impossible here, and that is a finding rather than
+  something left undone.** Making the rendered depths selectable needs either
+  script in the browser — the third evaluator, back again — or a query
+  parameter, which is literally the per-point query v0.7 refused, with the
+  rejected-query log line recorded as its evidence. The page is therefore
+  non-interactive on depth **by construction**, not by scope. Exact path
+  matching is what makes it mechanical on this route too: `/?depth=2.0`
+  answers 404 `no-such-endpoint`, and the detail line names the depth it
+  refused to accept.
+- **Refusals, as three states that cannot collapse into one another.** A
+  refused class reads as refused, says it adopted no continuous form, and
+  shows the banded table it kept — which still answers, which is what keeping
+  it bought. A band with no samples reads `no samples`, never `0.000000` and
+  never blank. Outside the domain nothing answers at all, and that is stated
+  above the classes as a property of the domain rather than as an empty cell,
+  because it belongs to the domain and not to any one class. There is no path
+  on the page from a refused class to coefficients that do not exist, for the
+  same reason there is none in the Swift type: there are none to show.
+- **Both teeth shown red first.** Rendering a refused class as an empty panel
+  — the blank where a refusal belongs, the exact inversion of the thesis this
+  repository exists to test — turned **four** tests red across the two files.
+  Rendering a null band median as `0.000000` turned **one** red, and its
+  failure message shows the band table with a zero sitting in the row nobody
+  sampled, which is what the tidy-looking version of that bug looks like.
+  Both were restored and the file byte-compared against its pre-inversion
+  copy.
+- **The domain is read half-open, the second consumer of a field the schema
+  does not settle.** `depthDomain` carries two bare numbers and no inclusivity
+  marker. v0.7 commit 2 flagged this dashboard as the consumer that could
+  resolve it the other way and put the two readers one depth apart; it reads
+  it as `Model` does, and says so on the page rather than only here. No
+  evaluator is involved — this is a rendered statement of a resolved decision.
+- **Three number formats, and the third exists because a sign is a finding.**
+  `ModelProbe` has `fixed` (`%.6f`), `bound` (`%.2f`) and `signed` (`%+.6f`),
+  and the page matches all three so the two readers print the same numbers at
+  the same widths. Margins take the signed one: the high class's fold row
+  reads `+0.000003  -0.000003  -0.000001`, and the flip across folds is the
+  whole reason that class was refused rather than averaged. `fit.py`'s own
+  driver already prints margins `{:+.6f}` too, so the page agrees with both
+  sides rather than one. A decimation is a count and prints as the integer the
+  export wrote, never at a metric's six decimals.
+- **Found and not fixed.** `ModelProbe.fixed`'s docstring says "Six decimals
+  for a metric, a margin or a coefficient" — it claims the margin that the
+  call site does not send it, which goes through `signed` instead. The
+  docstring is stale in shipped code. Not corrected here: `Sources/` is
+  outside this commit and a Swift edit would have moved the test count.
+- **Two contradictions in the repository, one of them load-bearing for the
+  next commit.** `ModelProbe.depths` is commented "The registered ladder", and
+  this rung's own instructions call it registered — but the v0.7 commit 2
+  entry above says plainly that "the depth ladder the probe prints is a
+  probe-local choice and is not registered anywhere." Both cannot hold. It
+  matters because the registration below leans on that ladder being the same
+  question asked on both sides. Recorded, not resolved: whichever way it goes
+  is a one-line change and it belongs to the commit that uses the ladder.
+- **What "no script, nothing fetched" actually claims, after the browser
+  falsified the tidier version.** The page authors no subresource: no script,
+  no stylesheet, no font, no image, so nothing of ours is fetched and nothing
+  is evaluated in the browser. It is **not** "one document, one request" —
+  a real load is two. Chrome asks for `/favicon.ico` on its own, with no
+  markup asking it to, and the request log across the manual check reads
+  `"GET / HTTP/1.1" 200` then `"GET /favicon.ico HTTP/1.1" 404`. That refusal
+  is the first evidence the exact-match router has been driven by something
+  other than `curl`, which is worth more than the sentence it replaced.
+- **The `://` assertion is deliberate and it is fragile, said now rather than
+  discovered.** "No script and no `://` anywhere in the rendered page" is the
+  same shape as v0.7's `"rfile" not in inspect.getsource(serve)` and inherits
+  the same weakness: a future comment, or a doctype carrying a namespace URL,
+  turns it red for a non-reason. Kept, because what it pins is the rung's
+  whole architecture, and a mechanical guard on that is worth an occasional
+  false red.
+- **The route's mechanics, and the one place the shape had to change.**
+  `CONTENT_TYPE` was one module-level constant and two routes now disagree, so
+  the content type became a property of the resolved response —
+  `resolve` returns `(status, content_type, headers, body)` — rather than a
+  branch where the bytes go out. GET and HEAD only on both routes, `Allow:
+  GET, HEAD` on the 405, and no route reads a request body: v0.7's source
+  assertion passes unmodified. The renderer is stronger than that assertion
+  rather than merely compliant with it, because it never receives the request
+  object at all — a pure function of the artifact and the shell, which is
+  `serve.py`'s own router-with-no-socket split moved one seam out.
+- **Errors stay JSON on the page's route, which is a trade rather than an
+  oversight.** `/v1/` versions one error shape; an HTML error page would fork
+  the envelope for cosmetics and `ERROR_CODES` would stop meaning one thing. A
+  browser meeting a 503 sees the body a client would. Both routes read the
+  artifact through one function and refuse it identically — a page has no
+  better answer to a missing fit than the endpoint does, and writing the
+  refusal twice is how the two would come to differ.
+- **A missing shell is 500 `no-view`, and the departure from 503 is the
+  point.** `no-model` is 503 because the fit legitimately has not run yet — a
+  state this service passes through by design, and refusing to start would
+  make it untestable. `Fit/view.html` is committed, so its absence is a broken
+  checkout: the operator's problem, never the request's, which is the
+  `bad-artifact` family. It gets its own code because a missing document and a
+  corrupt artifact are different findings. Driven by hand against a directory
+  with the shell removed: 500 `no-view`, with `/v1/model` still answering 200
+  beside it.
+- **The shell is re-read per request, exactly as the artifact is.** Edit the
+  page, reload, no restart — and a test drives that by rewriting the file
+  between two requests. The cost is a second file read per request, which
+  nobody has measured. It is not a caching decision, the same words v0.7 used
+  and for the same reason.
+- **Registered for commit 2, because the opener is where it is decided.**
+  (1) `fit.predict` is a shared evaluator but **not** a shared refuser: its
+  own docstring says the parametric forms "are evaluated wherever asked", so
+  `predict("quadratic", coefficients, 6.0)` returns a number exactly where
+  `ModelProbe` prints a refusal, and its table path returns bare `NaN` for two
+  findings the Swift type keeps apart. So a refuser mirroring `Estimate`'s four
+  cases has to be **written**, and a second implementation of refusal
+  semantics is a heavier thing than a second implementation of arithmetic
+  would have been. The obvious home is `fit.py`, beside the declaration it
+  enforces — and that home has a cost worth naming now: `POSITIVITY_GRID`
+  spans `[0.5, 5.0]` **inclusive**, so the fit's validity domain is closed
+  where a consumer's answering domain is half-open, and one module would then
+  hold two domains with the same two endpoints, different inclusivity, and two
+  different questions. That is the confusion v0.7 predicted between two
+  clients, relocated inside one module, where no language boundary makes it
+  visible. Commit 2 either places the gate there **with** two distinctly named
+  domains, a line at each saying which question it answers, and a test pinning
+  5.0 answering differently in the two — or concludes that this is reason
+  enough to put it elsewhere, and says where. Both are legitimate; what is
+  registered is the constraint, not the location.
+  (2) The rendered ladder is `ModelProbe.depths` verbatim, so Python and Swift
+  answer identical questions and drift shows up by comparing two outputs that
+  already exist — no new mechanism, no new job, no new toolchain.
+  (3) Refusals before the curve, the order v0.6 used when it froze criteria
+  before data. No curve is drawn until (1) and (2) are in, and the page's own
+  closing line — that it evaluates nothing — is the first thing commit 2
+  removes.
+- **The page says it evaluates nothing, in its own text.** Without that line a
+  reader cannot tell "this rung computes no estimate" from "the curve is
+  missing", and the same move is already made for the domain's silence one
+  section up. A decision stated beats a gap inferred.
+- **The gate did not grow.** 163 Swift tests green and unchanged, because no
+  Swift was added. 56 Python — 31 before (16 fit, 15 serve) and 25 new (10
+  route, 15 renderer). Both iOS builds succeeded. Drift green with all four
+  assertions quiet.
+- **Measured, because the run produced it:** the rendered page is 11,177 bytes
+  for the committed artifact, and `curl -I` reports the same `Content-Length`
+  on HEAD as GET's body length. `GET /v1/model | diff - Fit/model.json` came
+  back empty, unchanged by the second route.
+- **Not measured yet, as a trigger rather than a someday.** Request latency,
+  throughput, behavior under concurrent requests, the per-request
+  read-and-render cost, startup and decode cost. What kept these off the list
+  was "there is no consumer"; there is one now, so the condition is written
+  instead: **they are measured when the service is run for a reader on a
+  machine that reader does not operate — the first moment a figure describes
+  an experience rather than a loopback round trip — and a registered workload
+  exists to measure against, so the number is reproducible rather than one
+  anecdote.** Before both, a millisecond from a local GET is decoration. The
+  ROADMAP paragraph that gave the old reason was corrected in this commit.
+  The command an operator runs is unchanged and now prints two URLs:
+  `.venv/bin/python Fit/serve.py Fit/model.json`.

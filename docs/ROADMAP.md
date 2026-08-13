@@ -311,11 +311,17 @@ Python entered in v0.6 not because it is popular but because an uncertainty
 model had to be fitted somewhere; step 25 is that fit, and steps 26 and 27 are
 the seam that carries it, so the model now reaches a reader without a capture
 ever leaving the machine. One rung is still forward-looking: once there is a
-service, a dashboard costs a day. It would also be the first consumer whose
-experience request latency, throughput and behavior under concurrent requests
-would describe, which is why those stay on the not-measured-yet list. Each
-rung is pulled in by the one below it. That is the difference between a
-ladder and a checklist.
+service, a dashboard costs a day. That dashboard has now started, and request
+latency, throughput, behavior under concurrent requests, the per-request
+read-and-render cost and startup are all still unmeasured — so what keeps them
+off the list is no longer "there is no consumer yet", and it is written as a
+trigger instead. **They are measured when the service is run for a reader on a
+machine that reader does not operate — the first moment a figure describes an
+experience rather than a loopback round trip — and a registered workload exists
+to measure against, so the number is reproducible rather than one anecdote.**
+Before both, a millisecond from a local GET is decoration. Each rung is pulled
+in by the one below it. That is the difference between a ladder and a
+checklist.
 
 ## Deliberately not built
 

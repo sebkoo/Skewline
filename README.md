@@ -75,9 +75,10 @@ only, and the fix stays a human commit. The fourth runs the fit harness in
 `Fit/` — Python and numpy, because an uncertainty model has to be fitted
 somewhere — whose tests plant known model parameters in synthetic data and
 require the fit to recover them, or to refuse. That same job covers the
-endpoint that serves the fitted model, which lives beside the fit and shares
-its reader; a service that re-parsed the artifact would be a second reader to
-drift.
+endpoint that serves the fitted model and the page it renders, both beside
+the fit and sharing its reader; a service that re-parsed the artifact would
+be a second reader to drift, and a page that parsed it in the browser would
+be a third.
 
 ## Where this goes
 
@@ -119,8 +120,19 @@ this repository. The wire runs one way: what it carries down is the same
 aggregate artifact already committed here, and nothing from a capture goes
 up — no frames, no depth, no observation rows, and no per-point query, since
 asking "how wrong is a reading at this depth" would send the asker's own
-depths to whoever runs the service. The client evaluates the model itself,
-and that client now exists.
+depths to whoever runs the service. The Swift client evaluates the model
+itself, and that client exists.
+
+The same service also renders a page describing the model, and that page is
+the first consumer here that does not read the artifact for itself: a browser
+cannot import the fit, so one that parsed the schema would be a third
+implementation of it, after the Python that writes it and the Swift that
+reads it. What survives is not a count of endpoints but the exclusion itself
+— **no depth a client picked ever travels up.** Every depth on that page is
+the repository's own, fixed in the tree, and no parameter exists that could
+carry a viewer's instead. It is also why the page offers no depth slider:
+making it interactive needs either a script in the browser or a query
+parameter, and the second is the per-point query this paragraph refuses.
 
 Reconstruction is deliberately out of scope. This is the layer underneath it:
 any reconstruction is only as trustworthy as its input, and today that input

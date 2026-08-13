@@ -26,8 +26,10 @@ COMMITTED_ARTIFACT = os.path.join(HERE, "model.json")
 
 
 @contextlib.contextmanager
-def running(artifact_path):
-    server = serve.ModelServer((serve.BIND_HOST, 0), artifact_path, log_requests=False)
+def running(artifact_path, view_path=serve.VIEW_DOCUMENT):
+    server = serve.ModelServer(
+        (serve.BIND_HOST, 0), artifact_path, log_requests=False, view_path=view_path
+    )
     # A short poll interval only shortens how long `shutdown` waits for the
     # loop to notice; the default 0.5 s would tax the gate once per server.
     thread = threading.Thread(
@@ -244,6 +246,116 @@ class TheEnvelope(unittest.TestCase):
         with artifact_file() as missing, running(missing) as port:
             _, _, body = request(port, "GET", serve.MODEL_PATH)
         self.assertNotIn("schema", json.loads(body))
+
+
+class TheViewRoute(unittest.TestCase):
+    """The page, at the router's level. What it renders is `test_view.py`'s."""
+
+    def test_the_page_is_served_as_html(self):
+        with running(COMMITTED_ARTIFACT) as port:
+            status, headers, body = request(port, "GET", serve.VIEW_PATH)
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["Content-Type"], "text/html; charset=utf-8")
+        # Per-route, and the model route is unmoved by it.
+        self.assertIn(b"skewline-fit/1", body)
+
+    def test_the_model_route_still_serves_json(self):
+        # The content type became a property of the resolved response rather
+        # than one module-level constant. This is the half that must not have
+        # moved while the other half arrived.
+        with running(COMMITTED_ARTIFACT) as port:
+            status, headers, body = request(port, "GET", serve.MODEL_PATH)
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["Content-Type"], "application/json")
+        with open(COMMITTED_ARTIFACT, "rb") as handle:
+            self.assertEqual(body, handle.read())
+
+    def test_the_page_takes_no_query_parameter(self):
+        # The exactness that makes "no per-point query" mechanical, now on
+        # both routes: a depth the viewer picked has nowhere to go.
+        with running(COMMITTED_ARTIFACT) as port:
+            for path in (f"{serve.VIEW_PATH}?depth=2.0", "/index.html", "/view"):
+                with self.subTest(path=path):
+                    status, _, body = request(port, "GET", path)
+                    self.assertEqual(status, 404)
+                    self.assertEqual(
+                        json.loads(body)["error"], serve.NO_SUCH_ENDPOINT
+                    )
+
+    def test_upload_methods_are_refused_here_too(self):
+        with running(COMMITTED_ARTIFACT) as port:
+            for method in ("POST", "PUT", "PATCH", "DELETE"):
+                with self.subTest(method=method):
+                    status, headers, body = request(
+                        port, method, serve.VIEW_PATH, body=b'{"upload":"no"}'
+                    )
+                    self.assertEqual(status, 405)
+                    self.assertEqual(headers["Allow"], "GET, HEAD")
+                    self.assertEqual(
+                        json.loads(body)["error"], serve.METHOD_NOT_ALLOWED
+                    )
+
+    def test_head_conforms_on_the_page(self):
+        with running(COMMITTED_ARTIFACT) as port:
+            get_status, _, get_body = request(port, "GET", serve.VIEW_PATH)
+            status, headers, body = request(port, "HEAD", serve.VIEW_PATH)
+        self.assertEqual(status, get_status)
+        self.assertEqual(int(headers["Content-Length"]), len(get_body))
+        self.assertEqual(body, b"")
+
+    def test_with_no_model_the_page_refuses_as_the_endpoint_does(self):
+        # Errors stay in the /v1/ JSON shape on this route: one service, one
+        # error shape. A browser sees the body a client would.
+        with artifact_file() as missing, running(missing) as port:
+            status, headers, body = request(port, "GET", serve.VIEW_PATH)
+        self.assertEqual(status, 503)
+        self.assertEqual(headers["Content-Type"], "application/json")
+        self.assertEqual(json.loads(body)["error"], serve.NO_MODEL)
+
+    def test_a_foreign_artifact_never_reaches_the_page_either(self):
+        with artifact_file(raw='{"schema": "something-else/9"}\n') as path, \
+                running(path) as port:
+            status, _, body = request(port, "GET", serve.VIEW_PATH)
+        self.assertEqual(status, 500)
+        self.assertEqual(json.loads(body)["error"], serve.BAD_ARTIFACT)
+
+    def test_a_missing_shell_is_its_own_refusal(self):
+        # 500 rather than 503, and its own code: the shell is committed to the
+        # repository, so its absence is a broken checkout rather than a state
+        # this service legitimately passes through the way a fit that has not
+        # run yet is.
+        with tempfile.TemporaryDirectory() as directory:
+            absent = os.path.join(directory, "view.html")
+            with running(COMMITTED_ARTIFACT, view_path=absent) as port:
+                status, _, body = request(port, "GET", serve.VIEW_PATH)
+                # The model route is unaffected by the page's absence.
+                model_status, _, _ = request(port, "GET", serve.MODEL_PATH)
+        self.assertEqual(status, 500)
+        self.assertEqual(json.loads(body)["error"], serve.NO_VIEW)
+        self.assertIn(serve.NO_VIEW, serve.ERROR_CODES)
+        self.assertEqual(model_status, 200)
+
+    def test_the_page_is_re_read_per_request(self):
+        # The shell is re-read exactly as the artifact is, and for the same
+        # reason: edit it and reload, with no restart.
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "view.html")
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write("<!doctype html><title>one</title>$content")
+            with running(COMMITTED_ARTIFACT, view_path=path) as port:
+                _, _, first = request(port, "GET", serve.VIEW_PATH)
+                with open(path, "w", encoding="utf-8") as handle:
+                    handle.write("<!doctype html><title>two</title>$content")
+                _, _, second = request(port, "GET", serve.VIEW_PATH)
+        self.assertIn(b"<title>one</title>", first)
+        self.assertIn(b"<title>two</title>", second)
+
+    def test_the_view_path_is_off_the_version_prefix(self):
+        # `/v1/` versions the endpoint set and the error shape. An HTML
+        # document has no payload version, so it does not sit under a prefix
+        # promising one -- and the data api stays exactly one GET.
+        self.assertFalse(serve.VIEW_PATH.startswith(f"/{serve.API_VERSION}/"))
+        self.assertEqual(serve.VIEW_PATH, "/")
 
 
 if __name__ == "__main__":

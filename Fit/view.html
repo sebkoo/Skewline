@@ -1,0 +1,176 @@
+<!doctype html>
+<!--
+  The shell the service substitutes into. Everything here is written by hand;
+  everything at the placeholder below is written by view.py. There is
+  exactly one placeholder, and this comment deliberately does not spell it --
+  substitution is textual and would fill a second one here too.
+
+  One document. No script, no stylesheet, no font and no image outside this
+  file, so the browser evaluates nothing and fetches nothing of ours. That is
+  not the same claim as "one request": a browser asks for /favicon.ico on its
+  own, with no markup here asking it to, and the router answers that 404 like
+  any other path it does not serve.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skewline · the fitted model</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --page: #fbfaf8;
+  --ink: #1c1b19;
+  --quiet: #6a675f;
+  --rule: #e0dcd4;
+  --card: #ffffff;
+  --adopted: #2f6f6a;
+  --refused: #a2661a;
+  --none: #8a8679;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #161614;
+    --ink: #eceae5;
+    --quiet: #9c988e;
+    --rule: #2f2c28;
+    --card: #1e1c19;
+    --adopted: #6fb3ab;
+    --refused: #d6a15c;
+    --none: #837e73;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 3rem 1.25rem 5rem;
+  background: var(--page);
+  color: var(--ink);
+  font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+main { max-width: 54rem; margin: 0 auto; }
+h1 {
+  margin: 0;
+  font-size: 1.7rem;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+}
+h1 span {
+  display: block;
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--quiet);
+  letter-spacing: 0;
+}
+.tag {
+  margin: 0.35rem 0 2.25rem;
+  color: var(--quiet);
+  font-size: 0.82rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.facts {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  gap: 0.65rem 1.25rem;
+  margin: 0 0 2.5rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--rule);
+}
+.facts dt {
+  color: var(--quiet);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding-top: 0.15rem;
+}
+.facts dd { margin: 0; min-width: 0; }
+.note, .facts .note {
+  display: block;
+  margin-top: 0.4rem;
+  color: var(--quiet);
+  font-size: 0.85rem;
+  max-width: 46rem;
+}
+.sessions { list-style: none; margin: 0.5rem 0 0; padding: 0; }
+.sessions li {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  padding: 0.12rem 0;
+}
+.sessions span { color: var(--quiet); margin-left: 0.9rem; }
+.cls {
+  margin: 0 0 1.5rem;
+  padding: 1.25rem 1.4rem 1.4rem;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--rule);
+  border-radius: 3px;
+}
+.cls.adopted { border-left-color: var(--adopted); }
+.cls.refused { border-left-color: var(--refused); }
+.cls h2 {
+  margin: 0 0 0.6rem;
+  font-size: 1.15rem;
+  font-weight: 620;
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+}
+.verdict {
+  font-size: 0.72rem;
+  font-weight: 640;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0.16rem 0.5rem;
+  border-radius: 2px;
+  border: 1px solid currentColor;
+}
+.adopted .verdict { color: var(--adopted); }
+.refused .verdict { color: var(--refused); }
+.why { margin: 0 0 0.9rem; max-width: 46rem; }
+.why code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88em;
+}
+.coefficients { margin: 0 0 1rem; display: flex; flex-wrap: wrap; gap: 1.4rem; }
+.coefficients span { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.88rem; }
+.coefficients b { color: var(--quiet); font-weight: 400; margin-right: 0.45rem; }
+table {
+  border-collapse: collapse;
+  margin: 0 0 1rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82rem;
+  width: 100%;
+}
+th, td {
+  text-align: left;
+  padding: 0.34rem 1.1rem 0.34rem 0;
+  border-bottom: 1px solid var(--rule);
+  white-space: nowrap;
+  font-weight: 400;
+}
+tr:first-child th {
+  color: var(--quiet);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+.bands { max-width: 30rem; }
+.folds { display: block; overflow-x: auto; }
+.margin { color: var(--quiet); margin-left: 0.5rem; }
+.none { color: var(--none); font-style: italic; }
+.silence {
+  margin: 2.5rem 0 0;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--rule);
+  color: var(--quiet);
+  max-width: 46rem;
+}
+</style>
+</head>
+<body>
+<main>
+$content
+</main>
+</body>
+</html>
