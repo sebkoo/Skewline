@@ -1800,3 +1800,136 @@ answer is that there is not one.
   ROADMAP paragraph that gave the old reason was corrected in this commit.
   The command an operator runs is unchanged and now prints two URLs:
   `.venv/bin/python Fit/serve.py Fit/model.json`.
+
+## 2026-08-13 · v0.8 commit 2 — the refuser, the registered ladder, and the evaluated column
+
+**Built and gated.** The page evaluates now, and the two things it needed
+first were a ladder that is actually registered and a refuser that is not
+`predict`.
+
+- **The ladder was not registered, and this commit gave it the status its
+  comment already claimed.** `ModelProbe.swift:23` read "The registered ladder"
+  while the v0.7 entry above says the ladder "is a probe-local choice and is
+  not registered anywhere." DEVLOG was right by this repository's meaning of
+  the word — written before use, in a place that binds — so the fix was to
+  register it rather than to soften the comment. **This entry is the
+  registration.** `fit.DEPTH_LADDER` is the declaration, `view.py` imports it
+  the way it already imports `fit.CLASS_NAMES`, and Swift carries the same
+  eight numbers because it cannot read a Python constant. One source and one
+  mirror: a symmetric pair of literals has no owner, which is why "both sites
+  carry it" was not enough.
+- **Three alternatives, and why each lost.** A committed data file both read is
+  a new read path in two languages for eight numbers, and it moves the ladder
+  out of the block each reader's own comment sits in. This entry alone, with no
+  mechanical check, leaves the agreement as prose that only a human diffing two
+  outputs would catch. Not sharing it at all discards the free drift detector
+  and the reason commit 1 registered the reuse. A **derived** ladder — band
+  edges plus a point outside each end — was considered and lost on its own
+  merits: `BAND_EDGES` has no Swift twin, and deriving it there from the
+  artifact's table would make a deterministic block artifact-dependent and
+  undefined when no class is refused.
+- **The check reads the Swift declaration from the Python suite, and the
+  precedent is not `rfile`.** It is `ModelArtifactTests`, whose own comment says
+  copying `Fit/model.json` into `Tests/` "would create a second copy to drift"
+  and which therefore reaches across the tree from the test — same problem,
+  same answer, opposite direction. `rfile` and `://` are negative-existence
+  sweeps whose failure mode is passing silently; this is a positive assertion
+  on one declaration whose failure mode is going red. A reformatted declaration
+  going red is the price of never having a silent green, and the price is worth
+  paying in that direction.
+- **Not a fifth drift assertion, for a reason inside the script.**
+  `Scripts/readme-drift.swift` opens "Fails when the README contradicts the
+  repository" and every failure it emits is formatted `README claims "…" -- …`.
+  Two source files disagreeing about eight numbers has no README end to anchor
+  to, and README's own line — "The third fails when this README contradicts the
+  repository" — would have gone stale in the commit adding a check against
+  staleness. The Fit suite's cost is real and is named rather than waved past:
+  the argument that kept the gate at five commands was that these tests live
+  beside the fit and one `discover -s Fit` finds them, and a cross-tree read
+  erodes that slightly. It is the smaller price. The `fit` job checks the whole
+  repository out, so the Swift file is there.
+- **The path is anchored to `__file__`, and that is load-bearing rather than
+  tidy.** The check fails rather than skips when the declaration is missing, so
+  a path resolved against the caller's working directory would turn "run from
+  somewhere other than the root" into a red that reads exactly like "someone
+  moved the declaration" — destroying the one thing this check exists to say
+  unambiguously. `test_serve.py`'s `HERE` is the shape it copies.
+- **Two questions over one pair of endpoints, said precisely.**
+  `POSITIVITY_GRID` is closed and asks *may this candidate be adopted*: a form
+  that goes non-positive at 5.0 m is disqualified whether or not any consumer
+  asks there. `ANSWERING_DOMAIN` is half-open and asks *does this consumer get
+  a number*, the reading `Sources/Model` resolved from the banded table's own
+  arithmetic, where the last band is `[3.0, 5.0)` and 5.0 falls in none. It is
+  an **alias**, not a second pair — the two names are one object, the
+  half-openness lives in `estimate`'s comparison and in the comment, and a
+  reader who greps `DEPTH_DOMAIN` still lands on both uses. What enforces the
+  difference is `test_the_two_domains_disagree_at_the_top_endpoint`, which pins
+  5.0 on the gate's grid and refused by the refuser.
+- **The refuser is a second implementation of refusal semantics, which is a
+  heavier thing than a second arithmetic would have been.** `fit.predict` is a
+  shared evaluator and deliberately not a shared refuser: it answers at 6.0 m
+  where `ModelProbe` refuses, and its table path returns one bare `NaN` for two
+  findings the Swift type keeps apart. `fit.estimate` mirrors `Estimate` case
+  for case, in plain dicts, with no new import. **Four cases and no fifth**: an
+  unnamed verdict, a form the module has no arithmetic for, and a table that
+  does not span the domain all raise, exactly as `predict` raises on an unknown
+  form. Inventing an unnamed silence here would be, in the other language, the
+  failure that enum exists to prevent.
+- **What the page does when the refuser raises.** It prints a sentence and no
+  number, and still shows everything the artifact carries for that class —
+  verdict, coefficients, folds — which is the same rule that already renders a
+  form `FORMULAS` cannot name. Refusing to invent an estimate is not the same
+  as hiding what the artifact says.
+- **The closing line came out first, as registered, and what replaced it.** The
+  page no longer says it evaluates nothing. What survived the edit is the half
+  that is still true and still load-bearing: every depth is the repository's
+  own, no depth a viewer chose is on the page, and making them selectable needs
+  either a script in the browser or a query parameter — neither of which this
+  service accepts. The domain's silence stays stated above the classes, and the
+  ladder's own out-of-domain cells are worded as the **domain's** refusal, so
+  the two silences still cannot collapse into one another.
+- **Both teeth shown red first.** Making the answering domain closed — 5.0
+  answering — turned **five** test methods red across both files, and four of
+  them were errors rather than failures: with 5.0 admitted, the refused class
+  falls in no band there and the page stops rendering a ladder at all, which is
+  the fifth silence arriving exactly where the two-domain argument said it
+  would. Rendering a band without samples as `0.000000` turned **two** red,
+  including commit 1's own band test, and the failure message shows the zero in
+  the ladder row beside the band table still correctly reading `no samples` —
+  the tidy-looking version of the bug. Both were restored and both files
+  byte-compared against their pre-inversion copies.
+- **One assertion was written wrong and caught by its own red.** The replaced
+  closing-line test first swept the whole page for "evaluates nothing" and went
+  red on the shell's hand-written comment that the **browser** evaluates
+  nothing — a different claim, still true. It now asserts the removed sentence
+  by its distinctive words, with a note saying why the wider sweep is not
+  wanted. This is the `://` fragility appearing in a test written the same week
+  it was described.
+- **The fold table's overflow, found visually and not by a test.** The terminal
+  verified commit 1 as extracted text, so nothing saw that at the default width
+  the column falling off the card was `quadratic` — the adopted form — and the
+  value clipped was its margin, the evidence this rung gave a sign on purpose.
+  Holdouts now print their first UUID block, as this log already writes them,
+  with all four full identifiers still on the page under TRAINED ON. A name
+  that is not UUID-shaped prints whole: shortening an arbitrary one could make
+  two rows read identically, and each row is a different container's evidence.
+  No `title` attribute — it would put the full identifier back in the markup
+  for no rendered gain.
+- **`ModelProbe.fixed`'s docstring was fixed first, in `15e4c25`, not here.**
+  Recorded found-not-fixed by commit 1; it claimed the margin its call site
+  never sends it. It is not this commit's concern — line 23 changes *because*
+  the ladder's status changed, while 177 was unrelated staleness — and one
+  concern per commit was never one file per commit.
+- **The gate did not grow.** 163 Swift tests green and unchanged: the only
+  Swift edit is a comment, and a comment is not a test. Python 56 → **71** — 16
+  fit becomes 24 (six refuser, two ladder), 15 renderer becomes 22 (five
+  ladder, two holdout, one rewritten in place), 25 route unchanged, and the
+  arithmetic closes. Both iOS builds succeeded. Drift green with all four
+  assertions quiet, and README is untouched: nothing it claims about the page
+  became false, and "every depth on that page is the repository's own, fixed in
+  the tree" is what the registration above finally makes checkable.
+- **Not measured yet.** Request latency, throughput, behavior under concurrent
+  requests, the per-request read-and-render cost. Commit 1's trigger stands
+  unchanged and this commit does not trip it: nothing here was run for a reader
+  on a machine that reader does not operate, and no registered workload exists
+  yet. The page grew by a table per class and that size was not measured either.

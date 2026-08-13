@@ -16,10 +16,12 @@ because "what is the disagreement at depth d" sends the CLIENT's depth up.
 The page is therefore non-interactive on depth by construction, and every
 depth on it is the repository's own.
 
-This rung renders and does not evaluate. Every number below is a number the
-artifact carries: a verdict, a coefficient, a band median, a fold metric.
-The page says so in its own text, so that "no estimate is computed here"
-reads as a decision rather than as a curve someone forgot to draw.
+The page evaluates, and only at depths this repository fixed: `DEPTH_LADDER`
+is `fit.DEPTH_LADDER`, the same eight `ModelProbe` prints, so the two
+readers can be compared as two outputs rather than trusted. Every estimate
+goes through `fit.estimate` -- the refuser, never `fit.predict`, which is a
+shared evaluator that answers wherever it is asked -- so a silence here is
+the silence `Sources/Model` reports for the same class at the same depth.
 
 Pure, and deliberately: `render` takes the artifact `fit.read_artifact`
 already returned and the shell `serve.py` already read, and touches no file
@@ -38,6 +40,11 @@ import fit
 # these panels are not going to inherit one -- the discipline ModelProbe
 # already applies to its class blocks and its form names.
 CLASS_ORDER = fit.CLASS_NAMES
+
+# The registered ladder, imported rather than restated: `fit.py` is where it is
+# declared and this is the mirror-free side of it -- Swift has to carry its own
+# copy because it cannot read a Python constant, and a test pins that one.
+DEPTH_LADDER = fit.DEPTH_LADDER
 
 # The formula each named form is evaluated from, for a reader looking at its
 # coefficients. A form this table cannot name is still rendered -- with its
@@ -80,6 +87,11 @@ def _content(artifact):
            ])
            + "</p>")
     yield from _facts(artifact)
+    yield ('<p class="note">Each class below is evaluated at one registered '
+           "ladder of depths — the same eight the model probe prints, fixed in "
+           "this repository and recorded in docs/DEVLOG.md, so the two readers "
+           "can be compared as two outputs. None of them is a depth a viewer "
+           "chose.</p>")
 
     classes = artifact.get("classes", {})
     for name in CLASS_ORDER:
@@ -94,9 +106,13 @@ def _content(artifact):
     for name in sorted(set(classes) - set(CLASS_ORDER)):
         yield from _panel(name, classes[name])
 
-    yield ('<p class="silence">This page renders the model and evaluates '
-           "nothing: no estimate is computed at any depth. Every number above "
-           "is one the artifact carries.</p>")
+    yield ('<p class="silence">Every estimate above is computed here, in the '
+           "same Python that fitted the model, at depths fixed in this "
+           "repository: there is no depth on this page a viewer chose. Making "
+           "them selectable needs either a script in the browser — a third "
+           "reader of one schema — or a query parameter, which would send the "
+           "asker's own depth up the wire, and this service accepts "
+           "neither.</p>")
 
 
 def _facts(artifact):
@@ -165,6 +181,8 @@ def _panel(name, model):
     else:
         yield ('<p class="why">This class carries a verdict this page cannot '
                "name, so no form and no table are shown for it.</p>")
+    # The class's answer, then the evidence for it: the ladder above the folds.
+    yield from _ladder(model)
     yield from _folds(model.get("folds", []))
     yield "</section>"
 
@@ -223,6 +241,75 @@ def _bands(table):
     yield "</table>"
 
 
+def _ladder(model):
+    """The registered depths, answered through `fit.estimate`.
+
+    Through the refuser and never through `fit.predict`: the parametric forms
+    are evaluated wherever asked, so `predict` would put a number on this page
+    at 6.0 m where the Swift reader refuses, and its table path returns one
+    NaN for two silences that are not one thing.
+    """
+    rows = []
+    for depth in DEPTH_LADDER:
+        try:
+            rows.append((depth, fit.estimate(model, depth)))
+        except ValueError as refusal:
+            # The refuser names four cases and no fifth. A class this page
+            # cannot evaluate -- an unnamed verdict, a form the fit has no
+            # arithmetic for, a table that does not span the domain -- gets a
+            # sentence and never a number. Everything the artifact carries for
+            # it is still above; what is refused is inventing an estimate.
+            yield ('<p class="why">No ladder is evaluated for this class: '
+                   f"{_text(refusal)}. What the artifact carries for it is "
+                   "shown above, and an estimate that cannot be computed is "
+                   "not invented here.</p>")
+            return
+    yield '<table class="ladder">'
+    yield ("<tr><th>depth (m)</th>"
+           "<th>median pairwise disagreement (m)</th></tr>")
+    for depth, answer in rows:
+        yield f"<tr><th>{_bound(depth)}</th><td>{_answer(answer)}</td></tr>"
+    yield "</table>"
+
+
+def _answer(answer):
+    """One of `fit.estimate`'s four cases as a cell. A case this page cannot
+    name reads as absent rather than as one of the refusals it is not."""
+    case, meters = answer.get("case"), answer.get("meters")
+    if case == fit.FROM_ADOPTED_FORM:
+        return _number(meters)
+    if case == fit.FROM_BANDED_TABLE:
+        # The refused class answering, marked as ModelProbe marks it, because
+        # "this number came from the table it kept" is the v0.6 finding.
+        return f'{_number(meters)}<span class="margin">table</span>'
+    if case == fit.REFUSED_BAND_WITHOUT_SAMPLES:
+        return '<span class="none">refused: no samples in this band</span>'
+    if case == fit.REFUSED_OUTSIDE_DEPTH_DOMAIN:
+        # Named as the domain's refusal and not the class's: the sentence that
+        # explains it sits above every class, because that silence belongs to
+        # the domain rather than to any one of them.
+        return '<span class="none">refused: outside the domain</span>'
+    return ABSENT
+
+
+def _holdout(name):
+    """A session identifier shortened to its first UUID block, as DEVLOG writes
+    them, so the widest column in the fold table is not the one carrying the
+    least: full-width holdouts pushed the adopted form's margin -- the evidence
+    this rung gave a sign on purpose -- off the card at the default width. The
+    four full identifiers are on this page, in TRAINED ON.
+
+    A name that is not UUID-shaped prints whole. Shortening an arbitrary one
+    could make two rows read identically, and each row here is a different
+    container's evidence.
+    """
+    text = str(name)
+    blocks = text.split("-")
+    shaped = ([len(block) for block in blocks] == [8, 4, 4, 4, 12]
+              and all(digit in string.hexdigits for digit in text.replace("-", "")))
+    return f"{_text(blocks[0])}…" if shaped else _text(text)
+
+
 def _folds(folds):
     if not folds:
         return
@@ -245,7 +332,7 @@ def _folds(folds):
             f"<td>{_outcome(fold.get('forms', {}).get(name))}</td>"
             for name in columns
         )
-        yield (f"<tr><th>{_text(fold.get('holdout', ''))}</th>"
+        yield (f"<tr><th>{_holdout(fold.get('holdout', ''))}</th>"
                f"<td>{_number(fold.get('table'))}</td>{cells}</tr>")
     yield "</table>"
 

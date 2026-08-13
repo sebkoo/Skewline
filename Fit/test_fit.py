@@ -18,6 +18,16 @@ import numpy as np
 
 import fit
 
+# Anchored to this file and never to the working directory: the mirror check
+# below FAILS rather than skips when the declaration is missing, so a path
+# resolved against a caller's cwd would turn "run from somewhere else" into a
+# red that reads exactly like "the declaration moved". `test_serve.py`'s
+# `HERE` is the same shape, and `ModelArtifactTests` does this in the other
+# language with `#filePath`.
+HERE = os.path.dirname(os.path.abspath(__file__))
+PROBE_SOURCE = os.path.join(HERE, os.pardir, "Sources", "ModelProbe", "ModelProbe.swift")
+LADDER_DECLARATION = "static let depths: [Double] = ["
+
 
 def synthetic(rng, n, sigma_fn, noise=0.4):
     """Depths uniform over the domain; |delta| = sigma(d) times a factor
@@ -256,6 +266,116 @@ class ObservationFiles(unittest.TestCase):
         np.testing.assert_allclose(containers[0][0][2], [0.02])
         self.assertEqual(containers[1][0][1].size, 0)
         self.assertEqual(provenance, [{"session": "2110CDA9-TEST", "decimation": 64}])
+
+
+class TheRefuser(unittest.TestCase):
+    """`fit.estimate`, whose four cases mirror `Sources/Model`'s `Estimate`.
+
+    `predict` is the shared evaluator and not a shared refuser: it answers
+    wherever it is asked and returns one NaN for two different silences, which
+    is why these are tests of a second function rather than of that one.
+    """
+
+    ADOPTED = {"verdict": "adopted", "form": "quadratic",
+               "coefficients": {"a": 0.02, "b": 0.01}, "folds": []}
+    REFUSED = {"verdict": "refused", "folds": [],
+               "table": {"edges": list(fit.BAND_EDGES),
+                         "medians": [0.003, None, 0.006, 0.009]}}
+
+    def test_an_adopted_class_answers_from_its_form(self):
+        answer = fit.estimate(self.ADOPTED, 2.0)
+        self.assertEqual(answer["case"], fit.FROM_ADOPTED_FORM)
+        self.assertAlmostEqual(answer["meters"], 0.02 + 0.01 * 4.0)
+
+    def test_a_refused_class_still_answers_from_the_table_it_kept(self):
+        # v0.6's finding, in the evaluator: refused is not unavailable.
+        answer = fit.estimate(self.REFUSED, 2.5)
+        self.assertEqual(answer["case"], fit.FROM_BANDED_TABLE)
+        self.assertEqual(answer["meters"], 0.006)
+
+    def test_a_band_without_samples_is_its_own_silence(self):
+        answer = fit.estimate(self.REFUSED, 1.5)
+        self.assertEqual(answer["case"], fit.REFUSED_BAND_WITHOUT_SAMPLES)
+        self.assertIsNone(answer["meters"])
+
+    def test_outside_the_domain_nothing_answers_for_either_verdict(self):
+        for model in (self.ADOPTED, self.REFUSED):
+            for depth in (0.4, 6.0):
+                with self.subTest(verdict=model["verdict"], depth=depth):
+                    answer = fit.estimate(model, depth)
+                    self.assertEqual(answer["case"],
+                                     fit.REFUSED_OUTSIDE_DEPTH_DOMAIN)
+                    self.assertIsNone(answer["meters"])
+        # And `predict` would have answered there, which is the whole reason
+        # this refuser had to be written.
+        self.assertTrue(np.isfinite(
+            fit.predict("quadratic", self.ADOPTED["coefficients"], 6.0)
+        ))
+
+    def test_the_two_domains_disagree_at_the_top_endpoint(self):
+        # One pair of endpoints, two questions. The gate asks "may this be
+        # adopted" and is closed -- 5.0 is on its grid, because a form that
+        # goes non-positive at the top of the fitted range is disqualified
+        # whether or not anyone asks there. The refuser asks "does a consumer
+        # get a number" and is half-open -- the last band is [3.0, 5.0) and
+        # 5.0 falls in none. The constants are one object; this is what
+        # enforces the difference.
+        self.assertEqual(float(fit.POSITIVITY_GRID[-1]), fit.DEPTH_DOMAIN[1])
+        self.assertTrue(fit.positive_on_domain("quadratic",
+                                               self.ADOPTED["coefficients"]))
+        self.assertEqual(fit.estimate(self.ADOPTED, 4.9)["case"],
+                         fit.FROM_ADOPTED_FORM)
+        self.assertEqual(fit.estimate(self.ADOPTED, 5.0)["case"],
+                         fit.REFUSED_OUTSIDE_DEPTH_DOMAIN)
+        self.assertEqual(fit.estimate(self.REFUSED, 5.0)["case"],
+                         fit.REFUSED_OUTSIDE_DEPTH_DOMAIN)
+
+    def test_what_it_cannot_name_raises_rather_than_inventing_a_silence(self):
+        # Four cases and no fifth: an unnamed verdict, a form with no
+        # arithmetic here, and a table that does not span the domain -- the
+        # last of which the Swift decoder refuses an artifact over.
+        for model in (
+            {"verdict": "pending", "folds": []},
+            {"verdict": "adopted", "form": "cubic", "coefficients": {"a": 1.0}},
+            {"verdict": "adopted", "form": "quadratic", "coefficients": {"a": 1.0}},
+            {"verdict": "refused",
+             "table": {"edges": [0.5, 1.0], "medians": [0.003]}},
+        ):
+            with self.subTest(model=model):
+                with self.assertRaises(ValueError):
+                    fit.estimate(model, 2.0)
+
+
+class TheSharedLadder(unittest.TestCase):
+    """The ladder is registered in docs/DEVLOG.md and declared here; Swift
+    carries the same eight numbers because it cannot read a Python constant."""
+
+    def test_the_ladder_straddles_both_edges_of_the_answering_domain(self):
+        low, high = fit.ANSWERING_DOMAIN
+        self.assertEqual(list(fit.DEPTH_LADDER), sorted(fit.DEPTH_LADDER))
+        self.assertTrue(any(depth < low for depth in fit.DEPTH_LADDER))
+        self.assertTrue(any(depth > high for depth in fit.DEPTH_LADDER))
+        # Both endpoints themselves, because the top one is where the two
+        # domains disagree and a ladder that skipped it would hide that.
+        self.assertIn(low, fit.DEPTH_LADDER)
+        self.assertIn(high, fit.DEPTH_LADDER)
+
+    def test_the_swift_mirror_carries_the_registered_ladder(self):
+        # Copying the ladder into a fixture would create a second copy to
+        # drift, so this reads the declaration itself -- ModelArtifactTests'
+        # move in the other direction. It is a positive assertion on one
+        # declaration, so its failure mode is going red rather than passing
+        # quietly, and a reformatted declaration going red is the price of
+        # never having a silent green.
+        with open(PROBE_SOURCE, encoding="utf-8") as handle:
+            source = handle.read()
+        self.assertIn(LADDER_DECLARATION, source,
+                      f"{PROBE_SOURCE} no longer declares the mirrored ladder")
+        literal = source.split(LADDER_DECLARATION, 1)[1].split("]", 1)[0]
+        # Parsed floats in order: text would go red on 0.4 against 0.40 for no
+        # reason, and a set would drop the order both readers render.
+        mirrored = tuple(float(part) for part in literal.split(","))
+        self.assertEqual(mirrored, tuple(float(d) for d in fit.DEPTH_LADDER))
 
 
 if __name__ == "__main__":

@@ -47,6 +47,18 @@ def section(page, name):
     raise AssertionError(f"no panel for {name}")
 
 
+def ladder(chunk):
+    """One class's evaluated ladder as `{depth: cell}`, so an assertion about
+    what 5.00 does cannot be satisfied by a band edge elsewhere in the panel."""
+    body = chunk.split('<table class="ladder">')[1].split("</table>")[0]
+    rows = {}
+    for row in body.split("<tr>")[2:]:      # [1] is the header row
+        rows[row.split("<th>")[1].split("</th>")[0]] = (
+            row.split("<td>")[1].split("</td>")[0]
+        )
+    return rows
+
+
 def planted(**overrides):
     """A small `skewline-fit/1` carrying three shapes the committed artifact
     does not: a band with no samples, a form this page cannot name, and a
@@ -120,6 +132,67 @@ class WhatARefusalLooksLike(unittest.TestCase):
         self.assertNotIn(nothing_answers, high)
 
 
+class TheEvaluatedLadder(unittest.TestCase):
+    """The rendered estimates. Every one goes through `fit.estimate`, so a
+    refusal here is the refusal `Sources/Model` reports for the same class at
+    the same depth -- and the depths are one registered list both readers use.
+    """
+
+    def test_every_registered_depth_gets_a_row_in_order(self):
+        for name in fit.CLASS_NAMES:
+            with self.subTest(name=name):
+                rows = ladder(section(committed(), name))
+                self.assertEqual(list(rows), [f"{d:.2f}" for d in fit.DEPTH_LADDER])
+
+    def test_both_edges_of_the_domain_refuse_on_every_class(self):
+        # What the ladder straddling both edges is for: 0.40 below, 5.00 the
+        # upper bound the half-open reading excludes, 6.00 well outside. The
+        # refusal is named as the domain's, and the sentence explaining it
+        # stays above the classes -- `test_the_two_silences_read_differently`
+        # is what keeps it there.
+        for name in fit.CLASS_NAMES:
+            rows = ladder(section(committed(), name))
+            for depth in ("0.40", "5.00", "6.00"):
+                with self.subTest(name=name, depth=depth):
+                    self.assertIn("refused: outside the domain", rows[depth])
+                    self.assertNotIn("0.0", rows[depth])
+            self.assertNotIn("refused", rows["4.90"])
+
+    def test_a_refused_class_still_answers_inside_the_domain(self):
+        # v0.6's finding at the depth a reader actually asks about: refused is
+        # not unavailable, and the number comes from the table it kept.
+        rows = ladder(section(committed(), "high"))
+        self.assertIn("0.006249", rows["2.00"])
+        self.assertIn("table", rows["2.00"])
+        # The band table above says the same number, which is the point: the
+        # ladder is that table answered at a registered depth, not a new fit.
+        self.assertIn("0.006249", section(committed(), "high"))
+
+    def test_a_band_without_samples_reads_as_one_in_the_ladder(self):
+        # The planted high class has no median in [1.00, 2.00). Not zero and
+        # not blank: the two tidy-looking inversions of the thesis.
+        rows = ladder(section(render(planted()), "high"))
+        self.assertIn("no samples", rows["1.00"])
+        self.assertNotIn("0.000000", rows["1.00"])
+        # And the sampled bands beside it still answer, so "no samples" is
+        # this band's finding rather than the table's.
+        self.assertIn("0.009000", rows["3.00"])
+
+    def test_a_class_the_page_cannot_evaluate_gets_a_sentence(self):
+        # `fit.estimate` names four cases and no fifth, so a form it has no
+        # arithmetic for raises rather than inventing a silence. The page
+        # still shows everything the artifact carries for that class; what it
+        # does not do is put a number where there is none.
+        artifact = planted()
+        artifact["classes"]["low"] = {"verdict": "adopted", "form": "cubic",
+                                      "coefficients": {"a": 0.02}, "folds": []}
+        low = section(render(artifact), "low")
+        self.assertNotIn('<table class="ladder">', low)
+        self.assertIn("No ladder is evaluated for this class", low)
+        self.assertIn("<b>a</b>", low)          # still shown, not hidden
+        self.assertIn("cubic", low)
+
+
 class WhatThePageDoesNotDo(unittest.TestCase):
     def test_nothing_is_evaluated_in_the_browser(self):
         # The mechanical guard that there is no third reader: the page carries
@@ -132,11 +205,18 @@ class WhatThePageDoesNotDo(unittest.TestCase):
         self.assertNotIn("<script", page)
         self.assertNotIn("://", page)
 
-    def test_the_page_says_it_evaluates_nothing(self):
-        # Otherwise "no estimate at any depth" reads as a curve someone forgot
-        # rather than as this rung's decision. Commit 2 removes this line.
-        self.assertIn("evaluates nothing", committed())
-        self.assertIn("no estimate is computed at any depth", committed())
+    def test_the_page_says_whose_depths_it_evaluated(self):
+        # The line this replaces said the page evaluated nothing, which was
+        # this rung's decision until the ladder arrived. What has to stay said
+        # is the part that survived: the depths are the repository's, and no
+        # viewer's depth can reach this page at all.
+        page = committed()
+        closing = page.split('<p class="silence">')[1]
+        self.assertIn("there is no depth on this page a viewer chose", closing)
+        self.assertNotIn("no estimate is computed at any depth", page)
+        # Not a sweep for "evaluates nothing": the shell's own comment says the
+        # BROWSER evaluates nothing, which is still true and is a different
+        # claim. A wider assertion here would go red for that non-reason.
 
     def test_the_renderer_never_sees_a_request(self):
         # Stronger than serve.py's own version of this: there is no request
@@ -176,6 +256,29 @@ class WhatTheArtifactSays(unittest.TestCase):
         self.assertNotIn("<b>p</b>", low)
         self.assertIn("<b>p</b>", medium)
         self.assertNotIn("<b>b</b>", medium)
+
+    def test_a_fold_names_its_holdout_by_the_block_devlog_writes(self):
+        # The fold table is the widest thing on the page and the column that
+        # fell off the card at the default width was the adopted form's
+        # margin -- the evidence. The identifier loses nothing: all four are
+        # on the same page, in full, under TRAINED ON.
+        page = committed()
+        session = "931A8965-D191-4A08-B6D9-DC60EA2AA606"
+        self.assertIn("931A8965…", section(page, "low"))
+        self.assertNotIn(session, section(page, "low"))
+        self.assertIn(session, page.split("<section")[0])
+
+    def test_a_holdout_that_is_not_a_uuid_is_printed_whole(self):
+        # Shortening an arbitrary name could make two rows read identically,
+        # and every row here is a different container's evidence.
+        artifact = planted()
+        artifact["classes"]["high"]["folds"] = [
+            {"holdout": "PLANTED-A", "table": 0.004, "forms": {}},
+            {"holdout": "PLANTED-B", "table": 0.005, "forms": {}},
+        ]
+        high = section(render(artifact), "high")
+        self.assertIn("PLANTED-A", high)
+        self.assertIn("PLANTED-B", high)
 
     def test_a_decimation_is_a_count_and_not_a_measurement(self):
         self.assertIn("decimation 64", committed())

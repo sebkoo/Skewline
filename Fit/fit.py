@@ -38,6 +38,9 @@ ESTIMAND = (
 UNITS = "meters"
 OUTSIDE_DOMAIN = "refuse"
 
+# The pair the artifact carries: two bare numbers, because `skewline-fit/1`
+# settles no inclusivity marker for them. Two different questions are asked of
+# these same two endpoints below, and they answer differently at the top one.
 DEPTH_DOMAIN = (0.5, 5.0)
 BAND_EDGES = (0.5, 1.0, 2.0, 3.0, 5.0)
 CLASS_NAMES = ("low", "medium", "high")
@@ -53,8 +56,29 @@ POWER_GRID = np.linspace(0.5, 3.0, 51)
 IRLS_ITERATIONS = 50
 IRLS_EPSILON = 1e-9
 
-# The positivity gate's grid: 0.01 m steps across the depth domain.
+# The positivity gate's grid: 0.01 m steps across the depth domain, CLOSED at
+# both ends. The question is "may this candidate be adopted", and a form that
+# goes non-positive at 5.0 m is disqualified whether or not any consumer ever
+# asks there -- so 5.0 is on this grid.
 POSITIVITY_GRID = np.linspace(DEPTH_DOMAIN[0], DEPTH_DOMAIN[1], 451)
+
+# The other question over the same two endpoints: "does a consumer get a number
+# at depth d", asked by `estimate` below and HALF-OPEN, [0.5, 5.0) -- the
+# reading `Sources/Model` resolved from the banded table's own arithmetic,
+# where the last band is [3.0, 5.0) and 5.0 falls in no band at all. An alias
+# and not a second pair: the numbers are one object, the half-openness lives in
+# `estimate`'s comparison rather than in the constant, and what enforces the
+# difference from the gate above is a test that pins 5.0 answering differently
+# in the two.
+ANSWERING_DOMAIN = DEPTH_DOMAIN
+
+# The depth ladder every reader of this model reports at, straddling both edges
+# of the answering domain so that one report shows what answers and what
+# refuses. Registered in docs/DEVLOG.md, v0.8 commit 2. `view.py` imports it;
+# `Sources/ModelProbe/ModelProbe.swift` carries the same eight numbers because
+# Swift cannot read a Python constant, and `test_fit.py` reads that declaration
+# and pins the two equal.
+DEPTH_LADDER = (0.4, 0.5, 1.0, 2.0, 3.0, 4.9, 5.0, 6.0)
 
 # Diagnostics only -- never the fit path: fine bins printed beside the fit.
 DIAGNOSTIC_BIN_WIDTH = 0.1
@@ -355,6 +379,75 @@ def read_artifact(path):
     if artifact.get("schema") != ARTIFACT_SCHEMA:
         raise ValueError(f"{path}: not a {ARTIFACT_SCHEMA} artifact")
     return artifact
+
+
+# --- What the model answers, and where it refuses -----------------------------
+
+# The four cases `Sources/Model`'s `Estimate` names, mirrored here so the two
+# consumers of one artifact refuse in the same places. Two are answers and two
+# are silences, and the silences are different findings: inside the domain a
+# band nobody sampled has no median, while outside it nothing answers at all.
+FROM_ADOPTED_FORM = "from-adopted-form"
+FROM_BANDED_TABLE = "from-banded-table"
+REFUSED_BAND_WITHOUT_SAMPLES = "refused-band-without-samples"
+REFUSED_OUTSIDE_DEPTH_DOMAIN = "refused-outside-depth-domain"
+
+
+def estimate(class_model, depth):
+    """What one class of the artifact answers at one depth, or which silence.
+
+    `predict` is the shared evaluator and deliberately NOT a shared refuser:
+    the parametric forms are evaluated wherever asked, so it returns a number
+    at 6.0 m where a consumer must refuse, and its table path returns a bare
+    NaN for two silences that are not one thing. This is the refuser, and it
+    mirrors `Estimate` case for case rather than being a second arithmetic.
+
+    Returns `{"case": <one of the four above>, "meters": float or None}`.
+
+    Four cases and no fifth. A verdict this module cannot name, a form it has
+    no arithmetic for, and a table that does not span the depth domain -- the
+    last of which the Swift decoder refuses an artifact over -- all raise
+    ValueError, exactly as `predict` raises on an unknown form. Inventing an
+    unnamed silence here would be, in the other language, the failure that
+    type exists to prevent.
+    """
+    low, high = ANSWERING_DOMAIN
+    # Half-open, and asked first: outside the domain nothing answers, for an
+    # adopted class exactly as for a refused one.
+    if not low <= depth < high:
+        return {"case": REFUSED_OUTSIDE_DEPTH_DOMAIN, "meters": None}
+    verdict = class_model.get("verdict")
+    if verdict == "adopted":
+        coefficients = class_model.get("coefficients")
+        if not isinstance(coefficients, dict):
+            raise ValueError("an adopted class with no coefficients to evaluate")
+        try:
+            return {
+                "case": FROM_ADOPTED_FORM,
+                "meters": float(predict(class_model.get("form"), coefficients, depth)),
+            }
+        except KeyError as missing:
+            raise ValueError(
+                f"{class_model.get('form')!r} without its {missing} coefficient"
+            ) from missing
+    if verdict == "refused":
+        # A refused class still answers -- from the banded table it kept,
+        # which is exactly what keeping it bought.
+        table = class_model.get("table")
+        if not isinstance(table, dict):
+            raise ValueError("a refused class with no table to answer from")
+        edges = table.get("edges", [])
+        medians = table.get("medians", [])
+        for index, (band_low, band_high) in enumerate(zip(edges[:-1], edges[1:])):
+            if band_low <= depth < band_high and index < len(medians):
+                median = medians[index]
+                if median is None:
+                    return {"case": REFUSED_BAND_WITHOUT_SAMPLES, "meters": None}
+                return {"case": FROM_BANDED_TABLE, "meters": float(median)}
+        raise ValueError(
+            f"no band holds {depth} in a table that must span {list(ANSWERING_DOMAIN)}"
+        )
+    raise ValueError(f"unknown verdict {verdict!r}")
 
 
 # --- The driver the measured commit will run ---------------------------------

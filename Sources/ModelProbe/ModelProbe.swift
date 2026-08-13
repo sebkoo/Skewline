@@ -20,8 +20,13 @@ import Model
 /// code is `MainActor`-isolated, and nothing here wants an actor.
 @main
 struct ModelProbe {
-    /// The registered ladder, straddling both edges of the depth domain so a
-    /// single run shows what answers and what refuses.
+    /// The registered ladder -- `fit.DEPTH_LADDER`, registered in
+    /// docs/DEVLOG.md under v0.8 commit 2 -- straddling both edges of the
+    /// depth domain so a single run shows what answers and what refuses.
+    ///
+    /// This is the mirror, not the declaration: Swift cannot read a Python
+    /// constant, so `Fit/test_fit.py` reads these eight numbers back out of
+    /// this file and pins them equal to the ones the page renders.
     static let depths: [Double] = [0.4, 0.5, 1.0, 2.0, 3.0, 4.9, 5.0, 6.0]
 
     static func main() async {
