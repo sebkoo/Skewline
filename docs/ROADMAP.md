@@ -67,7 +67,7 @@ change, that is a signal the boundary was drawn wrong, and it belongs in
 
 ## What has shipped
 
-Twenty-seven steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
+Twenty-nine steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
 including the ones that were mistakes.
 
 1. **Types.** A pose, a 6×6 covariance beside it, and the tracker's own opinion
@@ -283,45 +283,100 @@ including the ones that were mistakes.
     connection. Forty-three tests, and the committed `Fit/model.json` is
     decoded by the suite through its own source path rather than copied into
     `Tests/`, where the copy would drift.
+28. **The page the service renders, and the reader that does not exist.** A
+    second route, `GET /`, serving an HTML document the service renders
+    itself. The rung opened on the premise that a page evaluating the model
+    is a *third* independent implementation of one schema — after the Python
+    that writes it and the Swift that reads it — and that premise was
+    discarded whole rather than solved: the same service renders the page
+    through `fit.read_artifact` and hands the browser a finished document, so
+    there is no third reader to hold honest, no node job, no toolchain pin
+    and no sixth gate command. It sits off the version prefix because
+    `skewline-fit/1` versions the payload and `/v1/` versions the endpoint
+    set and the error shape, while an HTML document has no payload version to
+    promise stability for — and `/` keeps `/v1/` a set of exactly one
+    endpoint. `view.py` is a pure function of the artifact and the committed
+    `view.html` shell, never receiving the request object at all, and both
+    files are re-read per request. Errors on the page's route stay in the
+    `/v1/` JSON shape, because one service is one error shape, with a new 500
+    `no-view` for a missing shell: a committed document's absence is a broken
+    checkout, the operator's problem rather than the request's. One clause of
+    the privacy line acquired an exception — the page is the first consumer
+    here that does not evaluate locally — and what makes that safe is the
+    clause worth carrying forward instead: **no depth a client picked ever
+    travels up.** A depth slider is therefore impossible by construction
+    rather than merely unbuilt, needing either script in the browser or a
+    query parameter, and `/?depth=2.0` answers 404 with the depth it refused
+    named in the detail. Twenty-five tests, both teeth shown red first; the
+    rendered page is 11,177 bytes for the committed artifact.
+29. **The refuser, the registered ladder, and the evaluated column.** The page
+    evaluates now, and the two things it needed first were a ladder that was
+    actually registered and a refuser that is not `predict`.
+    `ModelProbe.depths` was commented "the registered ladder" while the log
+    said plainly that it was a probe-local choice registered nowhere; the log
+    was right by this repository's meaning of the word, so the fix was to
+    register it rather than to soften the comment. `fit.DEPTH_LADDER` is the
+    declaration, `view.py` imports it, Swift carries the same eight numbers
+    because it cannot read a Python constant, and the Python suite reads that
+    declaration back out of the Swift file and pins the two equal — one source
+    and one mirror, because a symmetric pair of literals has no owner. The
+    ladder straddles both edges of the domain, so one output shows what
+    answers and what refuses. `fit.predict` is a shared evaluator and
+    deliberately not a shared refuser: it answers at 6.0 m where the Swift
+    reader refuses, and its table path returns one `NaN` for two findings that
+    type keeps apart. So `fit.estimate` mirrors `Estimate` case for case, four
+    cases and no fifth, and it lives beside the declaration it enforces — which
+    put two domains over one pair of endpoints inside one module, named apart
+    so the difference is visible: `POSITIVITY_GRID` closed, asking whether a
+    candidate may be adopted, and `ANSWERING_DOMAIN` half-open, asking whether
+    a consumer gets a number, with a test pinning 5.0 m answering on the grid
+    and refused by the refuser. Each class now carries an evaluated column at
+    those eight depths, so a refused class visibly still answers from the table
+    it kept, and every class refuses outside the domain — worded as the
+    domain's refusal rather than any one class's, because those two silences
+    are different findings. Holdouts print their first identifier block, after
+    the fold table's `quadratic` column — the adopted form, whose margin is the
+    evidence this rung gives a sign on purpose — was found falling off the card
+    at the default width by eye, not by a test. Fifteen more tests; Swift
+    unchanged, because the only Swift edit is a comment.
 
 ## Decided but not yet done
 
 A list that only shrinks. Anything finished moves to *What has shipped* above
 rather than gaining a tick here, so this section is empty when there is nothing
-outstanding — which is the honest resting state, not a gap.
+outstanding — which is the honest resting state, not a gap. It is empty now.
 
-```text
-  v0.8 view is a rung, not a commit list. Nothing below this line is
-  decided at commit level, and nothing should be.
-```
-
-Below that line, what each commit contains is decided by what the one before it
-turned out to be wrong about. That is why [`DEVLOG.md`](DEVLOG.md) records the
-mistakes and not only the decisions: it is the input to the next commit rather
-than a diary. Commit 2's shape came out of commit 1's report; commit 5 exists
-because commit 2 discovered that `canImport(ARKit)` is true on macOS.
+The divider that stood here named the rung below which nothing was decided at
+commit level. There is no rung below it, so it goes rather than being reworded
+onto one that does not exist. What it protected was never a property of any
+rung: what each commit contains is decided by what the one before it turned out
+to be wrong about. That is why [`DEVLOG.md`](DEVLOG.md) records the mistakes and
+not only the decisions — it is the input to the next commit rather than a diary.
+Commit 2's shape came out of commit 1's report; commit 5 exists because commit 2
+discovered that `canImport(ARKit)` is true on macOS.
 
 ## What is next, and what forces it
 
 | Version | Ships | What forces it |
 |---|---|---|
-| **v0.8** view | A small web dashboard over the same service | The endpoint already has a reader; a dashboard is nearly free as one more |
 
-Python entered in v0.6 not because it is popular but because an uncertainty
-model had to be fitted somewhere; step 25 is that fit, and steps 26 and 27 are
-the seam that carries it, so the model now reaches a reader without a capture
-ever leaving the machine. One rung is still forward-looking: once there is a
-service, a dashboard costs a day. That dashboard has now started, and request
-latency, throughput, behavior under concurrent requests, the per-request
-read-and-render cost and startup are all still unmeasured — so what keeps them
-off the list is no longer "there is no consumer yet", and it is written as a
-trigger instead. **They are measured when the service is run for a reader on a
-machine that reader does not operate — the first moment a figure describes an
-experience rather than a loopback round trip — and a registered workload exists
-to measure against, so the number is reproducible rather than one anecdote.**
-Before both, a millisecond from a local GET is decoration. Each rung is pulled
-in by the one below it. That is the difference between a ladder and a
-checklist.
+The table has no rows, for the same reason the list above it is empty: every
+rung this ladder registered has shipped. Python entered in v0.6 not because it
+is popular but because an uncertainty model had to be fitted somewhere; step 25
+is that fit, steps 26 and 27 are the seam that carries it, and steps 28 and 29
+are the page that reads it, so the model now reaches a reader without a capture
+ever leaving the machine. What stays unmeasured is unchanged and stays written
+as a condition rather than a plan: request latency, throughput, behavior under
+concurrent requests, the per-request read-and-render cost and startup.
+**They are measured when the service is run for a reader on a machine that
+reader does not operate — the first moment a figure describes an experience
+rather than a loopback round trip — and a registered workload exists to measure
+against, so the number is reproducible rather than one anecdote.** Before both,
+a millisecond from a local GET is decoration. A rung would be added the way
+every rung here was: pulled in by the one below it. That trigger and the two in
+*Deliberately not built* are the only registered conditions under which this
+table gains a line, and none of them is a promise that it will. That is the
+difference between a ladder and a checklist.
 
 ## Deliberately not built
 
