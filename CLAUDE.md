@@ -18,6 +18,9 @@ perpendicular is the residual.
 - `Interop` — a PLY point-cloud file read across a C seam into the module's
   own value types. Depends on nothing above: the C++ parser is a private
   target behind a pure C header, so no importer inherits a language mode.
+- `Model` — the fitted model, read from the service and evaluated locally.
+  Depends on nothing above and owns its value types: joining a model to
+  rendered points is the consumer's edge, so it never reaches for `Render`'s.
 
 Acyclic, `Core` at the root. `Replay` must never depend on `Capture`. Replay is
 what makes the pipeline testable without hardware, so anything it imports
