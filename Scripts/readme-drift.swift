@@ -2,7 +2,7 @@
 // is a human docs commit, never a bot's.
 //
 // Every assertion here is mechanically falsifiable, and each failure quotes
-// the claim it caught verbatim. Two designs are deliberate:
+// the claim it caught verbatim. Three designs are deliberate:
 //
 // - A negative claim ("No app") is checked only while its exact text appears
 //   in the README, so correcting the README retires the probe without
@@ -11,10 +11,17 @@
 // - A structural anchor -- the ladder, the module list, the CI job count --
 //   is required. A check that silently skips when its anchor disappears is
 //   decoration, which is the lesson the commit-msg hook taught.
+// - One anchor is conditional, and the cost is said rather than hidden. The
+//   ROADMAP's what-is-next table is required to have rows only while the
+//   ladder still has an unfinished rung; a ladder whose every rung is done
+//   has ended, and a table with no rows is that state's honest shape. The
+//   table itself stays required, so "empty" stays distinguishable from
+//   "deleted", and the next rung to arrive re-arms the row requirement.
 //
 // What none of this can catch: prose that is wrong without being falsifiable,
-// a claim reworded until the verbatim match misses, and the README agreeing
-// with a ROADMAP that is itself wrong. Agreement is not truth.
+// a claim reworded until the verbatim match misses, a ladder truncated to a
+// fully-done prefix rather than ended, and the README agreeing with a ROADMAP
+// that is itself wrong. Agreement is not truth.
 //
 // Run from the repository root: swift Scripts/readme-drift.swift
 
@@ -102,12 +109,23 @@ if ladder.isEmpty {
 
 let doneRows = ladder.enumerated().filter { $0.element.marker == "done" }
 let currentRows = ladder.enumerated().filter { $0.element.marker == "next" || $0.element.marker == "here" }
+
+/// A ladder whose every rung is done has ended, and an ended ladder is a
+/// state rather than a drift: no row is current, and the what-is-next table
+/// below has no rows. The two are only ever green together -- a table that
+/// empties while a rung is still current is the parse failure this assertion
+/// exists to catch, and a ladder that ends while the table still lists a rung
+/// is a half-finished edit the row loop below catches by name.
+let ladderHasEnded = !ladder.isEmpty && doneRows.count == ladder.count
+
 if !ladder.isEmpty {
     if doneRows.map(\.offset) != Array(0..<doneRows.count) {
         fail(claim: "done", because: "the ladder's done marks are not a prefix of the ladder")
     }
-    if currentRows.count != 1 {
-        fail(claim: "next", because: "the ladder marks \(currentRows.count) current rungs; exactly one row may be next/here")
+    if ladderHasEnded {
+        // Every rung done: nothing may be current, and nothing is.
+    } else if currentRows.count != 1 {
+        fail(claim: "next", because: "the ladder marks \(currentRows.count) current rungs; exactly one row may be next/here until the last rung is done")
     } else if currentRows[0].offset != doneRows.count {
         fail(claim: currentRows[0].element.marker!, because: "the current rung does not sit immediately after the done prefix")
     }
@@ -129,8 +147,17 @@ let roadmapRows: [(version: String, name: String)] = roadmap
         return (version, name)
     }
 
+// The table's header, kept verbatim when the last row goes, so that a table
+// with nothing outstanding stays legible as one. This literal is load-bearing:
+// it is what tells an empty table apart from a deleted section.
+let nextTableHeader = "| Version | Ships | What forces it |"
+
 if roadmapRows.isEmpty {
-    fail(claim: "ROADMAP", because: "no table rows (| **vX.Y** name |) were found in docs/ROADMAP.md to check")
+    if !ladderHasEnded {
+        fail(claim: "ROADMAP", because: "no table rows (| **vX.Y** name |) were found in docs/ROADMAP.md to check, and the ladder has not ended")
+    } else if !roadmap.contains(nextTableHeader) {
+        fail(claim: "ROADMAP", because: "the ladder has ended, so the what-is-next table may carry no rows -- but the table itself is gone from docs/ROADMAP.md, and an empty table is a state where a missing one is drift")
+    }
 }
 
 for row in roadmapRows {
