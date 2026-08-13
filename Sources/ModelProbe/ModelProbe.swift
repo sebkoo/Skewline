@@ -174,8 +174,9 @@ struct ModelProbe {
         }
     }
 
-    /// Six decimals for a metric, a margin or a coefficient: the scale the
-    /// fit's own transcript prints them at.
+    /// Six decimals for a metric or a coefficient: the scale the fit's own
+    /// transcript prints them at. Not a margin -- a margin carries its sign
+    /// and goes through `signed`.
     private static func fixed(_ value: Double) -> String {
         String(format: "%.6f", value)
     }
@@ -187,6 +188,10 @@ struct ModelProbe {
         String(format: "%.2f", value)
     }
 
+    /// Six decimals with the sign always printed, for a margin -- the third
+    /// format, and it exists because the sign is the finding: `+0.000003`
+    /// beside `-0.000003` makes the flip across folds unmissable, where a
+    /// magnitude alone would read as agreement.
     private static func signed(_ value: Double) -> String {
         String(format: "%+.6f", value)
     }
