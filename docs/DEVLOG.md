@@ -2210,3 +2210,54 @@ makes changing it a re-registration and not a config tweak.
   can now be reached by a machine its reader does not operate, which is the
   first half. The second half is a registered workload, and none exists. No
   number about the flag, the bind, or the wire appears anywhere in this commit.
+
+## 2026-08-13 · v0.9 commit 3 — one sentence, two readers
+
+**Built and gated.** `SightProbe.say` was the registered wording and it lived
+inside an executable target, which the app cannot import. A screen was about to
+need the same six sentences, and the only way to have them was to write them
+again.
+
+- **Moved rather than copied, on the argument this repository has already made
+  twice.** A second reader of the artifact is how two readers drift apart; that
+  is why the service shares `fit.read_artifact` and why the page renders
+  server-side instead of parsing the schema in a browser. Words drift the same
+  way schemas do, and the failure is worse rather than milder: a refusal worded
+  two ways is two findings to a reader who meets both, and nothing goes red.
+  `Sighting.sentence(from:)` lives in `Sight` and `ModelReadError.Kind.name`
+  lives in `Model`, each beside the type it describes.
+- **The registered wording had no test at all.** That is the finding of this
+  commit, and it was invisible until the move: `say` and `name(of:)` were
+  `static func`s on a `@main` struct, so nothing in `swift test` could reach
+  them, and the plan's claim that "the existing tests are the proof" was simply
+  wrong. Eight tests arrive with the move — six pinning sentences, two pinning
+  names — and they are what makes the *next* commit's change to the wording
+  visible rather than quiet.
+- **Pinned against a synthetic model, not the committed one.** `SightTests`
+  already keeps that rule so a refit cannot turn it red, and the wording tests
+  inherit it. `ModelFixture.artifact` gained a `trainedOn` parameter to make it
+  possible: the sentence names a session count, so a fixture that cannot vary
+  the count cannot test the clause that matters most.
+- **Two of the eight are properties rather than strings.**
+  `noSentenceHandsBackANumberWithoutItsProvenance` walks all three classes and
+  requires the sessions clause on every branch that carries a number, and
+  `everyRefusalHasItsOwnName` requires thirteen distinct non-empty names. A
+  string comparison pins today's wording; these two pin the rule the wording
+  exists to serve, and a fourteenth `Kind` added without a name goes red on the
+  second without anyone remembering to add a case.
+- **Output is unchanged, and that was checked rather than asserted.** Every
+  string survived the move byte for byte; the only edit is `fixed` becoming
+  `Self.fixed` at two call sites, which is a spelling and not a character on
+  anyone's terminal. The commit says `feat` because two modules gained public
+  API, not because behaviour moved.
+- **One wart found and deliberately not fixed.** The sentence says "on the 1
+  sessions this was fitted from" for a single-session artifact. `fit.py` refuses
+  to fit fewer than two containers, so no artifact this repository can produce
+  reaches it, and writing a plural rule for an unreachable case would be
+  inventing a case. Recorded here instead, which is what this file is for.
+- **The gate did not grow.** Five commands, unchanged. Swift 180 → **188**.
+  Python 76 unchanged, because nothing in `Fit/` was touched. Both iOS builds
+  succeeded. Drift green.
+- **Not measured yet.** Unchanged from the commit before: request latency,
+  throughput, behavior under concurrent requests, the per-request
+  read-and-render cost, startup. Nothing here runs, and nothing here measures.

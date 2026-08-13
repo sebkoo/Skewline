@@ -43,6 +43,7 @@ enum ModelFixture {
         units: String = FittedModel.units,
         outsideDomain: String = FittedModel.outsideDomain,
         depthDomain: String = "[0.5, 5.0]",
+        trainedOn: String = #"["A"]"#,
         classes: String = ModelFixture.classes()
     ) -> String {
         """
@@ -52,7 +53,7 @@ enum ModelFixture {
           "units": "\(units)",
           "outsideDomain": "\(outsideDomain)",
           "depthDomain": \(depthDomain),
-          "trainedOn": ["A"],
+          "trainedOn": \(trainedOn),
           "export": [{"session": "A", "decimation": 64}],
           "classes": \(classes)
         }

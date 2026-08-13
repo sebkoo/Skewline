@@ -74,3 +74,51 @@ private func serviceError(_ code: String, _ detail: String = "a detail") -> Stri
     #expect(ServiceErrorCode(wire: "brewing") == .unknown("brewing"))
     #expect(ServiceErrorCode.unknown("brewing").wire == "brewing")
 }
+
+// MARK: - Naming a refusal
+
+// The names moved out of `SightProbe` when a second reader appeared, and
+// arrive with the tests they never had there. A name is what a reader is
+// shown when the read fails, so an unnamed case is a screen with nothing on
+// it.
+
+/// Every case names itself, and no two share a name: a refusal a reader
+/// cannot tell from another refusal is the collapse this module spends four
+/// `Estimate` cases and thirteen `Kind` cases refusing.
+@Test func everyRefusalHasItsOwnName() {
+    let kinds: [ModelReadError.Kind] = [
+        .unreachable,
+        .service(status: 503, code: .noModel),
+        .notJSON,
+        .wrongSchema,
+        .missingField,
+        .wrongUnits,
+        .wrongOutsideDomain,
+        .malformedDomain,
+        .unknownClass,
+        .unknownVerdict,
+        .malformedForm,
+        .malformedFold,
+        .malformedTable,
+    ]
+    let names = kinds.map(\.name)
+    #expect(names.allSatisfy { !$0.isEmpty })
+    #expect(Set(names).count == kinds.count)
+}
+
+/// The status stays beside the code, because a service that grows a code this
+/// client has never heard of still answered, and the number says what happened
+/// when the name cannot.
+@Test func aServiceRefusalCarriesItsStatusIntoTheName() {
+    #expect(ModelReadError.Kind.service(status: 503, code: .noModel).name
+        == "service 503 no-model")
+    #expect(ModelReadError.Kind.service(status: 418, code: .unknown("brewing")).name
+        == "service 418 brewing")
+    #expect(ModelReadError.Kind.service(status: 502, code: nil).name
+        == "service 502 no error body")
+}
+
+/// The one a phone reaching a laptop meets first, so it is pinned by itself.
+@Test func theTransportFailureIsNamedUnreachable() {
+    #expect(ModelReadError.Kind.unreachable.name == "unreachable")
+}

@@ -232,3 +232,82 @@ private func committedModel() throws -> FittedModel {
         #expect(pixel.index == extent * extent - 1)
     }
 }
+
+// MARK: - The registered wording
+
+// Pinned string by string, and against a synthetic model rather than the
+// committed one so a refit cannot turn them red. The wording moved out of
+// `SightProbe` and into `Sight` because two readers need it now; until that
+// move it had no test at all, which is why these arrive with it. Every branch
+// that carries a number states where the number came from, and every branch
+// that carries none says "refused" and why.
+
+private func fourSessionModel(classes: String = ModelFixture.classes()) throws -> FittedModel {
+    try FittedModel(decoding: Data(ModelFixture.artifact(
+        trainedOn: #"["A", "B", "C", "D"]"#,
+        classes: classes
+    ).utf8))
+}
+
+@Test func anAdoptedFormNamesTheSessionsItWasFittedFrom() throws {
+    let model = try fourSessionModel()
+    // low is quadratic a=0.02 b=0.01, so 0.02 + 0.01 * 4 at two metres.
+    #expect(model.sighting(depthMeters: 2.0, rawConfidence: 0).sentence(from: model)
+        == "on the 4 sessions this was fitted from, two views of a point like this"
+        + " disagreed by about 0.060000 m")
+}
+
+/// A refused class still answers, and the sentence has to say both halves:
+/// no form was adopted, *and* here is what its band measured. Collapsing it to
+/// either half alone is the conflation `Estimate`'s four cases exist to refuse.
+@Test func aRefusedClassSaysSoAndStillAnswers() throws {
+    let model = try fourSessionModel()
+    // high is the refused fixture, band [2.0, 3.0) holding 0.003.
+    let sentence = model.sighting(depthMeters: 2.0, rawConfidence: 2).sentence(from: model)
+    #expect(sentence == "no form was adopted for this class; on the 4 sessions this was"
+        + " fitted from, its band disagreed by about 0.003000 m")
+    #expect(sentence.contains("no form was adopted"))
+    #expect(sentence.contains("0.003000"))
+}
+
+@Test func everySilenceSaysRefusedAndSaysWhy() throws {
+    let sparse = ModelFixture.classes(
+        high: ModelFixture.refused(
+            table: #"{"edges": [0.5, 1.0, 2.0, 3.0, 5.0], "medians": [0.001, null, 0.003, 0.004]}"#
+        )
+    )
+    let model = try fourSessionModel(classes: sparse)
+
+    #expect(model.sighting(depthMeters: 6.0, rawConfidence: 0).sentence(from: model)
+        == "refused: outside the depths this was fitted over, nothing answers")
+    #expect(model.sighting(depthMeters: 1.5, rawConfidence: 2).sentence(from: model)
+        == "refused: inside the fitted depths, but this band had no samples")
+    #expect(model.sighting(depthMeters: 0, rawConfidence: 0).sentence(from: model)
+        == "refused: the sensor returned no depth at this pixel")
+    #expect(model.sighting(depthMeters: 2.0, rawConfidence: 7).sentence(from: model)
+        == "refused: the sensor reported class 7, which no fold was fitted over")
+}
+
+/// The scene guard, stated as the property rather than as four string
+/// comparisons: the artifact cannot guard scene, so every sentence that hands
+/// back a number has to name the sessions it came from. A future branch that
+/// answers without that clause goes red here.
+@Test func noSentenceHandsBackANumberWithoutItsProvenance() throws {
+    let model = try fourSessionModel()
+    for raw in [UInt8(0), 1, 2] {
+        let sighting = model.sighting(depthMeters: 2.0, rawConfidence: raw)
+        let sentence = sighting.sentence(from: model)
+        #expect(sighting.medianPairwiseDisagreementMeters != nil)
+        #expect(sentence.contains("4 sessions this was fitted from"))
+    }
+}
+
+/// The count is the artifact's, never a literal: a model naming a different
+/// number of sessions says a different number.
+@Test func theSessionCountIsReadFromTheArtifact() throws {
+    let two = try FittedModel(decoding: Data(
+        ModelFixture.artifact(trainedOn: #"["A", "B"]"#).utf8
+    ))
+    #expect(two.sighting(depthMeters: 2.0, rawConfidence: 0)
+        .sentence(from: two).contains("on the 2 sessions"))
+}

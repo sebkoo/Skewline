@@ -53,7 +53,7 @@ struct SightProbe {
             try await report(model: arguments[0], container: arguments[1], points: points)
         } catch let refusal as ModelReadError {
             FileHandle.standardError.write(Data(
-                "error: \(arguments[0]): \(name(of: refusal.kind)) -- \(refusal.message)\n".utf8
+                "error: \(arguments[0]): \(refusal.kind.name) -- \(refusal.message)\n".utf8
             ))
             exit(1)
         } catch {
@@ -147,7 +147,7 @@ struct SightProbe {
             let raw = confidences[pixel.index]
             print(row(label, "pixel \(pixel.column),\(pixel.row)  "
                 + "depth \(bound(Double(depth))) m  class \(raw)"))
-            print(row("", say(model.sighting(depthMeters: depth, rawConfidence: raw), model: model)))
+            print(row("", model.sighting(depthMeters: depth, rawConfidence: raw).sentence(from: model)))
         }
 
         #if DEBUG
@@ -158,59 +158,6 @@ struct SightProbe {
         print("  --- timing (\(build); not deterministic) ---")
         print(row("read and decode one frame", String(format: "%.1f ms", (elapsed / .seconds(1)) * 1000)))
         print("")
-    }
-
-    /// The registered wording, and the reason this is a function rather than
-    /// an interpolation at the call site.
-    ///
-    /// The artifact guards depth -- outside the fitted range every class
-    /// refuses -- and guards scene not at all, because it cannot: the fit is
-    /// leave-one-out over the sessions it names, so a number read off a scene
-    /// that is not one of them is an extrapolation across scenes. A bare "this
-    /// point disagrees by X" would hide that. The sentence carries where the
-    /// number came from instead, and every consumer of this module owes its
-    /// reader the same.
-    static func say(_ sighting: Sighting, model: FittedModel) -> String {
-        switch sighting {
-        case .model(.fromAdoptedForm(let meters)):
-            "on the \(model.trainedOn.count) sessions this was fitted from, two views of a point"
-                + " like this disagreed by about \(fixed(meters)) m"
-        case .model(.fromBandedTable(let meters)):
-            "no form was adopted for this class; on the \(model.trainedOn.count) sessions this was"
-                + " fitted from, its band disagreed by about \(fixed(meters)) m"
-        case .model(.refusedBandWithoutSamples):
-            "refused: inside the fitted depths, but this band had no samples"
-        case .model(.refusedOutsideDepthDomain):
-            "refused: outside the depths this was fitted over, nothing answers"
-        case .noDepthReturned:
-            "refused: the sensor returned no depth at this pixel"
-        case .unknownConfidenceClass(let raw):
-            "refused: the sensor reported class \(raw), which no fold was fitted over"
-        }
-    }
-
-    static func name(of kind: ModelReadError.Kind) -> String {
-        switch kind {
-        case .unreachable: "unreachable"
-        case .service(let status, let code): "service \(status) \(code?.wire ?? "no error body")"
-        case .notJSON: "not JSON"
-        case .wrongSchema: "wrong schema"
-        case .missingField: "missing field"
-        case .wrongUnits: "wrong units"
-        case .wrongOutsideDomain: "wrong outside-domain behavior"
-        case .malformedDomain: "malformed depth domain"
-        case .unknownClass: "unknown class"
-        case .unknownVerdict: "unknown verdict"
-        case .malformedForm: "malformed form"
-        case .malformedFold: "malformed fold"
-        case .malformedTable: "malformed table"
-        }
-    }
-
-    /// Six decimals for a disagreement, the scale the fit's own transcript
-    /// prints at.
-    private static func fixed(_ value: Double) -> String {
-        String(format: "%.6f", value)
     }
 
     /// Two decimals for a depth, matching ModelProbe -- a block that claims to

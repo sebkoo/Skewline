@@ -41,6 +41,37 @@ public struct ModelReadError: Error, Equatable, Sendable {
     }
 }
 
+extension ModelReadError.Kind {
+    /// The refusal named for a reader, without the detail `message` carries.
+    ///
+    /// Here rather than at a call site because there are two callers now --
+    /// a probe printing to a terminal and a client drawing to a screen -- and
+    /// a `switch` copied into the second is how the two come to disagree
+    /// about what a refusal is called. The same argument the artifact's one
+    /// reader is built on, applied to the words rather than to the schema.
+    ///
+    /// `service` keeps the status beside the code deliberately: a service
+    /// that grows a code this client has never heard of still answered, and
+    /// the number says what happened when the name cannot.
+    public var name: String {
+        switch self {
+        case .unreachable: "unreachable"
+        case .service(let status, let code): "service \(status) \(code?.wire ?? "no error body")"
+        case .notJSON: "not JSON"
+        case .wrongSchema: "wrong schema"
+        case .missingField: "missing field"
+        case .wrongUnits: "wrong units"
+        case .wrongOutsideDomain: "wrong outside-domain behavior"
+        case .malformedDomain: "malformed depth domain"
+        case .unknownClass: "unknown class"
+        case .unknownVerdict: "unknown verdict"
+        case .malformedForm: "malformed form"
+        case .malformedFold: "malformed fold"
+        case .malformedTable: "malformed table"
+        }
+    }
+}
+
 /// The three registered confidence classes, spelled as `fit.py`'s
 /// `CLASS_NAMES` spells them and iterated in that same order.
 ///
