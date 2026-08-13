@@ -92,7 +92,7 @@ v0.4  measure      frame time, and drift under replay                 done
 v0.5  interop      a point-cloud reader over Swift–C++                done
 v0.6  fit          the uncertainty model, fitted offline              done
 v0.7  service      the fitted model reaches the device                done
-v0.8  view         a dashboard over the same service                  here
+v0.8  view         a dashboard over the same service                  done
 ```
 
 Rungs are planned; individual commits are not. What each commit contains is
