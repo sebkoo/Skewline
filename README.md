@@ -144,12 +144,17 @@ there is no truth rig, and cross-frame reprojection measures the joint
 pose-and-depth disagreement a replay can observe, not pose accuracy on its
 own. A number that has not been measured is worse than no number.
 
-Nothing is deployed. The fitted model is served by a local endpoint bound to
-loopback, not by a host somebody operates, and no secret or hostname is in
-this repository. The wire runs one way: what it carries down is the same
-aggregate artifact already committed here, and nothing from a capture goes
-up — no frames, no depth, no observation rows, and no per-point query, since
-asking "how wrong is a reading at this depth" would send the asker's own
+Nothing is deployed. The fitted model is served by a local endpoint, not by a
+host somebody operates, and no secret or hostname is in this repository. It
+binds loopback unless its operator names an interface, which takes an explicit
+argument and prints a warning on every run — a phone cannot reach a loopback
+socket on a laptop, and that is the only reason the flag exists. What it widens
+is reach and not exposure: there is no authentication because nothing served is
+private, and anyone who can reach the machine reads the same artifact this
+repository already publishes. The wire runs one way: what it carries down is
+the same aggregate artifact already committed here, and nothing from a capture
+goes up — no frames, no depth, no observation rows, and no per-point query,
+since asking "how wrong is a reading at this depth" would send the asker's own
 depths to whoever runs the service. The Swift client evaluates the model
 itself, and that client exists.
 

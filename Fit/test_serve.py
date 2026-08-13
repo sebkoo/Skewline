@@ -196,8 +196,53 @@ class TheWireRunsOneWay(unittest.TestCase):
         self.assertEqual(status, 404)
         self.assertEqual(json.loads(body)["error"], serve.NO_SUCH_ENDPOINT)
 
-    def test_the_bind_host_is_loopback(self):
+    def test_the_default_bind_host_is_loopback(self):
+        # Was `test_the_bind_host_is_loopback` while loopback was the only
+        # value. `--host` made it the default instead, and the name had to
+        # say which of the two it guards -- this is the guard on the value
+        # an operator gets for saying nothing.
         self.assertEqual(serve.BIND_HOST, "127.0.0.1")
+
+    def test_a_non_loopback_bind_requires_an_explicit_argument(self):
+        # The privacy decision, mechanical rather than promised: no argument
+        # list that omits `--host` may reach a non-loopback address. Driving
+        # the parse rather than reading the source, because the loop is what
+        # an operator actually meets.
+        for arguments in ([], ["--port", "8000"]):
+            with self.subTest(arguments=arguments):
+                host, _ = serve.parse_bind(arguments)
+                self.assertEqual(host, serve.BIND_HOST)
+        host, port = serve.parse_bind(["--host", "192.0.2.7", "--port", "8000"])
+        self.assertEqual(host, "192.0.2.7")
+        self.assertEqual(port, 8000)
+
+    def test_a_wildcard_bind_says_it_is_not_an_address_to_type(self):
+        # Bound to every interface the URL is printable and useless, and
+        # that line is what the operator types into a phone. It has to say
+        # so rather than look helpful.
+        out, err = serve.startup_report("0.0.0.0", 8000, COMMITTED_ARTIFACT)
+        self.assertIn("http://0.0.0.0:8000/v1/model", out[0])
+        self.assertTrue(any("not an address a client can use" in line for line in err))
+        self.assertTrue(any("--host" in line for line in err))
+
+    def test_a_loopback_bind_warns_about_nothing(self):
+        _, err = serve.startup_report(serve.BIND_HOST, 8000, COMMITTED_ARTIFACT)
+        self.assertEqual(err, [])
+
+    def test_a_named_bind_warns_about_reach_and_prints_a_usable_url(self):
+        out, err = serve.startup_report("192.0.2.7", 8000, COMMITTED_ARTIFACT)
+        self.assertIn("http://192.0.2.7:8000/v1/model", out[0])
+        self.assertEqual(len(err), 1)
+        # The three things the reach costs, and the reason it is tolerable.
+        self.assertIn("no credential", err[0])
+        self.assertIn("nothing served is private", err[0])
+        self.assertIn("no upload endpoint and no query surface", err[0])
+        self.assertIn("client's address and a timestamp", err[0])
+
+    def test_an_ipv6_literal_is_bracketed_in_the_printed_url(self):
+        # RFC 3986 section 3.2.2. `http://::1:8000/` parses as neither one.
+        out, _ = serve.startup_report("::1", 8000, COMMITTED_ARTIFACT)
+        self.assertIn("http://[::1]:8000/v1/model", out[0])
 
 
 class TheEnvelope(unittest.TestCase):

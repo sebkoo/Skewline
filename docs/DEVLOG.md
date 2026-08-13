@@ -2115,3 +2115,98 @@ who needs both is holding the phone.
   refuse. Nothing about the depth of a sighted point, its accuracy, or how often
   a tap lands on a pixel with no return was measured either, and no such number
   appears anywhere in this commit.
+
+## 2026-08-13 · v0.9 commit 2 — the interface the operator names
+
+**Built and gated.** The blocker on this rung was never the screen. `Fit/serve.py`
+bound loopback with no flag to change it, and a phone cannot reach a loopback
+socket on a laptop — so the first decision here is whether a registered constant
+moves, and v0.7 wrote that constant as a decision rather than a default, which
+makes changing it a re-registration and not a config tweak.
+
+- **The flag, and why it is not a new default.** `--host ADDRESS`, in the same
+  hand-rolled argument loop `--port` already lives in, defaulting to `BIND_HOST`.
+  That shape is the whole argument: the safe value is what an operator gets for
+  saying nothing, and reaching the network costs an explicit act. v0.7's own
+  words survive intact — the default is still a privacy decision, not a
+  convenience — because the flag does not move the default, it only makes the
+  other choice sayable. No environment variable, no auto-detected address, no
+  "if it looks like a LAN" heuristic: every one of those is a default this
+  repository would be choosing on the operator's behalf.
+- **What lost, and it lost on honesty rather than effort.** The alternative was
+  to keep loopback and ship `Fit/model.json` inside the app bundle. It builds,
+  and it is a lie by omission: the phone would be reading a copy rather than
+  consuming an API, `ModelClient.fetch` would be dead code on the device, and
+  the `unreachable` silence would be a case no client could reach. The rung's
+  registered claim is that a Swift reader exists and the person who needs it is
+  holding the phone. A bundled copy satisfies that sentence and not its meaning.
+  A tunnel is the same trade with more moving parts and a second thing to
+  explain.
+- **Four texts asserted the old unconditional fact, and none of them is drift-
+  checked.** `Scripts/readme-drift.swift` has no assertion that fires on any of
+  these, so each was a human edit or it rots silently. The comment at the
+  constant said "no flag exists to change it" and became false in the same diff
+  that added the flag — rewritten, not softened. `README.md`'s "bound to
+  loopback" was unconditional prose and is now conditional. The test is item
+  four and has its own bullet. Naming them as a set was worth more than fixing
+  them one at a time: the count is the finding, not any single edit.
+- **`test_the_bind_host_is_loopback` was kept and renamed rather than deleted.**
+  It is the only mechanical guard the privacy default has, and deleting it to
+  make room for a flag would trade the guard for the feature it guards. It is
+  now `test_the_default_bind_host_is_loopback` — the name had to say which of
+  the two it holds, because the constant stopped being the only value the same
+  day. Its sibling, `test_a_non_loopback_bind_requires_an_explicit_argument`,
+  is the new half: it drives `parse_bind` over argument lists that omit
+  `--host` and requires loopback back. Opt-in is now mechanical rather than
+  promised, which is the same move `test_no_route_reads_a_request_body` makes
+  for the wire.
+- **The parse and the startup lines are pure functions, for the reason the
+  router already is.** `parse_bind` and `startup_report` have no socket in
+  them, so what a non-loopback bind *tells* the operator is testable without
+  binding anything anywhere — the split `resolve` made in v0.7, applied to the
+  driver. Five of the seven new tests never open a port.
+- **A printed URL that cannot be typed is worse than no URL.** Bound to
+  `0.0.0.0` the old interpolation would have printed
+  `http://0.0.0.0:PORT/v1/model`, and that line is exactly what an operator
+  reads and types into a phone. It now prints as bound *and* says plainly that
+  a wildcard is every interface rather than an address a client can use. The
+  fix that was refused: discovering this machine's address and printing that
+  instead. It picks an interface nobody chose, on a multi-homed machine it
+  picks wrong, and it reinstates by inference the default the flag exists to
+  make explicit. Saying "this one does not work" is the smaller claim and the
+  true one. IPv6 literals are bracketed — RFC 3986 section 3.2.2, because
+  `http://::1:8000/` parses as neither host nor port.
+- **The privacy paragraph moved, and one third of v0.7's was wrong to inherit.**
+  v0.7 recorded that "any real deployment's log carries client address, user
+  agent and timestamps". Two thirds transfer and one does not:
+  `BaseHTTPRequestHandler.log_message` has *always* logged the client address
+  and a timestamp to stderr, so a LAN bind is not the first time that happens —
+  it is the first time the address is anything but `127.0.0.1`. **User agent is
+  not logged at all**, then or now: the handler logs the request line and never
+  the headers. Repeating v0.7's phrasing wholesale would have overclaimed the
+  exposure in the direction of alarm, which is the same failure as overclaiming
+  it in the direction of comfort.
+- **Who can reach it, said next to why that is tolerable.** Not "the phone":
+  anyone who can reach this machine on that network can read the model and the
+  page, with no credential, for as long as the process runs. That is acceptable
+  because **nothing served is private** — v0.7's finding, restated rather than
+  quietly inherited, since the artifact is already in a public git repository
+  and auth over it would be theater — and because nothing goes up. The two
+  sentences are printed in the same warning on purpose. Apart, the first reads
+  as a dismissal of the second.
+- **The warning fires every run, not once at the flag.** The reach is a
+  property of the process while it lives, and the operator is the only one who
+  can end it.
+- **A bind failure is answered rather than traced.** The likeliest new operator
+  error is an address that is not on this machine, and a typo deserves a
+  sentence rather than a stack. Exit 64, the same as the argument loop's:
+  both are fixed by running the command again differently.
+- **The gate did not grow.** Five commands, unchanged. Swift 180 unchanged,
+  because no Swift was touched. Python 71 → **76**. Both iOS builds succeeded.
+  Drift green.
+- **Not measured yet.** Request latency, throughput, behavior under concurrent
+  requests, the per-request read-and-render cost, startup. This commit does not
+  trip v0.8's trigger and gets closer to it than anything before: the service
+  can now be reached by a machine its reader does not operate, which is the
+  first half. The second half is a registered workload, and none exists. No
+  number about the flag, the bind, or the wire appears anywhere in this commit.

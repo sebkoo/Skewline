@@ -26,6 +26,20 @@ The refusal is enforced by the router rather than promised in prose: no
 route reads a request body, and every method other than GET and HEAD is
 answered 405 without one being read.
 
+Where it binds is the operator's, and loopback is what they get for
+saying nothing. v0.7 registered the loopback bind as a privacy decision
+and shipped no flag at all; a phone cannot reach a loopback socket on a
+laptop, so this rung adds `--host` rather than leaving the only client
+that needs the endpoint unable to use it. The decision survives the
+flag intact, because the flag does not move the default: binding where
+a network can see it is now an explicit act with a warning attached,
+and the value nobody names is still 127.0.0.1. Nothing about the wire
+changes -- the same one GET goes down, the same nothing comes up -- so
+what widens is reach, not what is exposed. There is no authentication
+and that is still a finding rather than a shortcut: the artifact being
+served is already in a public git repository, so a credential over it
+would be theater.
+
 The artifact is read through `fit.read_artifact`, never re-parsed here --
 a second reader of the same schema is how two readers drift apart, and a
 page that read it in the browser would be a THIRD, which is why the HTML
@@ -51,6 +65,7 @@ payload version is never inferred from the path.
 
 import json
 import os
+import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import fit
@@ -73,13 +88,23 @@ VIEW_PATH = "/"
 # not a caching decision.
 VIEW_DOCUMENT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "view.html")
 
-# Loopback, and no flag exists to change it. That default is a privacy
-# decision, not a convenience.
+# The default, and the only value that needs no argument. That default is a
+# privacy decision, not a convenience: a service reachable from the network
+# is something an operator asks for by naming an interface, never something
+# this file picks on their behalf. `--host` is that ask, and it is `--port`'s
+# shape -- a flag whose absence leaves the safe value in place.
 BIND_HOST = "127.0.0.1"
 
 # Ephemeral, and the bound port is printed. The repository commits no
 # invented port number, and the operator's path is the tests' path.
 DEFAULT_PORT = 0
+
+# Addresses that mean "every interface" rather than naming one. They bind
+# fine and they are useless in a URL: a client cannot connect to 0.0.0.0, so
+# the startup line has to say so rather than print it and look helpful. No
+# address is discovered to fill the gap -- choosing an interface for the
+# operator is the default this flag exists to avoid.
+WILDCARD_HOSTS = ("0.0.0.0", "::", "")
 
 # RFC 9110 section 9.1: a general-purpose server MUST support GET and HEAD;
 # every other method is OPTIONAL. HEAD is answered rather than refused on
@@ -277,30 +302,103 @@ class ModelServer(ThreadingHTTPServer):
 
 # --- The driver ---------------------------------------------------------------
 
-def main(argv):
-    if len(argv) < 2:
-        print("usage: serve.py <artifact.json> [--port N]")
-        return 64
-    artifact_path = argv[1]
+def _authority(host, port):
+    """`host:port` for a URL, bracketing an IPv6 literal -- RFC 3986 section
+    3.2.2, because `http://::1:8000/` parses as neither one."""
+    return f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
+
+
+def startup_report(host, port, artifact_path):
+    """What a run says on the way up, as `(stdout, stderr)` line lists.
+
+    A pure function with no socket in it, the same split `resolve` makes and
+    for the same reason: what a non-loopback bind tells the operator is a
+    decision, and the tests should be able to drive it without binding
+    anything anywhere.
+    """
+    url = f"http://{_authority(host, port)}"
+    out = [
+        f"serving {fit.ARTIFACT_SCHEMA} from {artifact_path} at {url}{MODEL_PATH}",
+        f"the page that reads it: {url}{VIEW_PATH}",
+    ]
+    err = []
+    if host != BIND_HOST:
+        # Said every run, not once at the flag: the reach is a property of
+        # this process while it lives, and the operator is the only one who
+        # can end it.
+        err.append(
+            f"warning: bound to {host!r}, not loopback. Anyone who can reach "
+            "this machine on that network can read the model and the page, "
+            "with no credential, for as long as this runs. That is acceptable "
+            "because nothing served is private -- the artifact is already in a "
+            "public repository -- and because nothing goes up: there is no "
+            "upload endpoint and no query surface. One line per request goes "
+            "to stderr, carrying the client's address and a timestamp."
+        )
+    if host in WILDCARD_HOSTS:
+        err.append(
+            f"warning: {host!r} is every interface, not an address a client "
+            "can use. The URL above is not one you can type into a phone -- "
+            "pass --host <this machine's address on that network> to print "
+            "one that is."
+        )
+    return out, err
+
+
+def parse_bind(arguments):
+    """`(host, port)` from whatever follows the artifact path.
+
+    Pure, so the privacy default is testable by driving the parse rather
+    than by reading the source: no argument list that omits `--host` can
+    return anything but `BIND_HOST`, and a test says so. Raises
+    `ValueError` for an argument this driver does not know.
+    """
+    host = BIND_HOST
     port = DEFAULT_PORT
-    rest = argv[2:]
+    rest = list(arguments)
     while rest:
         if rest[0] == "--port" and len(rest) >= 2:
             port = int(rest[1])
             rest = rest[2:]
             continue
-        print(f"serve.py: unknown argument {rest[0]!r}")
+        if rest[0] == "--host" and len(rest) >= 2:
+            host = rest[1]
+            rest = rest[2:]
+            continue
+        raise ValueError(f"unknown argument {rest[0]!r}")
+    return host, port
+
+
+def main(argv):
+    if len(argv) < 2:
+        print("usage: serve.py <artifact.json> [--port N] [--host ADDRESS]")
+        return 64
+    artifact_path = argv[1]
+    try:
+        host, port = parse_bind(argv[2:])
+    except ValueError as problem:
+        print(f"serve.py: {problem}")
         return 64
 
-    server = ModelServer((BIND_HOST, port), artifact_path)
+    try:
+        server = ModelServer((host, port), artifact_path)
+    except OSError as problem:
+        # The likeliest operator error this flag introduces is an address
+        # that is not on this machine, and a traceback is a poor answer to
+        # a typo. Same exit as the argument loop's: both are fixed by
+        # running the command again differently.
+        print(f"serve.py: cannot bind {host!r}:{port}: {problem}",
+              file=sys.stderr)
+        return 64
     bound = server.server_address[1]
-    # Flushed: with the port ephemeral by default, this line is how the
+    out, err = startup_report(host, bound, artifact_path)
+    # Flushed: with the port ephemeral by default, these lines are how the
     # caller learns where to connect, and stdout is block-buffered the
     # moment it is a pipe rather than a terminal.
-    print(f"serving {fit.ARTIFACT_SCHEMA} from {artifact_path} "
-          f"at http://{BIND_HOST}:{bound}{MODEL_PATH}", flush=True)
-    print(f"the page that reads it: http://{BIND_HOST}:{bound}{VIEW_PATH}",
-          flush=True)
+    for line in out:
+        print(line, flush=True)
+    for line in err:
+        print(line, file=sys.stderr, flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -311,6 +409,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    import sys
-
     sys.exit(main(sys.argv))
