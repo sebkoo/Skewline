@@ -66,6 +66,24 @@ nonisolated struct DepthEncoder {
         /// together -- the baseline the compression ratio is measured
         /// against.
         let packedBytes: Int
+        /// The tight-packed samples themselves, row padding stripped, before
+        /// compression.
+        ///
+        /// Handed back rather than discarded because a live sighting needs
+        /// exactly these bytes: `DepthMapGrid.Pixel.index` is
+        /// `row * width + column`, a packed index, while a `CVPixelBuffer`
+        /// carries a row stride that may exceed `width * 4` -- indexing the
+        /// buffer with that formula is right on devices where the two happen
+        /// to agree and silently wrong on the rest.
+        ///
+        /// They are also the bytes that go into the container, which is what
+        /// makes "the phone and the probe read the same frame" true by
+        /// construction rather than an argument about buffer lifetimes. And
+        /// they are bytes rather than a `CVPixelBuffer`, so nothing here
+        /// retains a slot in ARKit's pool -- the hazard `SensorSource`
+        /// already names at its own copy.
+        let packedDepth: Data
+        let packedConfidence: Data?
         let tally: ConfidenceTally?
         let depthFormat: OSType
         let confidenceFormat: OSType?
@@ -88,6 +106,7 @@ nonisolated struct DepthEncoder {
 
         var confidenceRecord: ConfidenceRecord?
         var confidenceData: Data?
+        var packedConfidence: Data?
         var tally: ConfidenceTally?
         var confidenceFormat: OSType?
         if let confidenceMap = depth.confidenceMap {
@@ -98,6 +117,7 @@ nonisolated struct DepthEncoder {
             confidenceFormat = format
             let packed = try PixelBufferPacking.tightlyPackedData(from: confidenceMap, bytesPerPixel: 1)
             packedBytes += packed.count
+            packedConfidence = packed
             tally = Self.tally(packed)
             confidenceData = try compress(packed)
             confidenceRecord = ConfidenceRecord(
@@ -119,6 +139,8 @@ nonisolated struct DepthEncoder {
             record: record,
             payload: SessionContainer.DepthPayload(depth: try compress(packedDepth), confidence: confidenceData),
             packedBytes: packedBytes,
+            packedDepth: packedDepth,
+            packedConfidence: packedConfidence,
             tally: tally,
             depthFormat: depthFormat,
             confidenceFormat: confidenceFormat

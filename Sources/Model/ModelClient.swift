@@ -85,9 +85,17 @@ public enum ModelClient {
         do {
             (data, response) = try await session.data(from: url)
         } catch {
+            // The `URLError` code is carried, not just its prose. A client on
+            // a phone cannot ask iOS whether local network access was denied
+            // -- there is no documented API for it -- so a denial and a
+            // service that is not running arrive as the same refusal. Naming
+            // the code is the only evidence a reader gets for telling them
+            // apart, and dropping it would leave two different findings
+            // looking identical.
+            let code = (error as? URLError).map { " (URLError \($0.errorCode))" } ?? ""
             throw ModelReadError(
                 kind: .unreachable,
-                message: "\(url.absoluteString): \(error.localizedDescription)"
+                message: "\(url.absoluteString): \(error.localizedDescription)\(code)"
             )
         }
         guard let http = response as? HTTPURLResponse else {

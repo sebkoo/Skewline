@@ -2351,3 +2351,105 @@ name another, so the phone's reading had nothing to be compared against.
   green.
 - **Not measured yet.** Unchanged. The probe's timing line is still a local
   read of a local file, which is the decoration v0.8's trigger exists to refuse.
+
+## 2026-08-13 · v0.9 commit 6 — the point you tap, and the run nobody has made
+
+**Built and gated, and NOT verified on a device.** The screen exists, the five
+commands are green, and the by-hand check this rung's whole claim rests on has
+not been run: it needs a phone and a laptop on one network, and neither was
+available here. What that leaves unanswered is written at the bottom of this
+entry rather than implied by its absence.
+
+- **`README.md`'s third reading held, and the narrowing clause names the other
+  two.** The sentence "it should not grow a second job" now says what a second
+  job would be: a measuring tool — two points and the distance between them, a
+  history, an export of its own. A single point the sensor is looking at now is
+  the same job, because the model is this pipeline's own output. The clause that
+  makes that more than an assertion is the last one: the frame being tapped is
+  one the container keeps, so the reading can be re-derived. **A reading nobody
+  can check would be the second job arriving in disguise.** No second app
+  target, and gate command 3 still names one scheme.
+- **The tap reads the frame the drain wrote, not the frame ARKit is showing.**
+  This is the decision the whole commit turns on and it was nearly the opposite
+  one. `arSession.currentFrame` is the obvious source and it is the wrong one:
+  `SensorSource` strides frames and drops them under load, so the frame on
+  screen is frequently one no container will ever hold, and a sighting taken
+  from it could never be checked by anything. The drain publishes each frame it
+  writes under the index the writer assigned, and the phone shows that index
+  beside the normalized point — which are exactly the two arguments
+  `SightProbe --frame N x,y` takes.
+- **The slot holds bytes, and that is consistency with a standing rule rather
+  than a new argument.** `SensorSource.swift:292-293` already says retaining an
+  `ARFrame` starves the session's pool and stalls capture, and `:348` names
+  holding ARKit's buffer across a yield as the thing its copy exists to avoid.
+  A `Data` is outside that class entirely and crosses to the main actor with no
+  `@unchecked` anywhere. `DepthEncoder.encode` already produced these bytes on
+  its way to the payload and discarded them, keeping only their count, so
+  handing them back costs no second pass over anything.
+- **The bytes being the *written* bytes is what makes the check structural.**
+  They are also tight-packed, `PixelBufferPacking` having stripped the row
+  padding, which is what makes `DepthMapGrid.Pixel.index` a legal subscript at
+  all: a `CVPixelBuffer`'s stride may exceed `width * 4`, and
+  `row * width + column` against one is correct on the devices where the two
+  agree and silently wrong on the rest. That is the mistake that would have
+  made this rung wrong while looking right on the machine it was written on.
+- **Two `ARView` facts, both of which fail quietly.** `ARView.session` has a
+  setter (`RealityKit.swiftinterface:997` in the iOS 26.5 SDK), so it is handed
+  the recorder's session rather than making a second one — two `ARSession`s
+  cannot both hold the camera. And `automaticallyConfigureSession` is set
+  **false** (`:1014`): left at its default, `ARView` reconfigures the session it
+  is given, which would drop the `.sceneDepth` frame semantic `start()` sets and
+  stop depth being captured with nothing going red. `ARView` conforms to
+  `ARSessionProviding` and `UIGestureRecognizerDelegate`, not
+  `ARSessionDelegate`, so `SensorSource` keeps the delegate slot.
+- **`Sighter` is its own type because `SessionRecorder` says so.** That file's
+  docstring reads "its only job is producing a container ... and it should not
+  grow a second one". The model, the fetch and the reading are the second one,
+  so they sit beside it rather than inside it.
+- **Nine states, and the one that nearly collapsed.** A tap arriving with no
+  ARKit frame first routed through `sight` with a not-a-number point, which
+  lands on `.offTheMap` — and "nothing is running" is not "you tapped past the
+  edge of the depth map". It got its own entry point. That is the same
+  collapse `Estimate`'s four cases and `Sighting`'s three exist to refuse,
+  reappearing in a UI convenience.
+- **Unreachable and permission-denied are one state, deliberately.** iOS
+  publishes no API for reading local-network authorization, and the preflight
+  that exists — an `NWBrowser`/`NWListener` pair against a custom Bonjour type —
+  costs an `NSBonjourServices` registration this app has no other use for and
+  still cannot check silently, because the preflight is itself what raises the
+  prompt. Declined. So the line names **both** causes and `ModelClient` now
+  carries the `URLError` code into its message, which is the only evidence a
+  reader gets for telling them apart. Naming two causes is more honest than
+  inventing a check the platform does not offer.
+- **No App Transport Security key ships, and that is the experiment rather than
+  an oversight.** The plan began by assuming `NSAllowsLocalNetworking` was
+  needed. It is not the right key for this: ATS does not govern numeric IP loads
+  at all — Apple's own guidance is that the key "has no effect on IP address
+  loads" and that on iOS 10 and later such loads are always allowed, the key
+  covering unqualified and `.local` hostnames instead. Shipping it anyway would
+  register a constraint that is not real, and no device run could have caught
+  that, because with the key present a numeric-IP fetch succeeds either way. So
+  the app ships with none and the run decides. `NSLocalNetworkUsageDescription`
+  does ship, in both configurations beside the camera string, because a LAN
+  request without it fails in a way that looks like a bug.
+- **The address is typed, never guessed.** No hostname or IP enters this
+  repository, and nothing browses for one. It is also not persisted, which is a
+  small unkindness to whoever runs the check repeatedly and was left alone
+  rather than turned into a stored default nobody asked for.
+- **The gate did not grow.** Five commands, unchanged. Swift 192 unchanged --
+  everything added here is in the app target, which has never been inside
+  `swift test`, and that is a real gap rather than a boast: `Sighter`'s nine
+  states are held by the compiler and by reading, not by a test. Python 76
+  unchanged. Both iOS builds succeeded. Drift green.
+- **Not measured yet, and now also NOT VERIFIED.** The measurement trigger is
+  untouched: a phone fetching from a laptop is the first half of v0.8's
+  condition and no registered workload exists, so no latency, throughput or
+  concurrency number is owed or given. Separately and more importantly, **none
+  of the by-hand checks has been run.** Unverified: that the phone reaches the
+  service at all; whether a numeric IP works with no ATS key; which `URLError`
+  a denied local-network permission produces and whether it differs from a
+  service that is not running; that the nine states are reachable; that the
+  frame counters still advance with `ARView` holding the session; and — the one
+  the rung stands on — that the phone's reading and
+  `SightProbe --frame N x,y` agree for the same tap. Until that last pair is
+  recorded, this rung is built and not done.

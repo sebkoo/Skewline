@@ -50,7 +50,15 @@ final class SessionRecorder {
         ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth)
     }
 
-    private let arSession = ARSession()
+    /// The session the passthrough view draws, handed to it rather than made
+    /// by it: two `ARSession`s cannot both hold the camera, and this one is
+    /// already configured with the frame semantics the capture needs.
+    let arSession = ARSession()
+
+    /// The last written frame's depth, for a tap. Read on the main actor,
+    /// written by the drain, and neither of them waits for the other.
+    let latestDepthFrame = LatestDepthFrame()
+
     private let source: SensorSource
 
     init() {
@@ -68,6 +76,10 @@ final class SessionRecorder {
         frameCount = 0
         timing = nil
         status = .recording
+        // A frame from the previous run would be sightable and unreachable:
+        // its container is finalized under a different name, so its index
+        // names nothing a caller could check. Cleared rather than left.
+        latestDepthFrame.clear()
 
         // All three streams have to exist before the session starts: anything
         // delivered before its continuation is installed has nowhere to go.
@@ -359,12 +371,21 @@ final class SessionRecorder {
             // which encoder spent it.
             var record = frameRecord
             var depthPayload: SessionContainer.DepthPayload?
+            var sighted: (depths: Data, confidences: Data?, width: Int, height: Int)?
             if let capturedDepth = frame.depth {
                 let depthStart = clock.now
                 let encoded = try depthEncoder.encode(capturedDepth)
                 let depthTime = clock.now - depthStart
                 record.depth = encoded.record
                 depthPayload = encoded.payload
+                // The same tight-packed bytes that are about to be written,
+                // held back for a tap. Not a second pass over the buffer and
+                // not a copy of ARKit's: `encode` already produced these on
+                // its way to the payload.
+                sighted = (
+                    encoded.packedDepth, encoded.packedConfidence,
+                    encoded.record.width, encoded.record.height
+                )
 
                 stats.withDepth += 1
                 stats.depthPackedBytes += encoded.packedBytes
@@ -401,14 +422,27 @@ final class SessionRecorder {
                 stats.maxPrincipalPointY = max(stats.maxPrincipalPointY, intrinsics.principalPointY)
                 stats.intrinsicsReferenceSizes.insert("\(intrinsics.referenceWidth)x\(intrinsics.referenceHeight)")
             }
+            let containerIndex: Int
             if let data {
-                try writer.append(data, depth: depthPayload)
+                containerIndex = try writer.append(data, depth: depthPayload)
                 stats.fileEncodedCount += 1
                 stats.totalBytes += data.count
                 stats.totalEncode += encodeTime
                 stats.maxEncode = max(stats.maxEncode, encodeTime)
             } else {
-                try writer.appendVideoFrame(depth: depthPayload)
+                containerIndex = try writer.appendVideoFrame(depth: depthPayload)
+            }
+            // Published after the write, under the index the write assigned.
+            // A tap can then be re-derived with `SightProbe --frame`, which is
+            // the only reason a live sighting is worth anything.
+            if let sighted {
+                latestDepthFrame.store(
+                    index: containerIndex,
+                    width: sighted.width,
+                    height: sighted.height,
+                    depths: sighted.depths,
+                    confidences: sighted.confidences
+                )
             }
 
             records.append(record)

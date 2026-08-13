@@ -10,6 +10,8 @@
 		F16819FC30282FD80020E861 /* Capture in Frameworks */ = {isa = PBXBuildFile; productRef = F16819FB30282FD80020E861 /* Capture */; };
 		F16819FE30282FD80020E861 /* Core in Frameworks */ = {isa = PBXBuildFile; productRef = F16819FD30282FD80020E861 /* Core */; };
 		F1681A0030282FD80020E861 /* Replay in Frameworks */ = {isa = PBXBuildFile; productRef = F16819FF30282FD80020E861 /* Replay */; };
+		F1681A1130282FD80020E861 /* Model in Frameworks */ = {isa = PBXBuildFile; productRef = F1681A1030282FD80020E861 /* Model */; };
+		F1681A1330282FD80020E861 /* Sight in Frameworks */ = {isa = PBXBuildFile; productRef = F1681A1230282FD80020E861 /* Sight */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -45,6 +47,8 @@
 				F1681A0030282FD80020E861 /* Replay in Frameworks */,
 				F16819FC30282FD80020E861 /* Capture in Frameworks */,
 				F16819FE30282FD80020E861 /* Core in Frameworks */,
+				F1681A1130282FD80020E861 /* Model in Frameworks */,
+				F1681A1330282FD80020E861 /* Sight in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -90,6 +94,8 @@
 				F16819FB30282FD80020E861 /* Capture */,
 				F16819FD30282FD80020E861 /* Core */,
 				F16819FF30282FD80020E861 /* Replay */,
+				F1681A1030282FD80020E861 /* Model */,
+				F1681A1230282FD80020E861 /* Sight */,
 			);
 			productName = SkewlineHarness;
 			productReference = F16819EC30282FA10020E861 /* SkewlineHarness.app */;
@@ -120,7 +126,7 @@
 			mainGroup = F16819E330282FA10020E861;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				F16819FA30282FD80020E861 /* XCLocalSwiftPackageReference "../../../Skewline" */,
+				F16819FA30282FD80020E861 /* XCLocalSwiftPackageReference "../.." */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F16819ED30282FA10020E861 /* Products */;
@@ -287,6 +293,7 @@
 				INFOPLIST_FILE = SkewlineHarness/Info.plist;
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Records camera pose while capturing a session.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Fetches the fitted uncertainty model from a service you run on your own computer. Nothing measured on this device is sent to it.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -327,6 +334,7 @@
 				INFOPLIST_FILE = SkewlineHarness/Info.plist;
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Records camera pose while capturing a session.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Fetches the fitted uncertainty model from a service you run on your own computer. Nothing measured on this device is sent to it.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -378,7 +386,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		F16819FA30282FD80020E861 /* XCLocalSwiftPackageReference "../../../Skewline" */ = {
+		F16819FA30282FD80020E861 /* XCLocalSwiftPackageReference "../.." */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../..;
 		};
@@ -396,6 +404,14 @@
 		F16819FF30282FD80020E861 /* Replay */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = Replay;
+		};
+		F1681A1030282FD80020E861 /* Model */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Model;
+		};
+		F1681A1230282FD80020E861 /* Sight */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Sight;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
