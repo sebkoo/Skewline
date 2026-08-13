@@ -1933,3 +1933,185 @@ first were a ladder that is actually registered and a refuser that is not
   unchanged and this commit does not trip it: nothing here was run for a reader
   on a machine that reader does not operate, and no registered workload exists
   yet. The page grew by a table per class and that size was not measured either.
+
+## 2026-08-13 · v0.9 commit 1 — the sighted point, and the span it refuses
+
+**Built and gated.** The ladder ended one commit ago, so this rung had to earn
+reopening it rather than assume it. The whole of the case, and the only thing
+offered: the fitted model exists, a Swift reader for it exists, and the person
+who needs both is holding the phone.
+
+- **Reopening a finished ladder is legal here, and the checker was built to
+  say so.** The v0.8 close argued that inventing a rung to keep an assertion
+  green inverts this repository's discipline. That argument cuts both ways: a
+  rung arriving because there is a reason is the honest case, and
+  `readme-drift.swift:119` already encodes the difference — a non-`done` row
+  makes `ladderHasEnded` false and re-arms the row requirement in the same
+  edit. What would have been drift is a rung *invented* to refill the table;
+  what happened is the ROADMAP's own "each rung is pulled in by the one below
+  it". The one below it is v0.7's endpoint and v0.8's page, both of which
+  serve a reader sitting at a laptop.
+- **The documents could not be split into the customary pair, and that decides
+  the commit shape.** Every earlier boundary landed as `docs: close v0.N in the
+  readme` then `docs: move v0.N into the roadmap's shipped list`, two commits,
+  because each half was independently green. Here neither half is: a README
+  ladder row without the ROADMAP row fails assertion 2 at
+  `readme-drift.swift:157`, and the ROADMAP row without the ladder row fails at
+  `:165`. Splitting would commit a red gate on purpose. One commit, both files,
+  and the precedent is only apparently broken.
+- **The name is not `measure`, and `point` is crowded on purpose.** `v0.4
+  measure` exists and assertion 2 pairs ladder names with ROADMAP names, so a
+  second `measure` would be legal and unreadable. `point` names the estimand's
+  granularity, which is the decision this rung lives on. But this repository
+  already says "44,973,892 points", "depth pixels into world points" and "a
+  point-cloud reader", so the word cannot stand alone anywhere it appears — the
+  ladder line, the table row and the attach map all carry a description that
+  disambiguates in the same breath. Runner-up `sight` is the better name on this
+  project's own lineage (a surveyor *takes a sight*; Skewline is named for the
+  common perpendicular of two rays that should meet) and lost on one thing: a
+  stranger parses `point` in one beat and stops at `sight`. It became the
+  module's name instead, which leaves it available if the collision reads worse
+  later than it does now.
+- **The model describes a point, not a span, and that is registered before any
+  UI exists.** The obvious feature is a tape measure printing `1.42 m ± 0.03`,
+  and it would be the largest overclaim in this project's history. The estimand
+  is the upper median absolute cross-frame reprojection disagreement of **one**
+  point at k=1; an interval on the separation of two points needs an
+  error-propagation rule never derived here and a correlation between the two
+  points' errors never measured. Adding it silently would undo v0.4 through v0.8
+  in one label. The trigger has two gates, not one, and the second is the
+  interesting one: `Calibration.Observation` carries separation, Δt, class,
+  depth and residual and **no frame identifier and no pixel identity**, so two
+  observations cannot be known to come from one frame pair. The correlation is
+  not computable from any export this repository has ever produced, and the
+  export that could compute it — per-pair per-pixel rows — is much closer to
+  reconstructable than the aggregates the privacy line permits, so it needs a
+  privacy decision before it needs code. The span is not "not done yet"; it is
+  blocked behind something deliberately never collected, which is the shape v0.7
+  gave capture upload.
+- **That refusal is documentary, and saying so is the honest part.** v0.7 could
+  write "enforced by the router rather than promised" because a 404 is a fact.
+  There is no equivalent here: `Estimate` hands out a `Double` and nothing stops
+  a caller subtracting two of them. What enforces the refusal is that no API
+  takes two points and no surface offers a span. Letting "refused" imply a guard
+  that does not exist would be the same overclaim one level up.
+- **The span is not the only overclaim, and the other one is invisible.** The
+  artifact guards **depth** — outside `[0.5, 5.0)` every class refuses — and
+  guards **scene** not at all, because it cannot: the fit is leave-one-out over
+  four recorded sessions, so a number read live in a fifth room is an
+  extrapolation across scenes, not across depths. A tape measure a careful
+  reader catches; this one they would not, which makes it the more dangerous of
+  the two. So the on-screen wording is registered here with the same care as the
+  span: not "this point disagrees by X" but a form carrying where the number came
+  from — *on the four sessions this was fitted from, two views of a point like
+  this disagreed by about X*. `SightProbe.say` is that wording, in code, and its
+  doc comment says every consumer of this module owes its reader the same.
+- **Planar z, and the fifteen per cent a raycast would cost silently.** The
+  fit's `depth` column is `Calibration.swift:514`'s `source.depths[index]`: the
+  raw `ARDepthData.depthMap` float, unmodified. ARKit's entire shipped text is
+  "per-pixel depth data (in meters)"; the deciding source is Apple's point-cloud
+  sample and `constantDepthMapUnprojectsToConstantCameraZ` locks it. That was
+  recorded at v0.3 as a geometry decision. On a phone it becomes a trap: the
+  obvious implementation of a tap is an `ARRaycastResult` distance, which is ray
+  length, and ray length exceeds planar z by `1 / cos` of the angle off axis —
+  about fifteen per cent at thirty degrees, with the model then applied to a
+  depth it was never fitted on and a plausible number coming out. Naming the
+  parameter `depthMeters` and documenting it as the depth map's own sample is
+  the only guard there is; there is no type that can tell the two `Float`s apart.
+- **A seventh module, and the cheaper alternative said out loud rather than
+  waved past.** The alternative is real: `Sighting` as an extension in `Model`
+  with a comment, `DepthMapGrid` beside `Unprojector` in `Render`, zero
+  documentation churn. It loses on three counts, and the first one is that *the
+  dependency argument does not decide it* — an extension taking a `UInt8` never
+  reaches for `Render`'s `ConfidencePoint`, so nothing in `Package.swift` is
+  literally violated. What decides it is what a module is allowed to *know*:
+  `skewline-fit/1` names its classes `low`/`medium`/`high` and says nothing
+  about 0/1/2, an encoding that is `ARConfidenceLevel`'s and enters this
+  repository through `Capture` and `Render`. A reader whose discipline is to
+  believe nothing the artifact does not say should not carry a sensor fact the
+  artifact never mentions. Second, the split leaves the composition homeless,
+  with no probe and no one place to test it, and makes the eventual client link
+  `Render` — Metal, shader bundle and all — for two pure functions. Third,
+  `Model` already named this boundary and declined to own it, calling it the
+  consumer's edge; this rung builds that consumer. The bar is one this
+  repository set: `Model` itself shipped in `7f8ad02` as a `.library` with
+  exactly one consumer, `ModelProbe`, and no app links it to this day.
+- **Two silences the sensor makes, kept apart from the two the model makes.**
+  `Sighting` nests `Estimate` rather than flattening into five cases. A pixel
+  that returned no depth and a confidence class the fit never saw happen
+  *before* the model is consulted; outside the fitted depths and inside a band
+  with no samples are the model's own. Flattening would say the two kinds are
+  one kind, which is the collapse `Estimate`'s four cases exist to refuse.
+  Depth is checked before class, because a pixel with no return has no reading
+  and whatever class the sensor stamped on it describes nothing. And the class
+  map is a `switch` with three written cases rather than a subscript into
+  `allCases`: the order is the same, but an array index would carry the mapping
+  in a coincidence of declaration order, and this mapping is the one thing here
+  that could be wrong with nothing going red.
+- **The half-open rule, now on the image plane, and one clamp that is not
+  decoration.** `DepthMapGrid.pixel(atNormalizedX:y:)` is `0 <= x < 1` and
+  truncating — the same convention `Range<Double>` gives the depth domain and
+  `low <= d < high` gives the bands. It also clamps, which looked redundant and
+  is not: the product of a normalized value a hair under 1 and the extent is
+  *rounded*, and for some extents it rounds up to the extent itself and
+  truncates one past the end of the buffer. `aValueAHairUnderOneNeverIndexesPastTheEnd`
+  walks 1…600 rather than asserting the clamp is unreachable. The other half of
+  a tap — `ARFrame.displayTransform(for:viewportSize:)` — stays out, because
+  only ARKit knows it and it is not the half that can be wrong quietly.
+- **v0.7's per-point refusal meets the first client that genuinely has
+  per-point questions.** The service answers no per-point query, because "how
+  wrong is a reading at this depth" would send the asker's own depths up the
+  wire. Every consumer so far had aggregate questions; a phone pointed at a wall
+  has exactly the question the endpoint refuses. The refusal holds by
+  construction rather than by restraint: the artifact comes down whole and is
+  evaluated locally, no depth, point, pose or frame goes up, and there is no
+  endpoint that would accept one. Verified rather than inherited — `Sources/Model`
+  is three files, all `import Foundation`, no `#if` of any kind, no target
+  dependencies, and the iOS build already compiled it before this commit.
+- **Where the live surface goes is bounded, and `README.md:84` has a third
+  reading nobody had checked.** The rung is committed to a client on the device
+  that fetches `/v1/model` and consumes it locally — registered here on v0.7
+  commit 1's precedent of registering a Swift client it did not ship. But
+  README says the harness "should not grow a second job", and that is a claim
+  this repository keeps true. Read the clause before it: *put the pipeline in
+  front of real sensors and produce containers a Mac can replay*. Showing what
+  the model says about what the sensor is seeing right now is that pipeline in
+  front of real sensors, end to end, since the fitted model is the pipeline's
+  own output. What that sentence refuses is a **measuring tool** — pick two
+  points, keep a history, export. On that reading the harness gains a `Model`
+  link and a line on its existing panel, and README needs a narrowing clause
+  naming what a second job would be, rather than a rewrite or a second app
+  target the gate's third command would not build. Which branch is taken is
+  decided in the commit that builds it, which is what the divider restored
+  above says.
+- **RealityKit rather than Metal, argued on what the feature needs.** Camera
+  passthrough, a tap, a 2D overlay; no anchors, no 3D content, no occlusion, no
+  mesh. `ARView` is passthrough with no rendering code. The Metal in this tree
+  is an offscreen point-cloud shader for replay with measured numbers behind it
+  and is not a camera-background pass, so "Metal is already here" does not
+  transfer — choosing it means a YCbCr background pass and its shader with
+  nothing measured behind either. A rung-level decision, not a commit-level one.
+- **My brief said RealityKit would be the first framework the gate cannot check
+  on a Mac. It is not.** ARKit already is: `SensorSource` and `SessionRecorder`
+  are type-checked by the second and third gate commands and run by nothing, and
+  the app target has never been inside `swift test`. RealityKit adds no new gate
+  cost. The clause was struck rather than softened.
+- **The gate did not grow.** Five commands, unchanged. Swift 163 → **180** — 17
+  in `SightTests`, nine on the sighting and eight on the grid. Python 71
+  unchanged, because nothing in `Fit/` was touched. Both iOS builds succeeded,
+  and the package build compiled `Sight` and `SightProbe` for the device without
+  a guard, which is the claim about `Model`'s portability being inherited rather
+  than re-argued. Drift green with all four assertions quiet, including the two
+  this edit aims at: the `done` marks are still a prefix, one `here` row sits
+  immediately after them, and the what-is-next table's row names the same rung
+  the ladder does. README gained a module bullet and a count, `Six` to `Seven`.
+- **Not measured yet.** Request latency, throughput, behavior under concurrent
+  requests, the per-request read-and-render cost, startup. v0.8 commit 1's
+  trigger stands and this commit does not trip it: a phone fetching from a
+  laptop is the first half of that condition, and it has not happened here —
+  nothing was run for a reader on a machine that reader does not operate, and no
+  registered workload exists to measure against. The probe's timing line is a
+  local read of a local file, which is the decoration that trigger exists to
+  refuse. Nothing about the depth of a sighted point, its accuracy, or how often
+  a tap lands on a pixel with no return was measured either, and no such number
+  appears anywhere in this commit.

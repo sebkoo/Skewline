@@ -11,7 +11,7 @@ it is the second, it does not go in.
 
 ## The shape of it
 
-Six modules. The graph is acyclic with `Core` at the root, and it is enforced
+Seven modules. The graph is acyclic with `Core` at the root, and it is enforced
 by the compiler rather than by anyone's discipline.
 
 ```text
@@ -43,6 +43,13 @@ Model       done      the fitted model, read from the service and
                       owns its value types -- joining a model to
                       rendered points is the consumer's edge, so it
                       never reaches for Render's.
+ │
+ └─ Sight   done      that consumer's edge, built: one depth sample and
+                      the class the sensor gave it, into what the model
+                      says about that point. Depends on Model alone --
+                      the sensor's confidence integers are an encoding
+                      the artifact never mentions, which is why they
+                      stay out of the reader above.
 ```
 
 `Replay` must never depend on `Capture`. Replay is what makes the pipeline
@@ -59,6 +66,7 @@ v0.5  Interop    reads a point-cloud file across a C seam, into its own types
 v0.6  Fit        consumes replayed sessions offline and fits the model
 v0.7  Service    serves what Fit produced, back to the device
 v0.8  View       reads Service
+v0.9  Sight      one tapped point's depth and class, into what Model says
 ```
 
 Nothing above v0.2 touches `Core`'s shape. If a later rung needs `Core` to
@@ -346,37 +354,53 @@ A list that only shrinks. Anything finished moves to *What has shipped* above
 rather than gaining a tick here, so this section is empty when there is nothing
 outstanding — which is the honest resting state, not a gap. It is empty now.
 
-The divider that stood here named the rung below which nothing was decided at
-commit level. There is no rung below it, so it goes rather than being reworded
-onto one that does not exist. What it protected was never a property of any
-rung: what each commit contains is decided by what the one before it turned out
-to be wrong about. That is why [`DEVLOG.md`](DEVLOG.md) records the mistakes and
-not only the decisions — it is the input to the next commit rather than a diary.
-Commit 2's shape came out of commit 1's report; commit 5 exists because commit 2
-discovered that `canImport(ARKit)` is true on macOS.
+```text
+  v0.9 point is a rung, not a commit list. Nothing below this line is
+  decided at commit level, and nothing should be.
+```
+
+The divider went when v0.8 closed, because there was no rung below it to name
+and rewording it onto one that did not exist would have been the invention this
+repository refuses. There is one again, so it is back — reworded, as it has been
+at every boundary since v0.2, and not re-argued.
+
+Below that line, what each commit contains is decided by what the one before it
+turned out to be wrong about. That is why [`DEVLOG.md`](DEVLOG.md) records the
+mistakes and not only the decisions — it is the input to the next commit rather
+than a diary. Commit 2's shape came out of commit 1's report; commit 5 exists
+because commit 2 discovered that `canImport(ARKit)` is true on macOS.
 
 ## What is next, and what forces it
 
 | Version | Ships | What forces it |
 |---|---|---|
+| **v0.9** point | What the model says about a point you tap on the live scene | The model exists, a Swift reader for it exists, and the person who needs both is holding the phone |
 
-The table has no rows, for the same reason the list above it is empty: every
-rung this ladder registered has shipped. Python entered in v0.6 not because it
-is popular but because an uncertainty model had to be fitted somewhere; step 25
-is that fit, steps 26 and 27 are the seam that carries it, and steps 28 and 29
-are the page that reads it, so the model now reaches a reader without a capture
-ever leaving the machine. What stays unmeasured is unchanged and stays written
-as a condition rather than a plan: request latency, throughput, behavior under
-concurrent requests, the per-request read-and-render cost and startup.
+The table emptied when v0.8 shipped and has one row again, which is the state it
+was built to be able to return to rather than a rung invented to fill it. Python
+entered in v0.6 not because it is popular but because an uncertainty model had to
+be fitted somewhere; step 25 is that fit, steps 26 and 27 are the seam that
+carries it, and steps 28 and 29 are the page that reads it, so the model reaches
+a reader without a capture ever leaving the machine. The reader that rung built
+is a laptop's. v0.9 is the same artifact in the hand of somebody pointing a
+sensor at a room — pulled in by the rung below it, which is the only way a rung
+has ever been added here. It answers about one point and refuses a span, for
+reasons kept in *Deliberately not built* rather than in a screen's source.
+
+What stays unmeasured is unchanged and stays written as a condition rather than
+a plan: request latency, throughput, behavior under concurrent requests, the
+per-request read-and-render cost and startup.
 **They are measured when the service is run for a reader on a machine that
 reader does not operate — the first moment a figure describes an experience
 rather than a loopback round trip — and a registered workload exists to measure
 against, so the number is reproducible rather than one anecdote.** Before both,
-a millisecond from a local GET is decoration. A rung would be added the way
-every rung here was: pulled in by the one below it. That trigger and the two in
-*Deliberately not built* are the only registered conditions under which this
-table gains a line, and none of them is a promise that it will. That is the
-difference between a ladder and a checklist.
+a millisecond from a local GET is decoration. A phone fetching from a laptop is
+the first half of that condition and not the second, so the trigger stands
+untripped: v0.9 opening does not turn it green, and no number here is owed one
+yet. That trigger and the three in *Deliberately not built* are the only
+registered conditions under which this table gains a further line, and none of
+them is a promise that it will. That is the difference between a ladder and a
+checklist.
 
 ## Deliberately not built
 
@@ -399,6 +423,28 @@ v0.6 spent a rung refusing to do. The trigger, in the same shape: upload
 revisits when a registered procedure exists that can fit or update a model
 from a single client's data, **and** the wire's privacy line is decided for
 that payload class. Before both, it is decoration with a privacy cost.
+
+An interval on a distance joined this list in v0.9, before the rung had a screen
+to put one on. A tape measure printing `1.42 m ± 0.03` is the obvious feature and
+would be the largest overclaim in this project's history: the estimand is the
+disagreement of **one point** at one depth, and turning two per-point
+disagreements into an interval on their separation needs an error-propagation
+rule that has never been derived here and a correlation between the two points'
+errors that has never been measured. The trigger, in the same shape, and it has
+two gates rather than one. First, that rule, derived and written down. Second, a
+data seam that does not exist: `Calibration.Observation` carries a separation, a
+Δt, a class, a depth and a residual, and **no frame identifier and no pixel
+identity**, so two observations cannot be known to come from one frame pair — the
+correlation is not computable from any export this repository has ever produced.
+The export that could compute it carries per-pair per-pixel rows, much closer to
+reconstructable than the aggregates the privacy line permits, so building it
+needs a privacy decision before it needs code. Before all of that, a span
+interval is a plausible number, which is worse than no number.
+
+Unlike the refusals the router enforces, this one is documentary. A 404 is a
+fact; here nothing stops a caller adding two of the module's own `Double`s
+together. What enforces it is that no API takes two points and no surface offers
+a span, and saying so plainly is better than implying a guard that is not there.
 
 ## Sequencing
 

@@ -14,6 +14,7 @@ let package = Package(
         .library(name: "Render", targets: ["Render"]),
         .library(name: "Interop", targets: ["Interop"]),
         .library(name: "Model", targets: ["Model"]),
+        .library(name: "Sight", targets: ["Sight"]),
     ],
     targets: [
         .target(
@@ -59,6 +60,16 @@ let package = Package(
         .target(
             name: "Model"
         ),
+        // The consumer's edge the line above declines to own, built where
+        // `swift test` can reach it: a sensor reading and a fitted model meet
+        // here and nowhere else. Depends on Model alone -- the confidence
+        // integers it joins are the sensor's encoding, which is why they do
+        // not belong inside a reader whose discipline is to believe nothing
+        // the artifact does not say.
+        .target(
+            name: "Sight",
+            dependencies: ["Model"]
+        ),
         .executableTarget(
             name: "RenderProbe",
             dependencies: ["Core", "Replay", "Render"]
@@ -79,9 +90,13 @@ let package = Package(
             name: "ModelProbe",
             dependencies: ["Model"]
         ),
+        .executableTarget(
+            name: "SightProbe",
+            dependencies: ["Replay", "Model", "Sight"]
+        ),
         .testTarget(
             name: "UnitTests",
-            dependencies: ["Core", "Replay", "Capture", "Render", "Interop", "Model"]
+            dependencies: ["Core", "Replay", "Capture", "Render", "Interop", "Model", "Sight"]
         ),
     ],
     cxxLanguageStandard: .cxx17

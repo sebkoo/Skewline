@@ -41,7 +41,7 @@ from the committed model: `.venv/bin/python Fit/serve.py Fit/model.json`.*
 
 ## What is here today
 
-Six modules, one harness app and the tests that hold them.
+Seven modules, one harness app and the tests that hold them.
 
 - **`Core`** — the measurement records: a pose with the uncertainty beside it
   and the tracker's own trust in that instant, an inertial sample, a camera
@@ -69,6 +69,14 @@ Six modules, one harness app and the tests that hold them.
   answers, and those two silences are different cases a caller has to tell
   apart. What it hands back is the disagreement between two readings, not one
   reading's error bar, and it is named that way.
+- **`Sight`** — where a sensor reading meets that model: one depth sample and
+  the confidence the sensor stamped on it become what the model says about that
+  point. The two silences a sensor can produce — a pixel that returned no depth,
+  a confidence class the fit never saw — stay apart from the two `Model` already
+  tells apart, because they are four different reasons to have no number and a
+  caller acts on them differently. The depth it takes is the depth map's own
+  sample, the quantity the model was fitted on, and not the length of the ray to
+  the point.
 
 ![44,973,892 points from one 31-second capture, each shaded by the depth
 sensor's own confidence — blue where it trusts itself, amber where less, red
@@ -114,6 +122,7 @@ v0.5  interop      a point-cloud reader over Swift–C++                done
 v0.6  fit          the uncertainty model, fitted offline              done
 v0.7  service      the fitted model reaches the device                done
 v0.8  view         a dashboard over the same service                  done
+v0.9  point        what the model says about a point you tap          here
 ```
 
 Rungs are planned; individual commits are not. What each commit contains is
