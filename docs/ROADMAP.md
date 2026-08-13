@@ -11,7 +11,7 @@ it is the second, it does not go in.
 
 ## The shape of it
 
-Five modules. The graph is acyclic with `Core` at the root, and it is enforced
+Six modules. The graph is acyclic with `Core` at the root, and it is enforced
 by the compiler rather than by anyone's discipline.
 
 ```text
@@ -37,6 +37,12 @@ Interop     done      a PLY point-cloud file read across a C seam into
                       above -- the C++ parser is a private target behind
                       a pure C header, so no importer inherits a
                       language mode from it.
+
+Model       done      the fitted model, read from the service and
+                      evaluated locally. Depends on nothing above and
+                      owns its value types -- joining a model to
+                      rendered points is the consumer's edge, so it
+                      never reaches for Render's.
 ```
 
 `Replay` must never depend on `Capture`. Replay is what makes the pipeline
@@ -61,7 +67,7 @@ change, that is a signal the boundary was drawn wrong, and it belongs in
 
 ## What has shipped
 
-Twenty-six steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
+Twenty-seven steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
 including the ones that were mistakes.
 
 1. **Types.** A pose, a 6×6 covariance beside it, and the tracker's own opinion
@@ -262,6 +268,21 @@ including the ones that were mistakes.
     Registered for the Swift client that has not shipped: a new module on
     Interop's precedent, with both of v0.6's teeth unavoidable in the type —
     the refused class *and* out-of-domain refusal.
+
+27. **The client the service registered.** `Model`: the `skewline-fit/1`
+    artifact as Swift values, the schema tag checked before any other field
+    is believed, and both of v0.6's teeth unavoidable in the type — a refused
+    class is an enum case carrying the banded table it kept, so it still
+    answers and there is no path from it to coefficients that do not exist,
+    while outside the fitted depths every class refuses. The two silences are
+    different cases, because "no form was adopted" and "nothing answers here"
+    are different findings. The estimand rides the API: what comes back is
+    named for the pairwise disagreement it measures, never `sigma`. The
+    socket lives in one function and every decision beside it is pure, the
+    split `serve.py` already made, so no test in the suite opens a
+    connection. Forty-three tests, and the committed `Fit/model.json` is
+    decoded by the suite through its own source path rather than copied into
+    `Tests/`, where the copy would drift.
 
 ## Decided but not yet done
 

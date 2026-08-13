@@ -1416,3 +1416,174 @@ is untouched.
   those numbers would describe. The command an operator runs:
   `.venv/bin/python Fit/serve.py Fit/model.json`, which prints the bound
   port.
+
+## 2026-08-12 · v0.7 commit 2 — the Swift client the service registered
+
+**Built and gated.** Commit 1 registered an obligation and shipped none of
+its code; this is that code. `Model` is the sixth `.library`, and the name
+commit 1 proposed stands unchanged, so nothing is owed here for it.
+
+- **The module fetches *and* decodes, with the socket in exactly one
+  function.** The trade, named rather than assumed: a library that imports
+  `URLSession` is not the Replay-must-not-import-Capture case — `URLSession`
+  is Foundation, which every module here already imports, so no dependency
+  is added and no build grows. What a network drags into a test suite is a
+  *call*, not an import, and the fix already exists on the other side of
+  this seam: `serve.py`'s router is one function with no socket in it and
+  its tests drive that function rather than a port. Mirrored exactly.
+  `FittedModel(decoding:)` turns bytes into a model or a refusal;
+  `ModelClient.outcome(status:body:)` turns an HTTP status and a body into
+  the same; `ModelClient.fetch(from:using:)` is the one function that opens
+  a connection, and **no test in the suite calls it**. So the tests are
+  network-free by construction rather than by convention, and the repository
+  still has one fetch instead of one per consumer — which is the
+  second-implementation problem v0.6 and v0.7 both refused.
+- **Refused is not unavailable, and the type cannot conflate them.**
+  `Estimate` has four cases: `.fromAdoptedForm` and `.fromBandedTable` both
+  carry a number, so a class whose fit was refused still answers — which is
+  precisely what keeping the banded table bought, and a `case .refused` that
+  returned nil would have thrown it away. The two silences are separate
+  cases: `.refusedOutsideDepthDomain`, where nothing answers, and
+  `.refusedBandWithoutSamples`, where the depth is inside the domain but its
+  band had no samples. A caller that only wants the number reads
+  `medianPairwiseDisagreementMeters`, which is `nil` for both silences; a
+  caller that must tell them apart switches. The other tooth is the verdict
+  enum: there is no path from a refused class to coefficients that do not
+  exist.
+- **The half-open domain resolves an ambiguity the schema does not settle,
+  and that is a contract decision rather than a code choice.** The artifact
+  carries `depthDomain: [0.5, 5.0]` — two numbers and no inclusivity marker
+  — so "does 5.0 m answer?" has no answer in `skewline-fit/1`. This client
+  resolves it **half-open**, on the banded table's own band arithmetic
+  (`d >= low && d < high`), which makes the table refuse at exactly 5.0; the
+  adopted forms are then held to the same boundary, so both verdicts share
+  one domain instead of the adopted classes answering one depth further than
+  the refused one. Recorded because v0.8's dashboard is the next consumer of
+  the same field and could resolve it inclusively, and the two clients would
+  then disagree about exactly one depth. Recorded with it so the record is
+  complete: `fit.py`'s positivity gate *does* evaluate at 5.0
+  (`POSITIVITY_GRID` spans `[0.5, 5.0]` inclusive), so the fit's validity
+  domain is closed where this consumer's answering domain is half-open. The
+  two are drawn to the same boundary here by choice, not because the schema
+  forces it.
+- **Three shapes the committed artifact does not contain, each decoded
+  deliberately and each exercised by a synthetic fixture.** Coefficients are
+  form-dependent — both adopted classes are quadratic with `{a, b}` while
+  the power form emits `{a, p}` — so they ride the enum case rather than
+  sitting in a dictionary a caller has to know how to read, and no
+  unevaluatable form is nameable. A fold's per-form entry is
+  `{metric, margin}` **or** `{"disqualified": true}`, so `FormOutcome` has
+  two cases and an entry that is neither is refused rather than defaulted. A
+  banded table's medians may be null, so the column is `[Double?]` and
+  evaluating into such a band is the third silence above rather than a zero
+  nobody measured. Zero committed instances exercise any of the three; that
+  is what the fixtures are for.
+- **Where the folds attach, decided rather than defaulted.** They hang off
+  `ClassModel` beside the verdict, with the verdict as an enum *inside* the
+  struct. Putting them in the enum — `.adopted(Form, [Fold])` — would tax
+  every call site that only wants to evaluate with a binding it does not
+  want, and a separate map on `FittedModel` would split what the JSON keeps
+  together. The artifact test reaches them, because decoding a shape nothing
+  reads is how a decoder rots, and it reaches them through a check that is
+  still self-derived: leave-one-out gives one fold per container, so
+  `folds.count == trainedOn.count` and every holdout is a session the fit
+  was trained on; and `select_for_class`'s adoption bar is re-derived from
+  the decoded numbers — an adopted class's winning form beats its fold's own
+  table in **every** fold, and a refused class has no candidate that swept.
+- **Strict about classes, loose about fold keys — an asymmetry with a
+  reason.** An adopted `form` string this type cannot name is refused,
+  because a form that cannot be evaluated cannot be adopted. A fold's form
+  name stays a `String` key, because a fold entry is a diagnostic, and
+  refusing a whole artifact — and with it the model a client needs — because
+  a later fit reported a fourth candidate would be the wrong trade. The
+  class set is strict in both directions: exactly the three `CLASS_NAMES`,
+  no more and no fewer, since a fourth class is a schema-tag question.
+- **Two fields are verified because their meaning is hard-coded; the third
+  is carried and not gated.** `units` must be `meters` and `outsideDomain`
+  must be `refuse` — the evaluator means both, so it checks both rather than
+  assuming them. `estimand` is carried verbatim and never compared: gating
+  on prose would go red on a rewording that changed nothing, while a changed
+  *meaning* is what the schema tag is for. The tag itself is read before any
+  other field, and a test proves the *order* by handing over an artifact
+  with three things wrong at once and requiring `wrongSchema` to be the one
+  reported.
+- **Two smaller refusals worth naming.** A coefficient object that is not
+  exactly the form's — `quadratic` with an `a`, a `b` *and* a `p` — is
+  refused, because quietly ignoring a coefficient the artifact carries is
+  the silent coercion this reader exists to avoid. And a refused class's
+  table must span the depth domain exactly, or the artifact is refused:
+  otherwise a depth inside the domain but outside every band would produce a
+  fourth, unnamed kind of silence, and the point of this type is that there
+  are exactly the ones it names.
+- **The tests reach the committed artifact, not a copy of it.**
+  `ModelArtifactTests` walks up from its own `#filePath` to the repository
+  root and decodes `Fit/model.json` — the file the service serves. Copying
+  it into `Tests/` would have created two files to drift. A missing file
+  **fails** rather than skips, on the drift script's own lesson that a check
+  which silently skips when its anchor disappears is decoration. Nothing in
+  that file transcribes a fitted number: every assertion is either a
+  registered constant or re-derived from the decoded artifact, so a refit
+  that changes the coefficients leaves it green while a decoder that starts
+  inventing numbers does not.
+- **Both teeth shown red first.** Making a refused class return
+  `.refusedBandWithoutSamples` unconditionally — the exact regression that
+  would throw away the model v0.6 fought to keep — turned **seven** tests
+  red across all three files, including the committed-artifact one. Moving
+  the schema check to *after* the units check turned two red, which is the
+  ordering claim being a claim rather than a comment. Both inversions were
+  restored and the files byte-compared against their pre-inversion copies.
+- **`ModelProbe`, the fifth probe, and no button in the harness.** An
+  argument with an `http` scheme is fetched; anything else is a path, and
+  both reach the same decoder. `swift run -c release ModelProbe
+  http://127.0.0.1:<port>/v1/model` and `swift run -c release ModelProbe
+  Fit/model.json` printed **identical** deterministic blocks — verified by
+  `diff` over everything between the block markers, empty — with only the
+  transport line and the timing differing. Form names are sorted before
+  printing, because a dictionary has no order and a block that claims to be
+  deterministic cannot inherit one. Fold lines drop the padded label column:
+  a session UUID is longer than it, and the first run truncated four
+  holdouts into their metrics.
+- **What the probe deliberately does not print.** No payload byte count over
+  the wire. The client hands back a model rather than a body, and adding a
+  second request to count bytes would be a request for a number nothing
+  needs; commit 1 already measured that payload with `curl`.
+- **Every refusal path driven by hand, against real services.** 404 on
+  `/v1/model?class=high&depth=2.0` (the query surface that does not exist,
+  with the client's depth in the URL exactly as commit 1 warned), 503
+  `no-model` against a service pointed at a missing artifact, 500
+  `bad-artifact` against one pointed at a foreign file, and `unreachable`
+  against a dead port. Each printed the refusal by name and exited 1; none
+  crashed and none produced a number. `POST` still answers 405, checked with
+  `curl` because the probe has no way to send one.
+- **Sendable, and what is not on an actor.** Every public type is written
+  `: Sendable` explicitly — SE-0302 gives a `public struct` no implicit
+  conformance and no diagnostic in synchronous code. `fetch` is the only
+  `async` API and carries no global actor, so it is nonisolated and a
+  `MainActor` caller does not drag the request onto the main thread; its
+  result is `Sendable` and crosses back without a hop. `ModelProbe` is
+  `@main` on a struct with an async `main()`, because top-level code in a
+  `main.swift` would be `MainActor`-isolated and nothing here wants an
+  actor. The three registered classes are a struct with three stored
+  properties rather than a dictionary, so a lookup the decoder already
+  guarantees is not optional at every call site.
+- **The gate did not grow.** 163 Swift tests green — 120 before, 43 new, and
+  the arithmetic closes exactly. 31 Python, unchanged, because a Swift
+  module adds no Python: 16 fit and 15 serve. Both iOS builds succeeded, and
+  the package build is what type-checks `Model` and `ModelProbe` for the
+  device — the claim that the module reaches the device is the gate's, not
+  this paragraph's. Drift green: Assertion 3 now matches six `.library`
+  products against six bolded module bullets, and Assertion 4 still reads
+  four CI jobs against four jobs in `ci.yml`.
+- **The instructions named two prose counts and there were three.** "Five
+  modules" in README and in the ROADMAP's graph header both moved to six, as
+  registered. The ROADMAP also opens *What has shipped* with "Twenty-six
+  steps", which no assertion checks and which the brief did not mention; it
+  moved to twenty-seven with the new step. Nothing else was ambiguous, and
+  nothing was guessed: the depth ladder the probe prints is a probe-local
+  choice and is not registered anywhere.
+- **Not measured yet.** Request latency, throughput, behavior under
+  concurrent requests, and decode cost. The probe prints a timing line and
+  it is labeled non-deterministic; no figure from it is recorded here,
+  because one local run against loopback describes no consumer's experience
+  and there is still no consumer. Caching is not built either: the client
+  fetches when asked, exactly as the service re-reads when asked.

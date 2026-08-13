@@ -13,6 +13,7 @@ let package = Package(
         .library(name: "Capture", targets: ["Capture"]),
         .library(name: "Render", targets: ["Render"]),
         .library(name: "Interop", targets: ["Interop"]),
+        .library(name: "Model", targets: ["Model"]),
     ],
     targets: [
         .target(
@@ -51,6 +52,13 @@ let package = Package(
             name: "Interop",
             dependencies: ["PLY"]
         ),
+        // The fitted model, read from the service that serves it. Depends on
+        // nothing above: it owns its value types and never reaches for
+        // Render's points, because joining a model to rendered points is the
+        // consumer's edge rather than this module's.
+        .target(
+            name: "Model"
+        ),
         .executableTarget(
             name: "RenderProbe",
             dependencies: ["Core", "Replay", "Render"]
@@ -67,9 +75,13 @@ let package = Package(
             name: "InteropProbe",
             dependencies: ["Core", "Replay", "Render", "Interop"]
         ),
+        .executableTarget(
+            name: "ModelProbe",
+            dependencies: ["Model"]
+        ),
         .testTarget(
             name: "UnitTests",
-            dependencies: ["Core", "Replay", "Capture", "Render", "Interop"]
+            dependencies: ["Core", "Replay", "Capture", "Render", "Interop", "Model"]
         ),
     ],
     cxxLanguageStandard: .cxx17

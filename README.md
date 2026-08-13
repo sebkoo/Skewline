@@ -20,7 +20,7 @@ Most pipelines take the midpoint and throw the width away. This one keeps it.
 
 ## What is here today
 
-Five modules, one harness app and the tests that hold them.
+Six modules, one harness app and the tests that hold them.
 
 - **`Core`** — the measurement records: a pose with the uncertainty beside it
   and the tracker's own trust in that instant, an inertial sample, a camera
@@ -42,6 +42,12 @@ Five modules, one harness app and the tests that hold them.
   deliberately C seam. The parsing — three encodings, arbitrary per-element
   property lists — lives in a C++ target behind a pure C header, so no C++
   type crosses a public signature and no importer inherits a language mode.
+- **`Model`** — the fitted uncertainty model, read from the endpoint that
+  serves it and evaluated locally. A class whose fit was refused still answers,
+  from the banded table it kept; outside the depths it was fitted over, nothing
+  answers, and those two silences are different cases a caller has to tell
+  apart. What it hands back is the disagreement between two readings, not one
+  reading's error bar, and it is named that way.
 
 ![44,973,892 points from one 31-second capture, each shaded by the depth
 sensor's own confidence — blue where it trusts itself, amber where less, red
@@ -113,7 +119,8 @@ this repository. The wire runs one way: what it carries down is the same
 aggregate artifact already committed here, and nothing from a capture goes
 up — no frames, no depth, no observation rows, and no per-point query, since
 asking "how wrong is a reading at this depth" would send the asker's own
-depths to whoever runs the service. The client evaluates the model itself.
+depths to whoever runs the service. The client evaluates the model itself,
+and that client now exists.
 
 Reconstruction is deliberately out of scope. This is the layer underneath it:
 any reconstruction is only as trustworthy as its input, and today that input
