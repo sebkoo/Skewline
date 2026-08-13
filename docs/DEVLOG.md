@@ -1211,3 +1211,208 @@ Containers: M1 `931A8965…`, M2 `1A68AF96…`, D1 `85E5E2F1…`, README
 `2110CDA9…`, all in `~/dev/Skewline-captures/`. The exported CSVs stay
 local beside them, never staged, as registered; `Fit/model.json` is the
 one derived file this rung commits, for the reasoning above.
+
+## 2026-08-12 · v0.7 commit 1 — the seam that carries the model, and the wire's privacy line
+
+**Built and gated; the endpoint has no consumer yet and no performance
+number.** Every prior privacy call in this repository was about what enters
+the tree. A network asks a different question, and this commit answers it
+before any endpoint has a caller. No Swift code ships and `Package.swift`
+is untouched.
+
+- **The charter contradicted itself, and the privacy answer decided which
+  half survives.** The attach block says "v0.7 Service — serves what Fit
+  produced, back to the device" (model down); the next-table said "the
+  client uploads a bundle and gets a model back" (capture up). Those are
+  different data flows. **The model goes down and nothing goes up.** The
+  attach line was already accurate and stands verbatim; the next-table
+  line is the one corrected, the way v0.5 commit 1 corrected "fills
+  Core" — argued here rather than quietly reworded. The deciding argument
+  is not privacy. **At n=1 upload is unsupported, not merely unwise.**
+  `select_for_class` fits each class by leave-one-out across containers
+  and adopts only on a unanimous sweep of the folds; it raises on fewer
+  than two containers. One client's bundle has no fold and no holdout, so
+  an upload endpoint would have to run criteria that do not exist — which
+  is exactly what v0.6 spent a rung refusing to do. Upload therefore moved
+  to *Deliberately not built* with a written trigger, the shape this repo
+  already uses for on-device inference: it revisits when a registered
+  procedure exists that can fit or update a model from one client's data,
+  **and** the wire's privacy line is decided for that payload class.
+  Registering "aggregates up later" instead was rejected on the ROADMAP's
+  own divider — v0.7 is a rung, not a commit list, and a trigger registers
+  scope without deciding a later commit's content.
+- **What crosses, and what the standing rule now means.** Down: the
+  `skewline-fit/1` artifact — per-class verdicts, coefficients or the
+  refused class's table, fold metrics, the estimand, `units`,
+  `outsideDomain`, `depthDomain`, and `trainedOn`'s four session UUIDs.
+  All of it is already committed as `Fit/model.json`, so **the endpoint
+  serves what the repository already serves**. Up: nothing. No frame, no
+  depth map, no pose, no observation row, no container. The
+  aggregates-yes/raw-or-reconstructable-never line now governs the wire as
+  well as the tree, with one tightening the tree never needed: a git blob
+  is pulled by whoever cloned the repo, but a network request has a
+  requester a host could log, so the service accepts no request body at
+  all.
+- **The load-bearing exclusion is the per-point query, and it is the one a
+  reader would not predict.** A "what is σ̂ at depth d" endpoint sends the
+  *client's* depths up. The model is public; the client's questions are
+  not. So there is no evaluation endpoint and no query surface — the whole
+  artifact goes down and the consumer evaluates locally, which is why the
+  API is one GET. The manual check made this concrete rather than
+  theoretical: the request log line for a rejected query reads `"GET
+  /v1/model?class=high&depth=2.0 HTTP/1.1" 404`, with the depth in it. Had
+  the query surface existed, that is where the client's scene measurements
+  would have landed.
+- **Enforced by the router, not promised in prose.** Path matching is
+  exact, so a query string is not this endpoint; every method other than
+  GET and HEAD answers 405 with `Allow: GET, HEAD`; and no route reads a
+  request body anywhere in the module.
+- **The honesty item, so "nothing sensitive crosses" is not overclaimed.**
+  The *response* is public aggregate. The *requests* are not nothing: any
+  real deployment's log carries client address, user agent and timestamps.
+  This commit's service writes no log file — the stdlib handler's one line
+  per request goes to stderr and that is the whole of it — but the
+  retention question belongs to whoever deploys, and is recorded here
+  rather than registered away.
+- **No authentication, as a finding rather than a shortcut.** Nothing
+  served is private; it is already in a public git repository. Auth over
+  public aggregates would be theater, and saying so is the point.
+- **Where it lives, and why the rung named Service has no `Service/`.**
+  `Fit/serve.py` and `Fit/test_serve.py`, beside the fit. The v0.6 lesson
+  decided it: the service must read `skewline-fit/1` through
+  `fit.read_artifact` rather than re-parse it, or the two drift silently,
+  and a same-directory `import fit` is the strongest mechanical guarantee
+  of that — no path shim, no packaging layer, each of which is a way for
+  the two to come apart. It also keeps `unittest discover -s Fit` the one
+  command that finds every Python test, so the gate stays five commands
+  and CI stays four jobs. The cost is that a reader greps for `Service/`
+  and finds nothing: ROADMAP's attach line names a rung, not a directory,
+  and this paragraph is where that reader should land.
+- **The import runs one way, and the dependency line has a registered
+  move-out condition.** `serve.py` imports `fit`; `fit` learns nothing
+  about serving — the same shape as Replay never depending on Capture,
+  because anything the fit imports becomes a thing every numerical test
+  drags along. Stated precisely: **the service adds no dependency.** It is
+  not "stdlib only" — numpy arrives transitively through the reader, which
+  is the point. `Fit/requirements.txt` is the *fit harness's* pin file and
+  CI's fit job installs it to run numerical tests, so the moment serving
+  needs a third-party dependency, those tests start dragging a web
+  framework along and `fit.py`'s "numpy is the only dependency" claim goes
+  false. Registered now rather than discovered later: a non-stdlib serving
+  dependency means its own directory and its own requirements file, in the
+  commit that introduces it.
+- **Two versions, of two different things.** `skewline-fit/1` is a schema
+  tag on the *payload*; `/v1/` versions the *endpoint set and error
+  shape*. They cannot be one thing, because an error response carries no
+  payload tag at all — a 503 body has no `schema` field to read — so
+  something must version the envelope, and one path segment is the
+  cheapest thing that can. A consumer reads both, and the 200 body always
+  carries its own tag so the payload version is never inferred from the
+  path.
+- **The endpoint.** Local, bound to `127.0.0.1`, with no flag to bind a
+  public interface — that default is a privacy decision, not a
+  convenience. A deployed host is an uptime-and-secrets commitment this
+  repository has never made; what the choice defers is TLS, real exposure,
+  rate limiting, log retention, and who runs it. No secret, token or
+  hostname enters the tree. `--port` defaults to 0 and the bound port is
+  printed, so no invented port number is committed and the operator's path
+  is the tests' path. `GET /v1/model` → 200; no artifact yet → **503**
+  `no-model` rather than 404, because the endpoint exists and is correct
+  while the service has nothing to serve *yet*, and refusing to start
+  would make that state untestable; an unreadable or wrong-tagged artifact
+  → **500** `bad-artifact`, refused at read rather than proxied, since a
+  foreign file is the operator's problem and must not reach a client; an
+  unknown path → 404. The artifact is re-read **per request**, so a fit
+  landing while the service runs is served without a restart.
+- **HEAD is answered, and that was a decision rather than a leftover.**
+  RFC 9110 §9.1 makes GET and HEAD the two methods a general-purpose
+  server MUST support and every other method optional, so 405 on
+  POST/PUT/PATCH/DELETE/OPTIONS conforms while 405 on HEAD would not. It
+  is also right on this rung's own terms: the refusal is about methods
+  that carry a body, and HEAD carries none, so refusing it would be
+  theater on a method that cannot upload anything. HEAD returns GET's
+  status line and headers — including the `Content-Length` GET would send
+  — with an empty body. `curl -I` is the first thing a reader tries.
+- **What never reading the request body costs, stated rather than
+  discovered later from a confused client.** The stance is right and
+  stays. The consequence is that the server answers 405 and closes with
+  unread bytes still in flight, so a client sending a body larger than the
+  socket buffer can see a connection reset instead of the 405. The tests
+  keep their bodies small on purpose, so the upload test exercises the
+  router rather than the kernel's buffering.
+- **The byte-identity claim, pinned to its scope.** A 200 is served as
+  `json.dumps(artifact, indent=2, sort_keys=True)` plus a newline — the
+  exact shape `write_artifact` produces — so it reproduces **the bytes
+  that writer writes**, and the committed `Fit/model.json` is such a file.
+  It is not a claim about arbitrary artifacts: one edited by hand but
+  still schema-valid is served *normalized*, not byte-for-byte as it sits
+  on disk. Someone who hand-edits an artifact and diffs the response is
+  meeting a property that was never that broad, not a bug.
+- **Fifteen new tests, and the highest-stakes one shown red first.**
+  Allowing POST through the router turned the upload test red on all four
+  of its methods, and the load-bearing failure is the first: POST returned
+  **200 where 405 was expected** — the artifact served on an upload
+  method, which is precisely the regression this rung must be able to
+  catch. Restored and byte-compared against the pre-inversion file.
+  Recorded rather than hidden: the *other* privacy test stayed green
+  through that inversion, because it is a source assertion about the
+  absence of a body read and cannot witness a routing regression. The two
+  tests divide the work; neither covers the other's failure. Every server
+  in the suite binds port 0 and reads its port back — a test racing for a
+  fixed port is a flake generator.
+- **Two defects the manual end-to-end check caught that the tests could
+  not.** The port line was block-buffered the moment stdout was a pipe
+  rather than a terminal, so an operator redirecting the service got no
+  port at all — the one line that matters when the port is ephemeral by
+  default; it is flushed now. And the `Server` header went out as
+  `Skewline ` with a trailing space, because the base class joins the
+  server and interpreter version strings on a space unconditionally and
+  the interpreter half was blanked rather than the join overridden. Both
+  are the kind of thing a socket test that only reads status codes and
+  bodies will never see.
+- **The Swift client: registered, not shipped.** It cannot ship here — a
+  module or probe needs a `Package.swift` change, which this commit
+  excludes — so what lands is the obligation, on Interop's precedent of a
+  module owning its own value types. The proposed name is **`Model`**:
+  `Service` is already the Python side and the Swift module *consumes* a
+  service rather than being one, so by this repo's one-word role-naming
+  convention the thing modeled is the fitted model and its reading, not
+  the transport. **Both of v0.6's teeth must be unavoidable in the type,
+  not one** — the refused class as an enum case, so a caller cannot dot
+  through to coefficients that may not exist, *and* `outsideDomain:
+  refuse`, so evaluating outside [0.5, 5.0) m returns a refusing result
+  rather than a silent extrapolation; a type misusable in either direction
+  has lost half the finding. The estimand rides the API: a property named
+  `sigma` handing back a `Double` invites exactly the misreading the fixed
+  wording exists to prevent, so naming and doc comments carry the pairwise
+  meaning, and a consumer wanting a per-reading error bar states its own
+  conversion. The schema tag is checked before anything is believed, the
+  discipline `fit.py` and the PLY reader already apply. The module owns
+  its value types, depends on nothing above, and does not reach for
+  `Render.ConfidencePoint` — joining a model to rendered points is the
+  consumer's edge, the call v0.5 commit 3 made. And the coupling that
+  would otherwise arrive as a red CI: a new `.library` product makes drift
+  Assertion 3 demand a bolded module bullet in README **in that same
+  commit**, and the prose counts move with it — "Five modules" in both
+  README and this ROADMAP's graph header. A probe adds no product and is
+  unaffected.
+- **The harness rule stands unamended.** README's "it should not grow a
+  second job" survives intact: the module is what reaches the device — the
+  iOS CI job type-checks it exactly as it does `Render` — and a UI is not
+  what makes something reach a device. A Mac-side probe is the established
+  way to exercise a library against real input, with four precedents. No
+  button in `SkewlineHarness`.
+- **The gate did not grow**, which is the placement decision paying off:
+  120 Swift tests green, 31 Python (16 fit, unchanged, and 15 serve), both
+  iOS builds succeeded, drift green with all four assertions quiet —
+  Assertion 3 because no `.library` was added, Assertion 4 because "Four
+  CI jobs" still matches four jobs in `ci.yml`.
+- **Measured, because the run produced it:** the served payload is 8,210
+  bytes, and `curl` reports the same `Content-Length` on HEAD as GET's
+  body length. `GET /v1/model | diff - Fit/model.json` came back empty.
+- **Not measured yet.** Request latency, throughput, behavior under
+  concurrent requests, the per-request file-read cost, and startup time.
+  The service has no consumer, so there is nothing yet whose experience
+  those numbers would describe. The command an operator runs:
+  `.venv/bin/python Fit/serve.py Fit/model.json`, which prints the bound
+  port.

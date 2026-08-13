@@ -68,7 +68,10 @@ Swift. The third fails when this README contradicts the repository — detection
 only, and the fix stays a human commit. The fourth runs the fit harness in
 `Fit/` — Python and numpy, because an uncertainty model has to be fitted
 somewhere — whose tests plant known model parameters in synthetic data and
-require the fit to recover them, or to refuse.
+require the fit to recover them, or to refuse. That same job covers the
+endpoint that serves the fitted model, which lives beside the fit and shares
+its reader; a service that re-parsed the artifact would be a second reader to
+drift.
 
 ## Where this goes
 
@@ -103,6 +106,14 @@ with margin. **What is still not here is pose error against ground truth** —
 there is no truth rig, and cross-frame reprojection measures the joint
 pose-and-depth disagreement a replay can observe, not pose accuracy on its
 own. A number that has not been measured is worse than no number.
+
+Nothing is deployed. The fitted model is served by a local endpoint bound to
+loopback, not by a host somebody operates, and no secret or hostname is in
+this repository. The wire runs one way: what it carries down is the same
+aggregate artifact already committed here, and nothing from a capture goes
+up — no frames, no depth, no observation rows, and no per-point query, since
+asking "how wrong is a reading at this depth" would send the asker's own
+depths to whoever runs the service. The client evaluates the model itself.
 
 Reconstruction is deliberately out of scope. This is the layer underneath it:
 any reconstruction is only as trustworthy as its input, and today that input

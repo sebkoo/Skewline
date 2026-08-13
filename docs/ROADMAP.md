@@ -61,7 +61,7 @@ change, that is a signal the boundary was drawn wrong, and it belongs in
 
 ## What has shipped
 
-Twenty-five steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
+Twenty-six steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
 including the ones that were mistakes.
 
 1. **Types.** A pose, a 6×6 covariance beside it, and the tracker's own opinion
@@ -242,6 +242,26 @@ including the ones that were mistakes.
     repository under the standing aggregates-yes/raw-or-reconstructable-
     never line the calibration medians and the README capture had already
     cleared.
+26. **The service seam, and the privacy line a wire forces.**
+    `Fit/serve.py`: `GET /v1/model` returns the `skewline-fit/1` artifact,
+    read through `fit.py`'s own reader rather than a second parser of the
+    same schema, validated before it is served rather than proxied, and
+    byte-identical to what `write_artifact` wrote. stdlib `http.server`, no
+    dependency added — numpy arrives transitively through that reader — and
+    the registered move-out condition if serving ever needs a third-party
+    one. The wire runs one way, and this commit corrects the next-table line
+    that promised a bundle upload rather than rewording it: at n=1 an upload
+    is not merely a privacy cost but *unsupported*, because the registered
+    procedure fits by leave-one-out across containers and one client's
+    bundle has no fold and no holdout. The refusal is enforced by the router
+    rather than promised — every method but GET and HEAD answers 405, no
+    route reads a request body, and there is no per-point query surface,
+    because "what is σ̂ at depth d" would send the *client's* depths up.
+    Fifteen tests, one shown red first: allowing POST through the router
+    served the artifact on an upload method (200 where 405 was expected).
+    Registered for the Swift client that has not shipped: a new module on
+    Interop's precedent, with both of v0.6's teeth unavoidable in the type —
+    the refused class *and* out-of-domain refusal.
 
 ## Decided but not yet done
 
@@ -264,7 +284,7 @@ because commit 2 discovered that `canImport(ARKit)` is true on macOS.
 
 | Version | Ships | What forces it |
 |---|---|---|
-| **v0.7** service | The fit becomes an endpoint; the client uploads a bundle and gets a model back | Once the fit exists offline, shipping it to the device is the only way it reaches a user |
+| **v0.7** service | The fitted model becomes an endpoint a client reads; nothing from a capture travels the other way | Once the fit exists offline, shipping it to the device is the only way it reaches a user |
 | **v0.8** view | A small web dashboard over the same service | Nearly free once v0.7 exists. Drops entirely if v0.7 slips |
 
 Python entered in v0.6 not because it is popular but because an uncertainty
@@ -284,6 +304,17 @@ On-device inference has a written trigger rather than a plan: if the analytic
 error model is **measured** to break down under some material or lighting
 condition, that measurement justifies a learned component. Before the
 measurement it is decoration.
+
+Capture upload joined this list in v0.7, having previously been written into
+the table above as something v0.7 would ship. It is not deferred for privacy
+alone — at n=1 it is unsupported. The registered procedure fits each class by
+leave-one-out across containers and adopts only on a unanimous sweep of the
+folds, so one client's bundle has no fold and no holdout, and an upload
+endpoint would have to run criteria that do not exist. That is precisely what
+v0.6 spent a rung refusing to do. The trigger, in the same shape: upload
+revisits when a registered procedure exists that can fit or update a model
+from a single client's data, **and** the wire's privacy line is decided for
+that payload class. Before both, it is decoration with a privacy cost.
 
 ## Sequencing
 
