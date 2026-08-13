@@ -16,9 +16,17 @@ import Sight
 /// probe: the artifact comes down whole and is evaluated locally, and no depth
 /// a client picked ever travels up.
 ///
-/// Usage: `SightProbe <model.json | http://host:port/v1/model> <container.skewline> [x,y ...]`
+/// Usage: `SightProbe <model.json | http://host:port/v1/model> <container.skewline> [--frame N] [x,y ...]`
 /// Points are in normalized image space, `0 <= x < 1` from the top-left corner.
 /// Given none, it sights the centre.
+///
+/// `--frame N` names a frame by its index in the container rather than taking
+/// the first one carrying both maps. It exists so a sighting made on the
+/// device can be re-derived here: the phone shows the index of the frame it
+/// read and the point that was tapped, and those two arguments are what turn
+/// that reading into something this probe can check. Naming an index is not
+/// the same as choosing a frame by what it contains -- the operator is
+/// repeating a measurement, not shopping for one that answers.
 ///
 /// The report is paired blocks, the RenderProbe pattern: the deterministic
 /// block byte-reproduces across runs on one machine, and the timing block is
@@ -33,7 +41,7 @@ struct SightProbe {
         let arguments = Array(CommandLine.arguments.dropFirst())
         guard arguments.count >= 2 else {
             FileHandle.standardError.write(Data(
-                "usage: SightProbe <model.json | http://host:port\(ModelClient.modelPath)> <container.skewline> [x,y ...]\n".utf8
+                "usage: SightProbe <model.json | http://host:port\(ModelClient.modelPath)> <container.skewline> [--frame N] [x,y ...]\n".utf8
             ))
             exit(64)
         }
@@ -41,16 +49,21 @@ struct SightProbe {
         print("warning: debug build -- the timing below is the optimizer's absence, not the arithmetic's bill")
         #endif
 
-        let points: [(x: Double, y: Double)]
+        let trailing: (frame: Int?, points: [(x: Double, y: Double)])
         do {
-            points = try parsePoints(Array(arguments.dropFirst(2)))
+            trailing = try parseTrailing(Array(arguments.dropFirst(2)))
         } catch {
             FileHandle.standardError.write(Data("error: \(error)\n".utf8))
             exit(64)
         }
 
         do {
-            try await report(model: arguments[0], container: arguments[1], points: points)
+            try await report(
+                model: arguments[0],
+                container: arguments[1],
+                frame: trailing.frame,
+                points: trailing.points
+            )
         } catch let refusal as ModelReadError {
             FileHandle.standardError.write(Data(
                 "error: \(arguments[0]): \(refusal.kind.name) -- \(refusal.message)\n".utf8
@@ -64,32 +77,74 @@ struct SightProbe {
 
     enum ProbeError: Error, CustomStringConvertible {
         case malformedPoint(String)
+        case malformedFrame(String)
+        /// `--frame` with nothing after it. Its own case because a missing
+        /// index and an unreadable one send the operator to different
+        /// places.
+        case frameIndexMissing
         case noFrameCarriesDepthAndConfidence
+        /// A named frame that is not in the container. Distinct from the case
+        /// above: "this container has nothing to sight" and "the frame you
+        /// asked for is not here" are different findings, and the second is
+        /// usually a transcription slip worth saying so.
+        case frameOutOfRange(index: Int, count: Int)
+        /// A named frame that exists and carries no maps. Also its own case,
+        /// for the same reason: the container is fine and this frame is not.
+        case frameCarriesNoDepthAndConfidence(index: Int)
 
         var description: String {
             switch self {
             case .malformedPoint(let text):
                 "\(text) is not an x,y pair of numbers"
+            case .malformedFrame(let text):
+                "\(text) is not a frame index"
+            case .frameIndexMissing:
+                "--frame needs an index after it"
             case .noFrameCarriesDepthAndConfidence:
                 "no frame in the container carries both a depth map and a confidence map"
+            case .frameOutOfRange(let index, let count):
+                "frame \(index) is not in this container, which has \(count)"
+            case .frameCarriesNoDepthAndConfidence(let index):
+                "frame \(index) carries no depth map and confidence map"
             }
         }
     }
 
-    static func parsePoints(_ arguments: [String]) throws -> [(x: Double, y: Double)] {
-        guard !arguments.isEmpty else { return [centre] }
-        return try arguments.map { text in
-            let parts = text.split(separator: ",")
-            guard parts.count == 2, let x = Double(parts[0]), let y = Double(parts[1]) else {
-                throw ProbeError.malformedPoint(text)
+    /// `--frame N` and the points, from whatever follows the container path.
+    ///
+    /// One pass, so `--frame` may sit before or after the points: an operator
+    /// copying an index and a point off a phone screen should not have to
+    /// learn an order as well.
+    static func parseTrailing(
+        _ arguments: [String]
+    ) throws -> (frame: Int?, points: [(x: Double, y: Double)]) {
+        var frame: Int?
+        var points: [(x: Double, y: Double)] = []
+        var rest = arguments[...]
+        while let argument = rest.first {
+            rest = rest.dropFirst()
+            if argument == "--frame" {
+                guard let text = rest.first else { throw ProbeError.frameIndexMissing }
+                rest = rest.dropFirst()
+                guard let index = Int(text), index >= 0 else {
+                    throw ProbeError.malformedFrame(text)
+                }
+                frame = index
+                continue
             }
-            return (x, y)
+            let parts = argument.split(separator: ",")
+            guard parts.count == 2, let x = Double(parts[0]), let y = Double(parts[1]) else {
+                throw ProbeError.malformedPoint(argument)
+            }
+            points.append((x, y))
         }
+        return (frame, points.isEmpty ? [centre] : points)
     }
 
     static func report(
         model source: String,
         container: String,
+        frame named: Int?,
         points: [(x: Double, y: Double)]
     ) async throws {
         let url = URL(string: source)
@@ -104,13 +159,31 @@ struct SightProbe {
         let reader = try SessionContainer.Reader(contentsOf: URL(filePath: container))
         let session = reader.session
 
-        // The first frame carrying both maps, not a frame chosen by anything
-        // about its contents: which pixel answers is the finding, and picking
-        // the frame that answers best would be picking the finding.
-        guard let index = session.frames.firstIndex(where: {
-            $0.depth != nil && $0.depth?.confidence != nil
-        }), let record = session.frames[index].depth else {
-            throw ProbeError.noFrameCarriesDepthAndConfidence
+        // Without `--frame`, the first frame carrying both maps -- not a frame
+        // chosen by anything about its contents, because which pixel answers
+        // is the finding and picking the frame that answers best would be
+        // picking the finding. With `--frame`, the operator names an index and
+        // gets it or an error; naming the frame a phone already read is
+        // repeating a measurement rather than shopping for one.
+        let index: Int
+        let chosenBy: String
+        if let named {
+            guard named < session.frames.count else {
+                throw ProbeError.frameOutOfRange(index: named, count: session.frames.count)
+            }
+            index = named
+            chosenBy = "named"
+        } else {
+            guard let first = session.frames.firstIndex(where: {
+                $0.depth != nil && $0.depth?.confidence != nil
+            }) else {
+                throw ProbeError.noFrameCarriesDepthAndConfidence
+            }
+            index = first
+            chosenBy = "first carrying depth and confidence"
+        }
+        guard let record = session.frames[index].depth, record.confidence != nil else {
+            throw ProbeError.frameCarriesNoDepthAndConfidence(index: index)
         }
 
         let clock = ContinuousClock()
@@ -126,7 +199,7 @@ struct SightProbe {
         print(row("transport", overTheWire ? "\(ModelClient.apiVersion) over HTTP" : "file"))
         print("container \(container)")
         print("  --- sighted (deterministic) ---")
-        print(row("frame", "\(index) of \(session.frames.count)"))
+        print(row("frame", "\(index) of \(session.frames.count), \(chosenBy)"))
         print(row("depth map", "\(decoded.width) x \(decoded.height)"))
         print(row("depth domain", bound(model.depthDomain.lowerBound)
             + " ..< " + bound(model.depthDomain.upperBound) + " m"))

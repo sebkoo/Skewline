@@ -2300,3 +2300,54 @@ pure move must not carry an output change hiding inside it.
 - **The gate did not grow.** Five commands, unchanged. Swift 188 → **192**.
   Python 76 unchanged. Both iOS builds succeeded. Drift green.
 - **Not measured yet.** Unchanged. No number here came from a run.
+
+## 2026-08-13 · v0.9 commit 5 — the frame the phone read
+
+**Built and gated.** A sighting on the device is only worth anything if it can
+be checked, and checking it means running the same point through the same frame
+here. The probe took the first frame carrying both maps and offered no way to
+name another, so the phone's reading had nothing to be compared against.
+
+- **`--frame N` names an index, which is not the same as choosing a frame.**
+  The default's rule is unchanged and its reason still holds: picking the frame
+  that answers best would be picking the finding. Naming one is the opposite
+  act — the operator is repeating a measurement the phone already made, and the
+  index is a fact about which frame that was rather than a preference about
+  which frame answers. The two are visibly different in the report, which now
+  prints `first carrying depth and confidence` or `named` beside the index.
+- **Three refusals, kept apart rather than merged into one.** "No frame in this
+  container carries both maps", "frame 9 is not in this container, which has 4"
+  and "frame 1 carries no depth map and confidence map" are three different
+  things to be told, and the last two are usually a transcription slip off a
+  phone screen. `--frame` with nothing after it is a fourth. Collapsing them
+  into one "bad frame" would be the same conflation this rung spends nine
+  states refusing.
+- **`--frame` may sit before or after the points.** One pass over the trailing
+  arguments, because an operator copying an index and a point off a screen
+  should not have to learn an order too.
+- **No unit test, and the reason is structural rather than an omission.** The
+  plan said "and the tests". `SightProbe` is an `executableTarget` with `@main`,
+  so `UnitTests` cannot import it; no probe in this repository has ever had a
+  Swift unit test, and giving one a test harness is a bigger change than a flag
+  warrants. It was verified by running instead, against a synthetic four-frame
+  container written for the purpose — frame 0 with no depth, frame 1 with depth
+  and no confidence, frames 2 and 3 with both and different numbers, so the
+  default and the flag disagree visibly. The generator stayed in the scratchpad,
+  the same call v0.8 made about its capture driver and for the same reason: a
+  committed generator would be tooling no gate runs.
+- **What the run showed, and it is a check rather than a demonstration.**
+  Against `Fit/model.json`: the default picked frame 2 and answered
+  `0.006249 m` for a class-2 sample at 2.00 m, which is the high class's
+  `[2.0, 3.0)` band median in the committed artifact; `--frame 3` picked a
+  class-1 sample at 3.50 m and answered `0.044594 m`, which is medium's
+  quadratic evaluated there. Both were checked against the artifact by hand
+  rather than accepted because they looked plausible. The three silences and
+  the off-the-map case were reached in the same run.
+- **Exit codes stayed as they were.** 64 for anything the argument loop
+  refuses, 1 for anything the container refuses. A flag that invented a third
+  would be a convention arriving inside a feature.
+- **The gate did not grow.** Five commands, unchanged. Swift 192 unchanged, no
+  test being reachable. Python 76 unchanged. Both iOS builds succeeded. Drift
+  green.
+- **Not measured yet.** Unchanged. The probe's timing line is still a local
+  read of a local file, which is the decoration v0.8's trigger exists to refuse.
