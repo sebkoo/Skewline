@@ -605,10 +605,11 @@ class TheSharpnessConditionIsRegistered(unittest.TestCase):
         # Measured, not assumed: with PAIRS_PER_CELL = 20_000 the upper
         # median is pinned tightly, so on data with no pathology the spread
         # stays a small fraction of CANCELLATION_MARGIN. Recorded in DEVLOG
-        # alongside this commit -- observed spreads ran roughly 0.003-0.04
-        # against a fixed seed at thousands of pairs per band, an order of
-        # magnitude below the 0.10 margin. This pins that finding as a
-        # regression rather than letting it silently drift.
+        # alongside this commit -- observed spreads ran roughly 0.004-0.015
+        # on this fixture against a fixed seed at thousands of pairs per
+        # band, between roughly seven and twenty-five times below the 0.10
+        # margin. This pins that finding as a regression rather than letting
+        # it silently drift.
         rng = np.random.default_rng(103)
         rows = planted_rows(rng, pairs=20, per_pair=4000, common=0.02, independent=0.01)
         with tempfile.TemporaryDirectory() as directory:

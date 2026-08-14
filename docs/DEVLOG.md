@@ -3264,9 +3264,10 @@ was the null's per-cell depth-matched binning, corrected at commit 7.)
   checking before trusting it exists. On a planted fixture with thousands of
   pairs per band (20 disjoint frame pairs, 4,000 rows each, one fixed seed),
   the measured spread ran from about 0.004 to 0.015 across the
-  well-populated bands — an order of magnitude below the `0.10` margin, and
-  never close to it. At a moderately populated size (10 pairs, 1,000 rows
-  each) spreads still stayed under 0.04. Near `MINIMUM_CELL_PAIRS`, bands
+  well-populated bands — between roughly seven and twenty-five times below
+  the `0.10` margin, and never close to it. At a moderately populated size
+  (10 pairs, 1,000 rows each) spreads still stayed under 0.04. Near
+  `MINIMUM_CELL_PAIRS`, bands
   read `None` (thin, not spread-refused) rather than a large spread. On this
   data the honest name for what `SHARPNESS_REFUSED` will actually catch is
   closer to a guard against anomalous seed-to-seed instability than a
@@ -3471,4 +3472,31 @@ one optimization taken while the same code was open.**
   at 121, output unchanged from commit 13's run. The other four commands are
   unaffected — nothing outside `Fit/span.py` and `Fit/test_span.py` changed
   — and were not re-run.
+- **Not measured yet.** Every span number. No container has been exported.
+
+## 2026-08-14 · v0.10 commit 15 — correct the measured sharpness spread
+
+**Commit 11's own record of a measured magnitude was itself imprecise, and
+this rung's argument for stating magnitudes at all is that they be exact.**
+
+- **"An order of magnitude below" overstated the top of its own range.**
+  Commit 11 reported the sharpness spread on a well-populated fixture as
+  running "from about 0.004 to 0.015 ... an order of magnitude below the
+  `0.10` margin." `0.10 / 0.004` is 25 — an order of magnitude, at the low
+  end. `0.10 / 0.015` is about 6.7 — not one, at the high end the same
+  sentence claimed it for. Corrected to "between roughly seven and
+  twenty-five times below the `0.10` margin," which is true across the
+  whole stated range rather than only its most favorable point. The same
+  overstatement was duplicated in `test_span.py`'s comment beside
+  `test_well_populated_cells_clear_the_margin_on_this_fixture` (there
+  compounded with a wider, unlabeled 0.003-0.04 range that mixed the
+  well-populated and moderately-populated fixtures together); corrected to
+  match, and to name which fixture the 0.004-0.015 figure belongs to.
+- **No number changed, no test changed.** This is a wording correction only
+  — the measured values (`0.004`, `0.015`, `0.10`) and the passing
+  assertions are exactly as commit 11 left them. What was wrong was the
+  arithmetic comparing them in prose, not the arithmetic in code.
+- **The gate.** `.venv/bin/python -m unittest discover -s Fit -v` is green
+  at 121, unchanged — a comment and two sentences of prose, no executable
+  line touched. The other four commands are unaffected and were not re-run.
 - **Not measured yet.** Every span number. No container has been exported.
