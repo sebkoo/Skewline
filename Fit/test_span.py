@@ -10,6 +10,7 @@ never enter this repository.
 Everything is seeded `default_rng`: a failure reproduces exactly.
 """
 
+import json
 import os
 import tempfile
 import unittest
@@ -469,6 +470,79 @@ class TheSeedIsRegistered(unittest.TestCase):
         first = span.cell_ratios(observations, 2, seed=7)
         second = span.cell_ratios(observations, 2, seed=7)
         self.assertEqual(first, second)
+
+
+class TheArtifact(unittest.TestCase):
+    def built(self, seed=30):
+        rng = np.random.default_rng(seed)
+        rows = planted_rows(rng, pairs=6, per_pair=300, common=0.05, independent=0.01)
+        with tempfile.TemporaryDirectory() as directory:
+            observations = span.read_geometry(written(rows, directory))
+        result = span.cell_ratios(observations, 2)
+        lateral = span.lateral_summary(observations, 2, 1.0)
+        provenance = [{"session": "PLANTED-TEST", "pairStride": 8, "pairsKept": 6}]
+        return observations, span.build_artifact({2: result}, {2: lateral}, provenance, 1.0)
+
+    def test_round_trip_and_schema_rejection(self):
+        _, artifact = self.built()
+        self.assertEqual(artifact["schema"], span.ARTIFACT_SCHEMA)
+        self.assertEqual(artifact["estimand"], span.ESTIMAND)
+        self.assertEqual(artifact["spanInterval"], "refused")
+        self.assertTrue(artifact["spanIntervalReason"])
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "span.json")
+            span.write_artifact(path, artifact)
+            self.assertEqual(span.read_artifact(path), json.loads(json.dumps(artifact)))
+            wrong = os.path.join(directory, "other.json")
+            with open(wrong, "w", encoding="utf-8") as handle:
+                json.dump({"schema": "something-else/9"}, handle)
+            with self.assertRaises(ValueError):
+                span.read_artifact(wrong)
+
+    def test_no_per_row_value_survives_into_the_artifact(self):
+        # The privacy decision, enforced rather than promised. The `/2` rows
+        # are per-pixel and stay local; this asserts that none of them -- and
+        # no extremum, because an extremum IS a row -- reaches the file that
+        # does enter the repository.
+        observations, artifact = self.built()
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "span.json")
+            span.write_artifact(path, artifact)
+            with open(path, encoding="utf-8") as handle:
+                text = handle.read()
+
+        # No geometry column name is even mentioned.
+        for name in ("src_frame", "tgt_frame", "src_x", "src_y", "tgt_x", "tgt_y"):
+            with self.subTest(column=name):
+                self.assertNotIn(name, text)
+
+        # And no row's actual values appear. Frame indices and pixels are
+        # small integers that could collide with a count by coincidence, so
+        # this checks the values that could not: the residuals and depths,
+        # which are the reconstructable part.
+        numbers = set()
+        for token in text.replace(",", " ").replace(":", " ").split():
+            try:
+                numbers.add(round(float(token.strip('"[]{}')), 9))
+            except ValueError:
+                continue
+        for column in ("delta", "depth", "rt_dx", "rt_dy"):
+            values = {round(float(v), 9) for v in observations[column]}
+            with self.subTest(column=column):
+                self.assertFalse(
+                    values & numbers,
+                    f"a per-row {column} value reached the artifact",
+                )
+
+    def test_the_artifact_carries_the_rule_and_its_axial_limit(self):
+        _, artifact = self.built()
+        self.assertEqual(artifact["component"], "axial")
+        self.assertIn("Cov", artifact["propagationRule"])
+        self.assertIn("axial", artifact["propagationRule"].lower())
+        self.assertEqual(artifact["lateralUnits"], "depth pixels")
+        self.assertAlmostEqual(
+            artifact["lateralClearanceFloor"], 1.0 - 1.0 / np.sqrt(2.0)
+        )
 
 
 if __name__ == "__main__":

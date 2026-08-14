@@ -3108,3 +3108,44 @@ that radius, because the radius is what shaped it.
 - **Not measured yet.** Every span number, all three registered values, the
   export's size. The clearances quoted above are the planted fixtures' and
   describe the code; no container has been exported.
+
+## 2026-08-14 · v0.10 commit 9 — the artifact, and the refusal it carries at the top
+
+**Built and gated; `skewline-span/1` exists and has never been written from a
+container.** Aggregates, verdicts and counts, mirroring `skewline-fit/1`'s
+shape: the estimand at the top with fixed wording, the units, the derived rule,
+and the schema checked before any field is believed.
+
+- **`spanInterval: "refused"` is load-bearing, not decoration.** It sits at the
+  top level so a reader who finds a ratio below 1 cannot take it as permission
+  to print `1.42 m ± 0.03`, and `spanIntervalReason` says why in the artifact
+  rather than only in this file: the estimand is an upper median of absolute
+  *disagreement* rather than a sigma, so no coverage is defined against it; the
+  component is axial, so it is not a distance; and no API here takes two
+  points. A later reader meeting the JSON without the prose still meets the
+  refusal.
+- **The rule travels with the number.** `propagationRule` carries
+  `Var(r_b − r_a) = Var(r_a) + Var(r_b) − 2·Cov(r_a, r_b)` and says in the same
+  breath that it is axial only. v0.6 put its estimand in the artifact so no
+  later rung could invent what the number meant; the same argument applies
+  harder here, because a ratio is easier to misread than a length.
+- **The privacy decision is now enforced by a test rather than by care.** The
+  artifact carries no frame index, no pixel, no depth, no Δt and no residual —
+  **and no minimum, maximum or illustrative example, because an extremum is a
+  row**. The test serializes the artifact, scrapes every number out of the
+  text, and requires no per-row `delta`, `depth`, `rt_dx` or `rt_dy` value to
+  appear; it also requires none of the geometry column *names* to be mentioned.
+- **Shown red by the mistake a helpful future edit would actually make.**
+  Adding a `worstResidual` field — an illustrative worst case, the most natural
+  thing in the world to want in a summary — turned the test red on the `delta`
+  column. That is the failure mode the rule exists for: nobody would commit a
+  row on purpose, and an extremum does not look like a row until it is named as
+  one.
+- **The lateral floor rides in the artifact too.** `lateralClearanceFloor`
+  carries `1 − 1/√2`, so the constraint on the margin is legible from the file
+  and not only from this entry.
+- **The gate did not grow.** Five commands, unchanged: Swift 201, Python 104,
+  both iOS builds, drift green.
+- **Not measured yet.** Everything the artifact is shaped to hold. No container
+  has been exported, all three registered values are open, and
+  `Fit/span.json` does not exist.

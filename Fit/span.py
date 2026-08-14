@@ -74,6 +74,7 @@ captures, carry a frame index and a pixel per row, and never enter the
 repository; only the aggregate artifact does.
 """
 
+import json
 import math
 
 import numpy as np
@@ -568,3 +569,82 @@ def lateral_verdict(summary, clearance_margin=None):
     return (
         LATERAL_REPORTABLE if summary["clearance"] > margin else LATERAL_REFUSED
     )
+
+
+# --- The artifact ---------------------------------------------------------
+
+def build_artifact(results, laterals, provenance, radius):
+    """`skewline-span/1`: aggregates, verdicts and counts.
+
+    **No per-row value appears here.** Not a frame index, not a pixel, not a
+    depth, not a Delta-t, not a residual -- and not a minimum, a maximum or an
+    illustrative example either, because an extremum IS a row. The `/2` files
+    this is derived from are per-pixel and stay on the machine that made them;
+    what enters the repository is this and nothing else.
+
+    `spanInterval` is load-bearing rather than decorative: it stops a reader
+    who sees a ratio below 1 from reading it as permission to print `1.42 m
+    +/- 0.03`. The estimand is an upper median of absolute DISAGREEMENT, not a
+    sigma, so there is nothing for a `+/-` to mean against it.
+    """
+    classes = {}
+    for class_index, result in sorted(results.items()):
+        name = CLASS_NAMES[class_index]
+        lateral = laterals.get(class_index)
+        classes[name] = {
+            "axial": {
+                "cells": result["cells"],
+                "targetPixelCollisions": result["targetPixelCollisions"],
+                "unmatchedPartners": result["unmatchedPartners"],
+                "sharedFrameRejected": result["sharedFrameRejected"],
+                "sharedFrameLeaked": result["sharedFrameLeaked"],
+                "outsideSeparationBands": result["outsideSeparationBands"],
+            },
+            "lateral": lateral,
+        }
+    return {
+        "schema": ARTIFACT_SCHEMA,
+        "estimand": ESTIMAND,
+        "units": UNITS,
+        "component": COMPONENT,
+        "outsideDomain": OUTSIDE_DOMAIN,
+        "lateralEstimand": LATERAL_ESTIMAND,
+        "lateralUnits": LATERAL_UNITS,
+        "lateralClearanceFloor": LATERAL_CLEARANCE_FLOOR,
+        "propagationRule": (
+            "Var(r_b - r_a) = Var(r_a) + Var(r_b) - 2*Cov(r_a, r_b); the naive "
+            "rule is Cov = 0, which gives sigma*sqrt(2). This artifact measures "
+            "the third term and does not assume it. Axial only: it is a rule "
+            "for one diagonal element of a point's error covariance and NOT "
+            "for a distance."
+        ),
+        "spanInterval": "refused",
+        "spanIntervalReason": (
+            "the estimand is an upper median of absolute disagreement, not a "
+            "sigma, so no coverage is defined against it; the component is "
+            "axial, so it is not a distance; and no API here takes two points"
+        ),
+        "separationEdges": list(SEPARATION_EDGES),
+        "depthMatchTolerance": DEPTH_MATCH_TOLERANCE,
+        "pairsPerCell": PAIRS_PER_CELL,
+        "minimumCellPairs": MINIMUM_CELL_PAIRS,
+        "seed": SEED,
+        "truncationRadiusPixels": float(radius),
+        "measuredOn": [entry["session"] for entry in provenance],
+        "export": provenance,
+        "classes": classes,
+    }
+
+
+def write_artifact(path, artifact):
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(artifact, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+
+
+def read_artifact(path):
+    with open(path, encoding="utf-8") as handle:
+        artifact = json.load(handle)
+    if artifact.get("schema") != ARTIFACT_SCHEMA:
+        raise ValueError(f"{path}: not a {ARTIFACT_SCHEMA} artifact")
+    return artifact
