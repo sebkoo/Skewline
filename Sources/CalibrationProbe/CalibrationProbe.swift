@@ -26,6 +26,12 @@ struct CalibrationProbe {
         var constants = Calibration.Constants()
         var dumpPath: String?
         var decimation = 64
+        var geometryPath: String?
+        // Registered default. It must exceed the largest separation exported
+        // -- at P <= k two kept pairs share a frame -- and 8 is 0.27 s apart
+        // at 30 fps, a visibly different viewpoint for a hand-held sensor
+        // rather than merely a non-shared frame.
+        var pairStride = 8
         let arguments = Array(CommandLine.arguments.dropFirst())
         var index = 0
         var usageError = false
@@ -62,6 +68,20 @@ struct CalibrationProbe {
                 } else {
                     usageError = true
                 }
+            case "--dump-geometry":
+                index += 1
+                if index < arguments.count {
+                    geometryPath = arguments[index]
+                } else {
+                    usageError = true
+                }
+            case "--pair-stride":
+                index += 1
+                if index < arguments.count, let parsed = Int(arguments[index]), parsed >= 1 {
+                    pairStride = parsed
+                } else {
+                    usageError = true
+                }
             default:
                 paths.append(arguments[index])
             }
@@ -72,11 +92,28 @@ struct CalibrationProbe {
         if dumpPath != nil, paths.count != 1 {
             usageError = true
         }
+        if geometryPath != nil, paths.count != 1 {
+            usageError = true
+        }
+        // Two schemas through one analysis would give two files whose
+        // sampling rules disagree while their headers both claim this run.
+        if dumpPath != nil, geometryPath != nil {
+            usageError = true
+        }
+        // The independence the permuted null rests on: at P <= k two kept
+        // pairs share a frame, so a partner from "a different pair" would
+        // still share a camera, a pose error and a depth map.
+        if geometryPath != nil, let widest = constants.separations.max(), widest >= pairStride {
+            usageError = true
+        }
         guard !paths.isEmpty, !usageError else {
             let usage = "usage: CalibrationProbe [--separations 1,5,15,30] [--pixel-stride N]"
                 + " [--dump-observations <out.csv> [--observation-decimation N]]"
+                + " [--dump-geometry <out.csv> [--pair-stride P]]"
                 + " <capture.skewline> ...\n"
-                + "       --dump-observations requires exactly one container\n"
+                + "       --dump-observations and --dump-geometry each require exactly one\n"
+                + "       container, and cannot be combined\n"
+                + "       --pair-stride must exceed the largest --separations value\n"
             FileHandle.standardError.write(Data(usage.utf8))
             exit(64)
         }
@@ -89,7 +126,10 @@ struct CalibrationProbe {
                 try report(
                     on: URL(filePath: path),
                     constants: constants,
-                    dump: dumpPath.map { (output: URL(filePath: $0), decimation: decimation) }
+                    dump: dumpPath.map { (output: URL(filePath: $0), decimation: decimation) },
+                    geometry: geometryPath.map {
+                        (output: URL(filePath: $0), pairStride: pairStride)
+                    }
                 )
             } catch {
                 FileHandle.standardError.write(Data("error: \(path): \(error)\n".utf8))
@@ -104,15 +144,23 @@ struct CalibrationProbe {
     static func report(
         on url: URL,
         constants: Calibration.Constants,
-        dump: (output: URL, decimation: Int)? = nil
+        dump: (output: URL, decimation: Int)? = nil,
+        geometry: (output: URL, pairStride: Int)? = nil
     ) throws {
         let collector = dump.map { ObservationCollector(decimation: $0.decimation) }
+        let geometryCollector = geometry.map { GeometryCollector(pairStride: $0.pairStride) }
         let clock = ContinuousClock()
         let start = clock.now
+        let sink: ((Calibration.Observation) -> Void)?
+        switch (collector, geometryCollector) {
+        case (let c?, nil): sink = { c.consume($0) }
+        case (nil, let g?): sink = { g.consume($0) }
+        default: sink = nil
+        }
         let report = try Calibration.analyze(
             reader: try SessionContainer.Reader(contentsOf: url),
             constants: constants,
-            observationSink: collector.map { c in { c.consume($0) } }
+            observationSink: sink
         )
         let elapsed = start.duration(to: clock.now)
 
@@ -144,6 +192,14 @@ struct CalibrationProbe {
             try writeObservations(
                 collector,
                 to: dump.output,
+                sessionID: report.sessionID,
+                constants: constants
+            )
+        }
+        if let geometry, let geometryCollector {
+            try writeGeometry(
+                geometryCollector,
+                to: geometry.output,
                 sessionID: report.sessionID,
                 constants: constants
             )
@@ -344,6 +400,106 @@ struct CalibrationProbe {
                     + "\(observation.confidenceClass),\(observation.depth),\(observation.residual)"
             )
         }
+    }
+
+    /// The span analysis's seam, probe-side. Same shape as the collector
+    /// above and a different retention rule: whole frame pairs rather than
+    /// every Nth survivor, because separation is a within-pair quantity.
+    ///
+    /// The intrinsics table is filled from the observations this collector
+    /// actually keeps, so the header is a projection of the rows beneath it
+    /// rather than a second path that could disagree with them.
+    final class GeometryCollector {
+        var sampler: Calibration.PairStrideSampler
+        var rows: [String] = []
+        var intrinsics: [Int: ScaledIntrinsics] = [:]
+
+        var pairStride: Int { sampler.stride }
+        var survivors: [Calibration.ObservationBucket: Int] { sampler.survivors }
+
+        init(pairStride: Int) {
+            self.sampler = Calibration.PairStrideSampler(stride: pairStride)
+        }
+
+        func consume(_ observation: Calibration.Observation) {
+            guard sampler.keep(observation) else { return }
+            intrinsics[observation.sourceFrame] = observation.sourceIntrinsics
+            rows.append(
+                "\(observation.separation),\(observation.deltaT),"
+                    + "\(observation.confidenceClass),\(observation.depth),"
+                    + "\(observation.residual),"
+                    + "\(observation.sourceFrame),\(observation.targetFrame),"
+                    + "\(observation.sourceX),\(observation.sourceY),"
+                    + "\(observation.targetX),\(observation.targetY),"
+                    + "\(observation.roundTripX),\(observation.roundTripY)"
+            )
+        }
+    }
+
+    static let geometryColumns = "k,delta_t,class,depth,delta,src_frame,tgt_frame"
+        + ",src_x,src_y,tgt_x,tgt_y,rt_dx,rt_dy"
+
+    /// The `/2` file. Everything the `/1` header carries, in the same order,
+    /// then the pair-level sampling provenance, then one `# intrinsics` line
+    /// per exported source frame.
+    ///
+    /// **This file is not shippable.** Its rows carry a frame index and a
+    /// pixel, so grouped by frame they are a subsampled depth image of
+    /// whatever the sensor was pointed at. It stays beside the container it
+    /// came from; only aggregates ever enter the repository, and the drift
+    /// check refuses a committed one by its schema tag.
+    static func writeGeometry(
+        _ collector: GeometryCollector,
+        to output: URL,
+        sessionID: UUID,
+        constants: Calibration.Constants
+    ) throws {
+        var lines: [String] = [
+            "# skewline-observations/2",
+            "# session \(sessionID.uuidString)",
+            "# separations \(constants.separations.map(String.init).joined(separator: ","))",
+            "# nominal-frame-interval \(constants.nominalFrameInterval)",
+            "# delta-t-tolerance \(constants.deltaTTolerance)",
+            "# band-edges \(constants.bandEdges.map { "\($0)" }.joined(separator: ","))",
+            "# edge-mask-relative-threshold \(constants.edgeMaskRelativeThreshold)",
+            "# forward-backward-radius \(constants.forwardBackwardRadius)",
+            "# minimum-ordering-samples \(constants.minimumOrderingSamples)",
+            "# ordering-margin \(constants.orderingMargin)",
+            "# pixel-stride \(constants.pixelStride)",
+            // Present and 1 so no reader has to branch on its absence: this
+            // file drops no survivor of a pair it kept.
+            "# decimation 1",
+            "# sampling pair-stride",
+            "# pair-stride \(collector.pairStride)",
+            "# pairs-seen \(collector.sampler.pairsSeen)",
+            "# pairs-kept \(collector.sampler.pairsKept)",
+        ]
+        for bucket in collector.survivors.keys.sorted() {
+            lines.append(
+                "# survivors k=\(bucket.separation) class=\(bucket.confidenceClass)"
+                    + " band=\(bucket.band) \(collector.survivors[bucket]!)"
+            )
+        }
+        for frame in collector.intrinsics.keys.sorted() {
+            let scaled = collector.intrinsics[frame]!
+            lines.append(
+                "# intrinsics \(frame) \(scaled.focalLengthX) \(scaled.focalLengthY)"
+                    + " \(scaled.principalPointX) \(scaled.principalPointY)"
+            )
+        }
+        lines.append("# columns \(geometryColumns)")
+        lines.append(contentsOf: collector.rows)
+        lines.append("")
+        try lines.joined(separator: "\n").write(to: output, atomically: true, encoding: .utf8)
+
+        print("  --- geometry (deterministic) ---")
+        print(row("pair stride", "\(collector.pairStride)"))
+        print(row("pairs", "\(collector.sampler.pairsKept) kept of \(collector.sampler.pairsSeen)"))
+        print(row("survivors", "\(collector.survivors.values.reduce(0, +))"))
+        print(row("rows kept", "\(collector.rows.count)"))
+        print(row("frames", "\(collector.intrinsics.count)"))
+        print(row("wrote", output.path))
+        print(row("privacy", "per-pixel rows -- keep local, never commit"))
     }
 
     /// One container, one file: `#` provenance header -- schema tag, session,

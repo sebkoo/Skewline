@@ -2762,3 +2762,59 @@ not.
   both iOS builds, drift green.
 - **Not measured yet.** The registered value of `P`, the row counts and the
   file sizes it implies, and every span number. Nothing has been exported.
+
+## 2026-08-14 · v0.10 commit 4 — the geometry export, behind its own flag
+
+**Built and gated, and the plumbing was run end to end on one container.**
+`--dump-geometry <out.csv> [--pair-stride P]` writes
+`skewline-observations/2`: the `/1` header verbatim and in the same order,
+then the pair-level sampling provenance, then one `# intrinsics` line per
+exported source frame, then thirteen-column rows whose **first five are the
+`/1` five, unchanged and in the same order**, so a reader that takes five
+positionally still reads them.
+
+- **Opt-in, and that is the privacy gate rather than an ergonomic choice.** A
+  `/1` row is five scalars with no address. A `/2` row carries a frame index
+  and a pixel, so grouped by frame the file is a subsampled depth image of
+  whatever the sensor was pointed at. Widening the *default* export would have
+  made every future dump reconstructable by accident; a separate flag means the
+  reconstructable file only exists when somebody typed the word. The probe
+  prints `privacy  per-pixel rows -- keep local, never commit` beside the path.
+- **Three usage guards, all verified to exit 64.** One container per
+  invocation, as `/1` already required, because one header binds one session.
+  The two dump flags cannot be combined — two schemas through one analysis
+  would produce two files whose sampling rules disagree while both headers
+  claim the same run. And `--pair-stride` must **exceed** the largest
+  separation: at `P <= k` two kept pairs share a frame, and the permuted null
+  would then be measuring the sharing it exists to exclude. `--separations 1,5
+  --pair-stride 5` is refused for that reason and not for being small.
+- **`# decimation 1` ships even though this file decimates nothing.** Present
+  and truthful rather than absent, so no reader has to branch on a missing key
+  to learn that a `/2` file drops no survivor of a pair it kept.
+- **The intrinsics table is a projection of the rows, and the smoke run proved
+  it had to be per-frame.** Entries are written only for observations the
+  sampler kept, so the header cannot describe a frame the file does not
+  contain. The run's three exported frames reported three *different* focal
+  lengths — ARKit updates intrinsics within a session — so a single header
+  value would have been quietly wrong for two of the three, and the
+  camera-space separation computed from it wrong with it.
+- **One trap did not fire, and that is worth saying too.** Every row of the
+  smoke container had `tgt_frame - src_frame == k`, because every frame in it
+  was eligible. `k` still counts eligible frames rather than session frames, so
+  the equality is a property of that container and not of the format; the test
+  asserts the ordering of the two indices and never their difference, which is
+  why it stays correct on a container with an ineligible frame in the middle.
+- **The smoke run, in v0.6's shape: plumbing only, deleted, no number kept.**
+  One container at a deliberately coarse stride, to prove the probe writes and
+  the header parses. Its row counts, survivor counts and runtime are **not**
+  the registered export's and none is recorded — reading a span statistic
+  before the thresholds are registered is precisely the contamination this
+  rung's ordering exists to prevent. The file was removed; nothing derived from
+  it enters the repository.
+- **The gate did not grow.** Five commands, unchanged: Swift 201, Python 76,
+  both iOS builds, drift green.
+- **Not measured yet.** Every span number, both thresholds, and the export's
+  size at the registered stride. The `/2` rows are much wider than `/1`'s and
+  the registered stride keeps whole pairs rather than every 64th survivor, so
+  the file will be substantially larger; whether it is *unwieldy* is not
+  measured, and `P` is the lever if it turns out to be.
