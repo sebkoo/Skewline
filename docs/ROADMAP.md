@@ -553,8 +553,23 @@ is a rule for one diagonal element of a point's error and not for a distance,
 and ticking gate 1 off whole would be the overclaim this entry exists to
 prevent. The seam now carries the frame pair, the source pixel, the matched
 target pixel and the round-trip displacement the filter chain used to discard.
-**The correlation still has not been measured**, and that clause stands here
-until a number replaces it.
+**The cancellation has now been measured, and the entry still refuses.** Four
+containers were exported and analysed, per confidence class and per separation
+band: the ratio of the same-frame-pair disagreement to a depth-matched,
+frame-disjoint null runs from 0.077–0.187 in the closest band to 0.609–1.001 in
+the widest, rising monotonically in all twelve class-and-container series. The
+errors do cancel, strongly while two points are close and less so as they part.
+One cell of eighty-four sits just above 1 and its verdict moves with the
+registered seed, so that cell is unsettled rather than a finding. The reading is
+**axial only** in the sense the paragraph above means it: a ratio that small
+describes one diagonal element of a point's error and never a distance. And it
+is not `Cov(r_a, r_b)`, which was never estimated — what was measured is a ratio
+of upper medians against a matched permutation null, the third term's *effect*
+on that statistic rather than its value, and `Fit/span.py`'s registered estimand
+says so in its own words: "not a correlation coefficient and not an interval".
+Nothing here produces a number that can be substituted into the rule above, so
+the rule still cannot be evaluated. What replaced the clause measures the
+effect; it is not a coefficient for the formula.
 
 A third gate was never named, and opening the first two is what made it
 visible: the estimand is an upper median of absolute *disagreement*, not a σ,

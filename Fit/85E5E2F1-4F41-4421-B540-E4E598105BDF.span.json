@@ -1,0 +1,285 @@
+{
+  "classes": {
+    "high": {
+      "axial": {
+        "cells": [
+          {
+            "high": 0.02,
+            "low": 0.0,
+            "nullPairs": 6486,
+            "pairs": 6649,
+            "permuted": 0.0076172356,
+            "ratio": 0.17698520444871096,
+            "sameFramePair": 0.0013481379999999996
+          },
+          {
+            "high": 0.05,
+            "low": 0.02,
+            "nullPairs": 26520,
+            "pairs": 27358,
+            "permuted": 0.007424712199999999,
+            "ratio": 0.28479676289674916,
+            "sameFramePair": 0.0021145340000000004
+          },
+          {
+            "high": 0.1,
+            "low": 0.05,
+            "nullPairs": 68018,
+            "pairs": 70473,
+            "permuted": 0.0072207451,
+            "ratio": 0.4112956570091361,
+            "sameFramePair": 0.0029698611000000003
+          },
+          {
+            "high": 0.2,
+            "low": 0.1,
+            "nullPairs": 174141,
+            "pairs": 181130,
+            "permuted": 0.0070455075,
+            "ratio": 0.5324016048524538,
+            "sameFramePair": 0.0037510395
+          },
+          {
+            "high": 0.4,
+            "low": 0.2,
+            "nullPairs": 375464,
+            "pairs": 394651,
+            "permuted": 0.0068017241999999995,
+            "ratio": 0.6316315501295982,
+            "sameFramePair": 0.0042961836000000005
+          },
+          {
+            "high": 0.8,
+            "low": 0.4,
+            "nullPairs": 665985,
+            "pairs": 703315,
+            "permuted": 0.00679361838,
+            "ratio": 0.7247714288008036,
+            "sameFramePair": 0.0049238205
+          },
+          {
+            "high": 1.6,
+            "low": 0.8,
+            "nullPairs": 555469,
+            "pairs": 594965,
+            "permuted": 0.007412075999999999,
+            "ratio": 0.8371584338180019,
+            "sameFramePair": 0.0062050819355
+          }
+        ],
+        "outsideSeparationBands": 181247,
+        "sharedFrameLeaked": 0,
+        "sharedFrameRejected": 120232,
+        "targetPixelCollisions": 3,
+        "unmatchedPartners": 0
+      },
+      "lateral": {
+        "atBound": 5.759081124510931e-05,
+        "class": "high",
+        "clearance": 0.6058816664911204,
+        "medianPixels": 0.39411833350887954,
+        "samples": 2483035,
+        "truncationRadiusPixels": 1.0
+      }
+    },
+    "low": {
+      "axial": {
+        "cells": [
+          {
+            "high": 0.02,
+            "low": 0.0,
+            "nullPairs": 38017,
+            "pairs": 39050,
+            "permuted": 0.05608427496,
+            "ratio": 0.07729733518159755,
+            "sameFramePair": 0.0043351649999999985
+          },
+          {
+            "high": 0.05,
+            "low": 0.02,
+            "nullPairs": 85800,
+            "pairs": 88143,
+            "permuted": 0.065650939,
+            "ratio": 0.14544958755273865,
+            "sameFramePair": 0.009548902000000005
+          },
+          {
+            "high": 0.1,
+            "low": 0.05,
+            "nullPairs": 115069,
+            "pairs": 118537,
+            "permuted": 0.07594417999999999,
+            "ratio": 0.2531449059032569,
+            "sameFramePair": 0.0192248823
+          },
+          {
+            "high": 0.2,
+            "low": 0.1,
+            "nullPairs": 170147,
+            "pairs": 175467,
+            "permuted": 0.08586036999999999,
+            "ratio": 0.37907446706786846,
+            "sameFramePair": 0.032547474
+          },
+          {
+            "high": 0.4,
+            "low": 0.2,
+            "nullPairs": 242179,
+            "pairs": 251122,
+            "permuted": 0.097791195,
+            "ratio": 0.6020281989600393,
+            "sameFramePair": 0.058873057000000006
+          },
+          {
+            "high": 0.8,
+            "low": 0.4,
+            "nullPairs": 335726,
+            "pairs": 350399,
+            "permuted": 0.105555774,
+            "ratio": 0.7804387849024724,
+            "sameFramePair": 0.08237981999999999
+          },
+          {
+            "high": 1.6,
+            "low": 0.8,
+            "nullPairs": 415322,
+            "pairs": 432756,
+            "permuted": 0.134034157,
+            "ratio": 0.859715743950253,
+            "sameFramePair": 0.115231275
+          }
+        ],
+        "outsideSeparationBands": 419672,
+        "sharedFrameLeaked": 0,
+        "sharedFrameRejected": 69023,
+        "targetPixelCollisions": 42,
+        "unmatchedPartners": 0
+      },
+      "lateral": {
+        "atBound": 0.011186165068184357,
+        "class": "low",
+        "clearance": 0.5923893323694205,
+        "medianPixels": 0.40761066763057957,
+        "samples": 519034,
+        "truncationRadiusPixels": 1.0
+      }
+    },
+    "medium": {
+      "axial": {
+        "cells": [
+          {
+            "high": 0.02,
+            "low": 0.0,
+            "nullPairs": 29316,
+            "pairs": 30242,
+            "permuted": 0.018179596,
+            "ratio": 0.17714905765782696,
+            "sameFramePair": 0.0032204983
+          },
+          {
+            "high": 0.05,
+            "low": 0.02,
+            "nullPairs": 67833,
+            "pairs": 70479,
+            "permuted": 0.020701825,
+            "ratio": 0.3071239854457276,
+            "sameFramePair": 0.0063580270000000005
+          },
+          {
+            "high": 0.1,
+            "low": 0.05,
+            "nullPairs": 107179,
+            "pairs": 111595,
+            "permuted": 0.022164523499999998,
+            "ratio": 0.46536457235365347,
+            "sameFramePair": 0.010314584000000002
+          },
+          {
+            "high": 0.2,
+            "low": 0.1,
+            "nullPairs": 176902,
+            "pairs": 184603,
+            "permuted": 0.0241483459,
+            "ratio": 0.6218560377669594,
+            "sameFramePair": 0.0150167947
+          },
+          {
+            "high": 0.4,
+            "low": 0.2,
+            "nullPairs": 287759,
+            "pairs": 299847,
+            "permuted": 0.024610698,
+            "ratio": 0.8164708493842799,
+            "sameFramePair": 0.0200939175
+          },
+          {
+            "high": 0.8,
+            "low": 0.4,
+            "nullPairs": 430346,
+            "pairs": 448130,
+            "permuted": 0.026470065,
+            "ratio": 0.9306306803553372,
+            "sameFramePair": 0.0246338546
+          },
+          {
+            "high": 1.6,
+            "low": 0.8,
+            "nullPairs": 562506,
+            "pairs": 584487,
+            "permuted": 0.030452788,
+            "ratio": 0.9875262455444144,
+            "sameFramePair": 0.030072927399999998
+          }
+        ],
+        "outsideSeparationBands": 412851,
+        "sharedFrameLeaked": 0,
+        "sharedFrameRejected": 84685,
+        "targetPixelCollisions": 13,
+        "unmatchedPartners": 0
+      },
+      "lateral": {
+        "atBound": 0.0009181398596400562,
+        "class": "medium",
+        "clearance": 0.6067217250006818,
+        "medianPixels": 0.39327827499931817,
+        "samples": 727558,
+        "truncationRadiusPixels": 1.0
+      }
+    }
+  },
+  "component": "axial",
+  "depthMatchTolerance": 0.05,
+  "estimand": "within each lateral separation band, the ratio of the upper median |r_b - r_a| for two same-class source pixels sharing one (source, target) frame pair at k=1 under the registered filter chain, to the upper median of |r_a - r_b'| over those same draws with b replaced by a residual matched on class and fine depth and drawn from a frame pair sharing no frame -- each null draw inheriting the separation band of the same-pair draw it answers, so numerator and denominator share a depth composition by construction; r is the signed axial depth residual in meters -- observed minus predicted planar z along the target camera's optical axis -- the ratio dimensionless, reported per class and separation band and never pooled to one number -- not a 3-D distance error, not accuracy against any known length, not a single-reading sigma, not sigma times root two, not a correlation coefficient and not an interval",
+  "export": [
+    {
+      "decimation": 1,
+      "session": "85E5E2F1-4F41-4421-B540-E4E598105BDF"
+    }
+  ],
+  "lateralClearanceFloor": 0.29289321881345254,
+  "lateralEstimand": "upper median of the forward-backward round-trip displacement of the same pairs, in depth pixels, reported only beside the truncation radius that produced it -- a measurement of the sensor only where the bound is not binding at the statistic, and of the filter otherwise",
+  "lateralUnits": "depth pixels",
+  "measuredOn": [
+    "85E5E2F1-4F41-4421-B540-E4E598105BDF"
+  ],
+  "minimumCellPairs": 2000,
+  "outsideDomain": "refuse",
+  "pairsPerCell": 20000,
+  "propagationRule": "Var(r_b - r_a) = Var(r_a) + Var(r_b) - 2*Cov(r_a, r_b); the naive rule is Cov = 0, which gives sigma*sqrt(2). This artifact measures the third term and does not assume it. Axial only: it is a rule for one diagonal element of a point's error covariance and NOT for a distance.",
+  "schema": "skewline-span/1",
+  "seed": 0,
+  "separationEdges": [
+    0.0,
+    0.02,
+    0.05,
+    0.1,
+    0.2,
+    0.4,
+    0.8,
+    1.6
+  ],
+  "spanInterval": "refused",
+  "spanIntervalReason": "the estimand is an upper median of absolute disagreement, not a sigma, so no coverage is defined against it; the component is axial, so it is not a distance; and no API here takes two points",
+  "truncationRadiusPixels": 1.0,
+  "units": "dimensionless -- a ratio of meters to meters"
+}

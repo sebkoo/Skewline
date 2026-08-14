@@ -3500,3 +3500,167 @@ this rung's argument for stating magnitudes at all is that they be exact.**
   at 121, unchanged — a comment and two sentences of prose, no executable
   line touched. The other four commands are unaffected and were not re-run.
 - **Not measured yet.** Every span number. No container has been exported.
+
+## 2026-08-14 · v0.10 — the span measurement, and the one cell it does not settle
+
+**Run, and recorded before anything closes.** Every entry in this rung so far
+has ended by saying that every span number was unmeasured and that no container
+had been exported. The export and the analysis were both run by hand at the
+shell, and four `skewline-span/1` artifacts enter the repository with this
+entry, one per container and named by session id. What follows is what they
+hold — including the one cell they do not settle, and the figures in this entry
+that nothing in the tree can check.
+
+- **The shape the amendment predicted is the shape that arrived.** `:3050-3051`
+  wrote, before any container was exported, that under the per-cell null
+  "cancellation is a ratio **below 1 inside a band**, and cancellation degrading
+  with distance is that ratio **rising toward 1 as the bands widen**." Across
+  all twelve container-and-class series the ratio is monotone increasing over
+  all seven separation bands, without exception — 84 cells, twelve series, no
+  inversion anywhere. That is a description of what the numbers do and it is
+  offered as nothing more: no p-value, no test, no interval. This module refuses
+  those, and a monotone sequence is a description rather than a null rejected.
+- **Cancellation is strong at short separations and weakens as the points
+  part.** Band by band, the extremes across the twelve series: `[0.00,0.02)`
+  0.077–0.187, `[0.02,0.05)` 0.128–0.326, `[0.05,0.10)` 0.171–0.465,
+  `[0.10,0.20)` 0.213–0.622, `[0.20,0.40)` 0.308–0.816, `[0.40,0.80)`
+  0.484–0.931, `[0.80,1.60)` 0.609–1.001. The cells themselves are in the four
+  artifacts and are not repeated here. All of it is **axial**: `r` is planar z
+  along the target camera's optical axis, so a ratio of 0.077 describes one
+  diagonal element of a point's error and not a distance.
+- **The unanimity verdict this entry owns, and it is not unanimous.** Commit 13
+  (`:3407-3411`) left it here on purpose — the verdict is a cross-file
+  comparison the artifact schema has no axis to hold, so "the only place it is
+  ever written down is whichever commit runs a real export". Against
+  `ratio < 0.90`, `CANCELS_WITH_MARGIN` in every container, unanimity holds in
+  18 of the 21 class-and-band cells and fails in three, all at the widest
+  separations: `medium` `[0.40,0.80)`, `medium` `[0.80,1.60)` and `high`
+  `[0.80,1.60)`. Across the 84 cells the census is 77 `CANCELS_WITH_MARGIN`, 6
+  `CANCELS_WITHOUT_MARGIN`, one `ANTI_CORRELATED`, and no `INSUFFICIENT_PAIRS`
+  at all. The registered criterion answered; it did not answer yes everywhere,
+  and the three cells where it did not are named rather than averaged away.
+- **The one cell above 1 is a verdict the data does not settle, not an
+  anti-correlation finding.** M1 `931A8965`, `medium`, `[0.80,1.60)`, ratio
+  1.000625 — the only cell of 84 above one. At the three registered seeds that
+  same cell reads 1.000625, 0.996067 and 1.001085, straddling the boundary the
+  verdict turns on. Its distance to that boundary is 0.000625; the seed range is
+  0.005018, eight times larger. Across all 84 cells and both registered
+  boundaries — 0.90 and 1.00 — it is the only cell whose seed range contains
+  one. The artifact is not wrong and `cell_verdict` is not unstable: at
+  `SEED = 0` the ratio is above one and the verdict is deterministic. What moves
+  is the verdict across the seeds, and a verdict the seed decides is not a
+  reading. `:3052-3053` calls anti-correlation "worse than the naive rule rather
+  than the same as no effect", which is exactly why this cell is reported as
+  unsettled instead: a finding that severe cannot rest on a coin.
+- **The registered sharpness condition did not catch it. The seed-stability
+  diagnostic did.** Sharpness measures the null's own replicate spread against
+  the `0.10` margin, and it cleared all 84 cells — no `SHARPNESS_REFUSED`
+  anywhere. That is the condition doing what commit 11 said it would:
+  `:3272-3274` predicted that "the honest name for what `SHARPNESS_REFUSED` will
+  actually catch is closer to a guard against anomalous seed-to-seed instability
+  than a condition expected to fire on an ordinary well-sampled export", and it
+  did not fire. What caught the straddle is the other diagnostic, the one
+  `span.py:163-171` exists for — "a statistic that moves with the seed is a
+  finding". The two look alike and are not: sharpness asks whether the null's
+  **denominator** is stable across replicates, seed stability asks whether the
+  **verdict** is. Only the second can see a boundary, because only the second
+  knows there is one. A cell can be sharply measured and still be undecided, and
+  this cell is both.
+- **The null held its disjointness.** `sharedFrameLeaked` is 0 in all twelve
+  container-and-class blocks, and `sharedFrameRejected` runs 69,023 to 174,552 —
+  the guard had work to do and never leaked, which is the non-vacuous form
+  `span.py:365-368` demands of it rather than a zero on data where sharing never
+  arose. `unmatchedPartners` is 0 in all twelve: every same-pair draw found a
+  depth-matched partner inside `DEPTH_MATCH_TOLERANCE`. `targetPixelCollisions`
+  runs 0 to 42 across the twelve, rejected rather than measured.
+- **`pairsPerCell: 20000` counts draws per frame pair, not pairs per cell, and
+  the field is not renamed.** `span.py:342` sits inside the
+  `for key in np.unique(keys)` loop, so the cap is per `(source, target)` frame
+  pair and the separation bands are assigned afterwards. The cells actually hold
+  5,003 to 703,315 pairs, none of them below `MINIMUM_CELL_PAIRS = 2,000`. A
+  reader meeting `pairsPerCell: 20000` beside a cell of 703,315 has met two
+  numbers that contradict each other, and the fix is this sentence rather than
+  the schema: `ARTIFACT_SCHEMA` is registered and was pushed at `d9e7207`, and
+  renaming a field after the export so that a reading comes out right is
+  precisely the edit a registration exists to forbid. The name stays; the
+  reading is corrected here, beside the number.
+- **The lateral is a reading of the sensor, not of the filter.** Round-trip
+  medians run 0.3884 to 0.4233 depth pixels against a truncation radius of 1.0,
+  read from each file's own header and never assumed. Clearance runs 0.5767 to
+  0.6116 against the registered `0.50` margin, far above the 0.29289 floor a
+  fully censored population would still show. `atBound` — the share of survivors
+  in the last tenth of the radius — is at most 0.019850. All twelve are
+  `LATERAL_REPORTABLE`: the bound is not binding at the statistic, so what these
+  numbers describe is the sensor.
+- **Export stats, per container, one release run each.** `--separations 1
+  --pair-stride 8`, timing as printed and never averaged:
+
+      M1 931A8965: 32,268,881 survivors, 4,041,636 rows kept, 109 of 865
+        pairs, 109 frames, 371,516,691 bytes, analysis 36.28 s
+      M2 1A68AF96: 29,991,724 survivors, 3,798,210 rows kept, 106 of 846
+        pairs, 106 frames, 349,652,604 bytes, analysis 33.42 s
+      D1 85E5E2F1: 29,827,060 survivors, 3,729,627 rows kept, 108 of 863
+        pairs, 108 frames, 342,893,661 bytes, analysis 42.79 s
+      README 2110CDA9: 31,200,020 survivors, 3,922,010 rows kept, 111 of 882
+        pairs, 111 frames, 361,116,997 bytes, analysis 45.41 s
+
+  One run each, not the two `:1176` reported, so its "X s then Y s" shape is not
+  borrowed. Two containers were first started under a debug build and
+  interrupted before completing; every figure above is from the release run that
+  replaced it, said here rather than left implying four clean first attempts.
+  **No comparison with v0.6's timings is made.** These ran with `--separations
+  1` and wrote about 4M rows to disk that v0.6's runs did not, so the two are
+  quantities with different work inside them. The flags are stated and the
+  comparison is left unmade.
+- **The whole filter cascade reproduced, seventeen commits later.** All four
+  survivor totals above reproduce v0.6's record at `:1177-1182` exactly, and the
+  `[1,2)`-band `k=1` high-class counts reproduce `:1163-1168` exactly. That
+  earlier consistency check was one band of one container; this is the whole
+  cascade producing an identical survivor set, from a release build seventeen
+  commits on. Rows kept differ, as they must: M1's 504,208 at every-Nth 64
+  became 4,041,636 at pair-stride 8, a factor of 8.016.
+- **The privacy argument, as arithmetic.** 37,748 bytes of artifact enter the
+  repository. The four `/2` files they were derived from total 1,425,179,953
+  bytes and stay outside it, beside the containers, where commit 1 put them.
+  Those two numbers next to each other are the confinement rule stated as a
+  ratio rather than as a principle.
+- **What the artifacts hold, what only this entry holds, and what nothing can
+  check.** `build_artifact` writes cells, counters and the lateral summary. It
+  writes no verdict, no seed stability and no sharpness spread — `_print_report`
+  prints those and the run ends. So the unanimity verdict, the sharpness
+  clearance and the three seed ratios above exist in this entry and nowhere else
+  in the tree. Stated plainly rather than left to be discovered: **the seed
+  ratios and the sharpness verdicts are single-sourced from the run that
+  produced them.** The outside review's arithmetic was performed on the CLI's
+  printed report, not on the artifacts, and no second execution exists. Nothing
+  committed here can be used to check them, and the only route to a second
+  opinion is another run against the `/2` files — which stay on one machine by
+  the privacy rule this rung chose. That is a cost of the confinement rather
+  than an oversight, and naming it is cheaper than implying a verification that
+  did not happen. v0.6's reproducibility gap, inherited and widened, exactly as
+  commit 1 said it would be.
+- **One commit for the artifacts, the entry and the ROADMAP clause — and no gate
+  would have caught the alternative.** `:1954-1961` gives the rule: split when
+  each half is independently green, combine when splitting would commit a defect
+  on purpose. Artifacts-plus-entry alone would leave the tree holding four
+  `skewline-span/1` files beside a ROADMAP sentence reading "the correlation
+  still has not been measured, and that clause stands here until a number
+  replaces it" — the number in the tree and the clause false, for the length of
+  one commit. So they land together. The difference worth recording is that
+  there, `readme-drift.swift:157` and `:165` would have gone red on the split;
+  here the check never reads *Deliberately not built* at all, so nothing would
+  have caught it. The same rule, held without the tool that enforced it last
+  time. The customary `docs: move v0.10 into the roadmap's shipped list` stays a
+  separate commit after the README close: the precedent is deferred, not
+  abandoned.
+- **The gate.** All five commands, run on this change: `swift build && swift
+  test` — Swift, unchanged at 201; both `xcodebuild` invocations green;
+  `.venv/bin/python -m unittest discover -s Fit -v` — green at 121;
+  `swift Scripts/readme-drift.swift` — green. Nothing executable changed, so no
+  count moved.
+- **Not measured yet.** The line shrinks rather than disappears. The span
+  numbers are measured, and the export's size at the registered stride — open
+  since `:2908` and still open at `:3196` — is answered above. Still not
+  measured: `span.py`'s own runtime, which was never timed and for which nothing
+  was recorded, and peak memory for either the export or the analysis. v0.8's
+  latency trigger is untouched and stands on its remaining half.
