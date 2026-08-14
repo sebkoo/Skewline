@@ -398,8 +398,23 @@ def _replace_partner(order, depth_sorted, depth_of_b, rng, tolerance):
 # the shape of a distribution near a bound, which is the assumption this module
 # refuses everywhere else, so both are judgments and are labelled as judgments
 # rather than dressed as derivations.
-CANCELLATION_MARGIN = None
-LATERAL_CLEARANCE_MARGIN = None
+#
+# Filled 2026-08-14, before any container was exported. That ordering IS the
+# registration.
+#
+# A ratio must sit below 1 by this much to count as cancellation, so the
+# verdict boundary is ratio < 0.90. Chosen comfortably above the observed
+# fixture noise floor of roughly +/-0.03 -- about three times it -- and that
+# floor is a spread of planted-fixture readings, not a standard error: this
+# module claims no standard error, no p-value and no interval, for the reason
+# its docstring gives.
+CANCELLATION_MARGIN = 0.10
+
+# Above the analytically derived fully censored floor of 1 - 1/sqrt(2) ~= 0.2929
+# that `_registered_clearance` enforces. In pixels, against the registered
+# radius of 1.0: the round-trip median must sit below 0.50, where a fully
+# censored population reads 0.7071.
+LATERAL_CLEARANCE_MARGIN = 0.50
 
 
 def _registered_clearance(value):

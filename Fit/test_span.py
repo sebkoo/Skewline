@@ -167,13 +167,32 @@ class WhatThisAnalysisRefuses(unittest.TestCase):
                 span.read_geometry(path)
         self.assertIn("pair-stride", str(raised.exception))
 
-    def test_no_verdict_before_the_margin_is_registered(self):
-        # The pre-registration, enforced rather than promised: asking for a
-        # verdict while the threshold is None raises instead of answering.
-        self.assertIsNone(span.CANCELLATION_MARGIN)
-        self.assertIsNone(span.LATERAL_CLEARANCE_MARGIN)
+    def test_an_unregistered_threshold_raises_rather_than_answering(self):
+        # Both thresholds are filled now, so this pins the BEHAVIOUR rather
+        # than the state it used to observe: a threshold that is not set
+        # refuses instead of quietly answering. Worth keeping after the fill,
+        # because it is what a future unset value would run into.
         with self.assertRaises(ValueError):
-            span.cell_verdict({"ratio": 0.5})
+            span._registered(None, "CANCELLATION_MARGIN")
+        with self.assertRaises(ValueError):
+            span._registered_clearance(None)
+
+    def test_the_registered_thresholds_are_the_values_that_were_filled(self):
+        self.assertEqual(span.CANCELLATION_MARGIN, 0.10)
+        self.assertEqual(span.LATERAL_CLEARANCE_MARGIN, 0.50)
+        self.assertGreater(
+            span.LATERAL_CLEARANCE_MARGIN, span.LATERAL_CLEARANCE_FLOOR
+        )
+
+    def test_the_cancellation_boundary_is_the_registered_one(self):
+        # ratio < 0.90 cancels with margin; at or above it does not.
+        self.assertEqual(span.cell_verdict({"ratio": 0.89}), span.CANCELS_WITH_MARGIN)
+        self.assertEqual(
+            span.cell_verdict({"ratio": 0.95}), span.CANCELS_WITHOUT_MARGIN
+        )
+        self.assertEqual(span.cell_verdict({"ratio": 1.0}), span.DOES_NOT_CANCEL)
+        self.assertEqual(span.cell_verdict({"ratio": 1.2}), span.ANTI_CORRELATED)
+        self.assertEqual(span.cell_verdict({"ratio": None}), span.INSUFFICIENT_PAIRS)
 
 
 class WhatTheStatisticMeasures(unittest.TestCase):
@@ -396,9 +415,8 @@ class TheLateralIsCensoredByItsOwnFilter(unittest.TestCase):
         self.assertLess(summary["medianPixels"], 0.5 * self.RADIUS)
         self.assertGreater(summary["clearance"], 0.5)
         self.assertLess(summary["atBound"], 0.01)
-        # Above the floor, so the margin is one that could refuse something.
         self.assertEqual(
-            span.lateral_verdict(summary, clearance_margin=0.40),
+            span.lateral_verdict(summary, clearance_margin=span.LATERAL_CLEARANCE_MARGIN),
             span.LATERAL_REPORTABLE,
         )
 
@@ -417,7 +435,7 @@ class TheLateralIsCensoredByItsOwnFilter(unittest.TestCase):
             summary["clearance"], span.LATERAL_CLEARANCE_FLOOR, delta=0.03
         )
         self.assertEqual(
-            span.lateral_verdict(summary, clearance_margin=0.40),
+            span.lateral_verdict(summary, clearance_margin=span.LATERAL_CLEARANCE_MARGIN),
             span.LATERAL_REFUSED,
         )
 
@@ -439,10 +457,23 @@ class TheLateralIsCensoredByItsOwnFilter(unittest.TestCase):
                 self.assertEqual(summary["truncationRadiusPixels"], self.RADIUS)
                 self.assertIsNotNone(summary["atBound"])
 
-    def test_no_lateral_verdict_before_the_clearance_is_registered(self):
-        self.assertIsNone(span.LATERAL_CLEARANCE_MARGIN)
+    def test_an_unregistered_clearance_raises_rather_than_answering(self):
+        # As above: the threshold is filled, so this pins what an unset one
+        # does rather than observing that it is unset.
         with self.assertRaises(ValueError):
-            span.lateral_verdict(self.summary_for(scale=0.05, seed=24))
+            span._registered_clearance(None)
+
+    def test_the_registered_clearance_decides_both_fixtures(self):
+        # The verdicts under the value actually registered, rather than under
+        # an argument passed in for the occasion.
+        self.assertEqual(
+            span.lateral_verdict(self.summary_for(scale=0.05, seed=24)),
+            span.LATERAL_REPORTABLE,
+        )
+        self.assertEqual(
+            span.lateral_verdict(self.summary_for(scale=5.0, seed=26)),
+            span.LATERAL_REFUSED,
+        )
 
 
 class TheSeedIsRegistered(unittest.TestCase):

@@ -3149,3 +3149,49 @@ and the schema checked before any field is believed.
 - **Not measured yet.** Everything the artifact is shaped to hold. No container
   has been exported, all three registered values are open, and
   `Fit/span.json` does not exist.
+
+## 2026-08-14 · v0.10 commit 10 — the pre-registration closes
+
+**The three registered values, chosen and written down before any container
+was exported.** That ordering is the registration. Nothing here is measured;
+these are decisions.
+
+- **`cancellationMargin = 0.10`.** A fixed margin chosen comfortably above the
+  observed fixture noise floor of roughly ±0.03 — about three times it. The
+  verdict boundary is therefore `ratio < 0.90`. The ±0.03 is a spread of
+  planted-fixture readings and nothing more: this module refuses standard
+  errors, p-values and confidence intervals, because observations are
+  correlated across neighbouring pixels and frames and a pair is built from two
+  samples correlated with each other by hypothesis. No interval is to be read
+  off that figure.
+- **`lateralClearanceMargin = 0.50`.** Above the analytically derived fully
+  censored floor of `1 − 1/√2 ≈ 0.2929`, which the code enforces by refusing a
+  smaller constant outright. In pixels, against the registered radius of 1.0:
+  the round-trip median must sit below 0.50, where a fully censored population
+  reads 0.7071.
+- **`P = 8`, unchanged, and this is a decision rather than an edit.** No
+  independent evidence exists to move it. **File size at the registered stride
+  is not measured**: the commit-4 smoke export was deleted and left no figure,
+  so there is nothing to weigh against, and moving the stride on an
+  unmeasured worry would be exactly the unregistered adjustment the ordering
+  forbids. `CalibrationProbe.swift` is not touched by this commit.
+- **All three were filled before the first export command was typed.** A
+  criterion with an open threshold is not registered, and the hole is where the
+  data would otherwise walk in. The gate for the fill is the export, not the
+  commit, and the export has still not run.
+- **A predicted red, and the tests were rewritten rather than deleted.** Two
+  tests asserted that the verdict functions raise while the thresholds were
+  open; with the globals filled they had to fail, and they did. The unfilled
+  behaviour is still worth pinning, so both now pass `None` explicitly into
+  `_registered` and `_registered_clearance` instead of reading the module
+  globals — they pin what an unset threshold *does* rather than observing that
+  one is unset. Shown red against the filled constants by letting an unset
+  value fall back to the global instead of refusing, which is the plausible
+  edit and would have made an unregistered threshold answer quietly. Three
+  further tests arrived with them: the two values are what was registered, the
+  cancellation boundary is `0.90` across all five verdicts, and the registered
+  clearance decides both lateral fixtures.
+- **The gate did not grow.** Five commands, unchanged: Swift 201, Python 107,
+  both iOS builds, drift green.
+- **Not measured yet.** Every span number, and the export's size at the
+  registered stride. No container has been exported.
