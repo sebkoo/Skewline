@@ -3195,3 +3195,94 @@ these are decisions.
   both iOS builds, drift green.
 - **Not measured yet.** Every span number, and the export's size at the
   registered stride. No container has been exported.
+
+## 2026-08-14 · v0.10 commit 11 — refuse a comparison the null cannot sharpen
+
+**The second registered-but-unimplemented sentence this rung has caught
+before export.** Commit 1 registered reading (b) of the sharpness condition
+(`:2614-2623`): the margin is fixed in advance, and the null's own replicate
+spread is checked afterward as a validity condition that "can only add
+refusals and never manufacture an adoption, which is why it is the one
+written down." Nothing computed that spread until now. (The first such gap
+was the null's per-cell depth-matched binning, corrected at commit 7.)
+
+- **Replicate means seed, not container.** `SEED` and `SEED_STABILITY_SEEDS`
+  are this repository's only randomness on a measured path, and re-drawing
+  the seed genuinely re-measures the same population — a replicate. A
+  different container is a different scene, not a replicate of this one, and
+  the four containers already have their own guard: unanimity. Reading
+  "replicate" as container would spend that axis twice and leave
+  `PAIRS_PER_CELL`'s own sampling noise — the thing actually varying between
+  runs of this analysis on one file — unchecked. It would also compare the
+  margin to a quantity it was never sized against: `CANCELLATION_MARGIN`'s
+  own justification (commit 10) sizes `0.10` against a spread of
+  planted-fixture *readings*, the same kind of quantity a seed re-draw
+  produces, not a cross-scene spread.
+- **New plumbing, not composition.** `seed_stability` (`:518`) already
+  existed and returns *ratios* per seed. This adds `sharpness_spread`, which
+  recomputes `cell_ratios` at each registered seed and reads `permuted`
+  instead — the null's denominator, not the ratio — a genuinely new surface
+  rather than something this commit merely wires together.
+- **`None` propagates instead of corrupting a mean.** `cell_ratios` sets
+  `permuted` to `None` below `MINIMUM_CELL_PAIRS`. If any of the three seed
+  replicates for a band is `None`, or the mean of the three is zero,
+  `sharpness_spread` reports `None` for that band rather than computing a
+  spread over a value that was never really there, and `sharpness_verdict`
+  reads a `None` spread as `INSUFFICIENT_PAIRS` — the same vocabulary
+  `cell_verdict` already uses for a thin cell, not a new silence.
+- **The spread's form is a specification, not a derivation, made before any
+  container was exported.** `(max - min) / mean` across the three seeds'
+  `permuted` values — the strictest of the candidates considered, because a
+  stricter sharpness condition can only add refusals, never let one through.
+  Alternatives considered and not chosen: `max/min - 1`, and
+  `(max - min) / median`. The margin is routed through
+  `_registered(margin, "CANCELLATION_MARGIN")` exactly as `cell_verdict`
+  does, so an unset threshold still refuses to answer rather than falling
+  back silently.
+- **The granularity is an amendment, and it is MORE PERMISSIVE than the
+  registered text, not stricter.** DEVLOG `:2621-2622` registers a
+  class-scoped consequence: "the class is refused wherever the ratio fell" —
+  every band of a class refused the moment any one band's sharpness fails.
+  This implements cell (class × band) scope instead: only the failing band
+  is refused, and the rest keep their own verdicts, including
+  `CANCELS_WITH_MARGIN`. The cell-scoped refusal set is a strict subset of
+  the class-scoped one, so this is a correction that lets through some
+  adoptions the registered text would have refused — moving *against* the
+  direction (`:2622-2623`) the registered reading justified itself by, which
+  is why it is written down as an amendment rather than presented as though
+  the class-scoped sentence had simply been carried out. The argument for
+  making it anyway: the null's replicate spread is a property of one cell's
+  own draw count and depth composition, so refusing a well-populated,
+  sharply-measured band because a sparse band elsewhere in the same class
+  wobbled would discard a valid reading for a reason unrelated to it. (That
+  the ratio itself is already "reported per class and separation band and
+  never pooled to one number" (`:110-111`) supports *computing* the
+  condition per cell; it says nothing about the refusal's granularity and is
+  not, by itself, the argument for the narrower scope.)
+- **Measured on fixtures, not assumed.** With `PAIRS_PER_CELL = 20_000` the
+  upper median is pinned tightly, so the guard's practical reach was worth
+  checking before trusting it exists. On a planted fixture with thousands of
+  pairs per band (20 disjoint frame pairs, 4,000 rows each, one fixed seed),
+  the measured spread ran from about 0.004 to 0.015 across the
+  well-populated bands — an order of magnitude below the `0.10` margin, and
+  never close to it. At a moderately populated size (10 pairs, 1,000 rows
+  each) spreads still stayed under 0.04. Near `MINIMUM_CELL_PAIRS`, bands
+  read `None` (thin, not spread-refused) rather than a large spread. On this
+  data the honest name for what `SHARPNESS_REFUSED` will actually catch is
+  closer to a guard against anomalous seed-to-seed instability than a
+  condition expected to fire on an ordinary well-sampled export — the
+  thin-cell case is already caught by `INSUFFICIENT_PAIRS` before this guard
+  is reached. `test_well_populated_cells_clear_the_margin_on_this_fixture`
+  pins the measured magnitude as a regression rather than letting it drift
+  unnoticed.
+- **Tests.** Four: the verdict boundary at the registered margin including
+  its edge; a thin fixture reading `INSUFFICIENT_PAIRS` rather than raising;
+  `sharpness_spread` checked against a hand-computed value built from
+  `cell_ratios`' own `permuted` field at each seed, to keep it visibly
+  distinct from `seed_stability`'s ratio-based diagnostic; and the measured
+  well-populated magnitude above. Python: 107 → 111.
+- **The gate.** `.venv/bin/python -m unittest discover -s Fit -v` is green
+  at 111. The full five-command gate, including both iOS builds, is run
+  once and reported after commit 13, since nothing in commits 11-13 touches
+  anything outside `Fit/`.
+- **Not measured yet.** Every span number. No container has been exported.

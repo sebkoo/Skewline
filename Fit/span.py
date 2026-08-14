@@ -176,6 +176,11 @@ DOES_NOT_CANCEL = "does not cancel"
 ANTI_CORRELATED = "anti-correlated"
 INSUFFICIENT_PAIRS = "insufficient pairs"
 
+# The sharpness condition's two outcomes: a validity gate on the comparison
+# itself, independent of what the ratio read.
+SHARPNESS_CLEARED = "sharp enough to trust"
+SHARPNESS_REFUSED = "refused -- the null's replicate spread was not cleared by the margin"
+
 # The lateral component's two outcomes. "Refused" is not "unavailable":
 # the number exists and is not reported, because what it measures is the
 # filter rather than the sensor.
@@ -524,6 +529,60 @@ def seed_stability(observations, class_index, seeds=SEED_STABILITY_SEEDS):
         str(seed): [cell["ratio"] for cell in cell_ratios(observations, class_index, seed=seed)["cells"]]
         for seed in seeds
     }
+
+
+def sharpness_spread(observations, class_index, seeds=SEED_STABILITY_SEEDS, pairs_per_cell=PAIRS_PER_CELL):
+    """Per band, the null's replicate spread: `(max - min) / mean` of
+    `cell["permuted"]` (:485) across the registered seeds, each seed's
+    `cell_ratios` recomputed fresh.
+
+    Replicate means SEED, not container. `SEED_STABILITY_SEEDS` is this
+    repository's only randomness on a measured path (see the comment above
+    `SEED`), and re-drawing it is a genuine replicate of the same population.
+    A different container is a different population, not a replicate of this
+    one -- and the four containers are already guarded by unanimity, a
+    separate, coarser check; reading "replicate" as container would spend
+    that axis twice and leave `PAIRS_PER_CELL`'s own sampling noise unchecked.
+
+    `None` where any seed's `permuted` was itself `None` (a cell thin enough
+    that `cell_ratios` could not compute it, :475-478) or where the mean is
+    zero -- both cases where a ratio would divide something meaningless.
+    """
+    per_seed = [
+        cell_ratios(observations, class_index, seed=seed, pairs_per_cell=pairs_per_cell)["cells"]
+        for seed in seeds
+    ]
+    spreads = []
+    for band_index in range(len(SEPARATION_EDGES) - 1):
+        values = [cells[band_index]["permuted"] for cells in per_seed]
+        if any(value is None for value in values):
+            spreads.append(None)
+            continue
+        mean = sum(values) / len(values)
+        spreads.append(None if mean == 0 else (max(values) - min(values)) / mean)
+    return spreads
+
+
+def sharpness_verdict(spread, margin=None):
+    """One band's validity gate, reading (b) of DEVLOG's sharpness condition
+    (2026-08-14): the margin is fixed in advance and the null's own replicate
+    spread is checked afterward, never used to choose the margin. Refuses
+    regardless of what `cell_verdict` read on the ratio -- that composition is
+    the caller's job, not this function's.
+
+    Scope: this is a per-band (cell) gate, not the per-class one DEVLOG
+    registers ("the class is refused wherever the ratio fell"). A class-scoped
+    reading would refuse every band of a class the moment any one band's
+    spread failed; this refuses only the failing band, so the set of bands it
+    refuses is a strict SUBSET of what the registered text would refuse -- an
+    amendment that is MORE PERMISSIVE, not stricter, and recorded as such in
+    DEVLOG rather than presented as a plain implementation of the registered
+    sentence.
+    """
+    margin = _registered(CANCELLATION_MARGIN if margin is None else margin, "CANCELLATION_MARGIN")
+    if spread is None:
+        return INSUFFICIENT_PAIRS
+    return SHARPNESS_REFUSED if spread >= margin else SHARPNESS_CLEARED
 
 
 # --- The lateral estimand, and the filter that censors it -----------------

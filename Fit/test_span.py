@@ -503,6 +503,81 @@ class TheSeedIsRegistered(unittest.TestCase):
         self.assertEqual(first, second)
 
 
+class TheSharpnessConditionIsRegistered(unittest.TestCase):
+    """Reading (b), DEVLOG 2026-08-14: the margin is fixed first and the
+    null's own replicate spread is checked afterward as a validity condition,
+    never used to choose the margin. Replicate means SEED here -- the
+    registered seed IS the replicate axis (`SEED_STABILITY_SEEDS`), not the
+    four containers, which are a different population each and already
+    guarded by unanimity."""
+
+    def test_the_verdict_reads_the_registered_margin(self):
+        # Hand-built spreads, the same style as the cancellation boundary's
+        # own test: the arithmetic is what is under test, not a fixture's
+        # capacity to produce a large spread.
+        self.assertEqual(span.sharpness_verdict(0.02), span.SHARPNESS_CLEARED)
+        self.assertEqual(span.sharpness_verdict(0.099), span.SHARPNESS_CLEARED)
+        # At the margin exactly: "not smaller than" refuses the boundary.
+        self.assertEqual(span.sharpness_verdict(0.10), span.SHARPNESS_REFUSED)
+        self.assertEqual(span.sharpness_verdict(0.15), span.SHARPNESS_REFUSED)
+        self.assertEqual(span.sharpness_verdict(None), span.INSUFFICIENT_PAIRS)
+
+    def test_a_thin_cell_reads_insufficient_rather_than_a_spread(self):
+        # Fewer than MINIMUM_CELL_PAIRS survive in most bands here, so
+        # `permuted` is None at one or more of the three seeds and the spread
+        # must not be computed over a list holding None.
+        rng = np.random.default_rng(40)
+        rows = planted_rows(rng, pairs=2, per_pair=60, common=0.02, independent=0.01)
+        with tempfile.TemporaryDirectory() as directory:
+            observations = span.read_geometry(written(rows, directory))
+        spreads = span.sharpness_spread(observations, 2)
+        self.assertTrue(any(spread is None for spread in spreads))
+        for spread in spreads:
+            if spread is None:
+                self.assertEqual(span.sharpness_verdict(spread), span.INSUFFICIENT_PAIRS)
+
+    def test_the_spread_is_computed_from_permuted_not_ratio(self):
+        # Distinct from `seed_stability`, which varies with the RATIO:
+        # this is hand-verified against `cell_ratios`' own `permuted` field,
+        # the null's denominator, at each registered seed.
+        rng = np.random.default_rng(41)
+        rows = planted_rows(rng, pairs=10, per_pair=1000, common=0.02, independent=0.01)
+        with tempfile.TemporaryDirectory() as directory:
+            observations = span.read_geometry(written(rows, directory))
+        spreads = span.sharpness_spread(observations, 2)
+        per_seed = [
+            span.cell_ratios(observations, 2, seed=seed)["cells"]
+            for seed in span.SEED_STABILITY_SEEDS
+        ]
+        for band_index, spread in enumerate(spreads):
+            values = [cells[band_index]["permuted"] for cells in per_seed]
+            with self.subTest(band=band_index):
+                if any(value is None for value in values):
+                    self.assertIsNone(spread)
+                else:
+                    mean = sum(values) / len(values)
+                    expected = None if mean == 0 else (max(values) - min(values)) / mean
+                    self.assertEqual(spread, expected)
+
+    def test_well_populated_cells_clear_the_margin_on_this_fixture(self):
+        # Measured, not assumed: with PAIRS_PER_CELL = 20_000 the upper
+        # median is pinned tightly, so on data with no pathology the spread
+        # stays a small fraction of CANCELLATION_MARGIN. Recorded in DEVLOG
+        # alongside this commit -- observed spreads ran roughly 0.003-0.04
+        # against a fixed seed at thousands of pairs per band, an order of
+        # magnitude below the 0.10 margin. This pins that finding as a
+        # regression rather than letting it silently drift.
+        rng = np.random.default_rng(103)
+        rows = planted_rows(rng, pairs=20, per_pair=4000, common=0.02, independent=0.01)
+        with tempfile.TemporaryDirectory() as directory:
+            observations = span.read_geometry(written(rows, directory))
+        spreads = span.sharpness_spread(observations, 2)
+        measured = [spread for spread in spreads if spread is not None]
+        self.assertTrue(measured)
+        for spread in measured:
+            self.assertLess(spread, 0.5 * span.CANCELLATION_MARGIN)
+
+
 class TheArtifact(unittest.TestCase):
     def built(self, seed=30):
         rng = np.random.default_rng(seed)
