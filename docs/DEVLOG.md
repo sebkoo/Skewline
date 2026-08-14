@@ -3286,3 +3286,55 @@ was the null's per-cell depth-matched binning, corrected at commit 7.)
   once and reported after commit 13, since nothing in commits 11-13 touches
   anything outside `Fit/`.
 - **Not measured yet.** Every span number. No container has been exported.
+
+## 2026-08-14 · v0.10 commit 12 — refuse a session with no disjoint pair
+
+**The third registered-but-unimplemented sentence this rung has caught
+before export.** The module docstring requires the null's partner come "from
+a frame pair sharing no frame" (`:25-28`). A file with no such pair anywhere
+has an undefined estimand — not a thin cell, the case `INSUFFICIENT_PAIRS`
+already covers correctly. Commit 7's own words for it: a session that never
+revisits a distance "has no null and no answer."
+
+- **The rule, kept linear.** `has_disjoint_pair` uses `_pair_key` for
+  identity rather than a quadratic pairwise scan (a long session has
+  thousands of frame pairs). Two frame pairs are disjoint iff they share no
+  frame, and a family of two-element sets that pairwise intersect is always
+  either a star (one frame common to every pair) or a triangle (exactly
+  three distinct pairs spanning exactly three frames — the only simple graph
+  on three vertices with three edges). So: no disjoint pair exists iff fewer
+  than two distinct pairs, or one frame is common to all of them, or there
+  are exactly three distinct pairs over exactly three frames. Linear in the
+  number of distinct pairs.
+- **Placed in `cell_ratios`, not `read_geometry` — a placement correction
+  found while writing the tests.** The plan called for a file-level check
+  right after `read_geometry`'s existing three checks. Putting it there
+  broke six passing tests: `TheLateralIsCensoredByItsOwnFilter`'s fixtures
+  use one frame pair throughout, because the lateral estimand needs no
+  partner pair at all, and `test_the_null_rejects_a_partner_that_merely_
+  shares_one_frame` deliberately builds a file with only two frame pairs
+  that share a frame, to exercise `permuted_samples`' own shared-frame
+  rejection — a function the module docstring already marks as kept
+  specifically for that refusal test, not the statistic's own path. Gating
+  `read_geometry` would have made that file unreadable by anything,
+  including the test built to read it. The check now lives at the top of
+  `cell_ratios`, the null's own entry point, so `read_geometry` and
+  `lateral_summary` are untouched and `permuted_samples` keeps a file it was
+  built to exercise. This still satisfies "before any per-class work" — it
+  is the first thing `cell_ratios` does, before `same_pair_samples` runs.
+- **File-level, not class-level — write the gap down.** `has_disjoint_pair`
+  ignores `class_index` entirely. `same_pair_samples` still selects by
+  class, so a file that clears this check can still hold one class whose
+  own rows all come from a single frame pair. Per-cell `INSUFFICIENT_PAIRS`
+  remains the only guard at that finer granularity; this check does not
+  widen to cover it.
+- **`P` is not leaned on.** `P = 8` at `k = 1` makes kept pairs disjoint in
+  practice, but the guard checks the actual condition rather than trusting
+  another constant to make it true.
+- **Tests.** Three: a star (four pairs sharing frame 0) and a triangle
+  ({0,1}, {1,2}, {0,2}) both refuse with a message naming "no frame" and not
+  "insufficient"; two pairs sharing no frame at all proceeds through
+  `cell_ratios` without raising. Python: 111 → 114.
+- **The gate.** `.venv/bin/python -m unittest discover -s Fit -v` is green
+  at 114. Full gate reported after commit 13, as before.
+- **Not measured yet.** Every span number. No container has been exported.

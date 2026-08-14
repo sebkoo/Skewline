@@ -167,6 +167,46 @@ class WhatThisAnalysisRefuses(unittest.TestCase):
                 span.read_geometry(path)
         self.assertIn("pair-stride", str(raised.exception))
 
+    def one_row(self, source, target):
+        return (1, 0.0333, 2, 1.0, 0.001, source, target, 10, 10, 10, 10, 0.0, 0.0)
+
+    def test_a_star_of_frame_pairs_is_refused(self):
+        # Every pair shares frame 0, so no null partner sharing no frame with
+        # any same-pair draw can ever be drawn: the estimand is undefined, not
+        # merely thin. `read_geometry` still succeeds -- `lateral_summary`
+        # needs no partner pair at all -- but `cell_ratios`, the null's own
+        # entry point, refuses before any per-class sampling runs.
+        rows = [self.one_row(0, 1), self.one_row(0, 2), self.one_row(0, 3), self.one_row(0, 4)]
+        with tempfile.TemporaryDirectory() as directory:
+            observations = span.read_geometry(written(rows, directory))
+        self.assertFalse(span.has_disjoint_pair(observations))
+        with self.assertRaises(ValueError) as raised:
+            span.cell_ratios(observations, 2)
+        self.assertIn("no frame", str(raised.exception))
+        self.assertNotIn("insufficient", str(raised.exception).lower())
+
+    def test_a_triangle_of_frame_pairs_is_refused(self):
+        # Exactly three distinct pairs over exactly three frames -- the one
+        # other shape a pairwise-intersecting family of two-element sets can
+        # take besides a star. {0,1}, {1,2}, {0,2}: every two share a frame,
+        # but no single frame is common to all three.
+        rows = [self.one_row(0, 1), self.one_row(1, 2), self.one_row(0, 2)]
+        with tempfile.TemporaryDirectory() as directory:
+            observations = span.read_geometry(written(rows, directory))
+        self.assertFalse(span.has_disjoint_pair(observations))
+        with self.assertRaises(ValueError) as raised:
+            span.cell_ratios(observations, 2)
+        self.assertIn("no frame", str(raised.exception))
+
+    def test_a_file_with_one_disjoint_pair_proceeds(self):
+        # The mirror: two pairs sharing no frame at all is enough, and must
+        # not be refused -- by the predicate or by `cell_ratios`.
+        rows = [self.one_row(0, 1), self.one_row(10, 11)]
+        with tempfile.TemporaryDirectory() as directory:
+            observations = span.read_geometry(written(rows, directory))
+        self.assertTrue(span.has_disjoint_pair(observations))
+        span.cell_ratios(observations, 2)  # must not raise
+
     def test_an_unregistered_threshold_raises_rather_than_answering(self):
         # Both thresholds are filled now, so this pins the BEHAVIOUR rather
         # than the state it used to observe: a threshold that is not set

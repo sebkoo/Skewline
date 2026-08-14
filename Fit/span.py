@@ -249,6 +249,47 @@ def _pair_key(observations):
     return observations["src_frame"].astype(np.int64) * (1 << 32) + observations["tgt_frame"]
 
 
+def has_disjoint_pair(observations):
+    """Whether at least two distinct (source, target) frame pairs anywhere in
+    this file share no frame -- across the whole file, not one class:
+    `same_pair_samples` below still selects by class, so a file that passes
+    this can still hold one class whose rows come from a single frame pair.
+    Per-cell `INSUFFICIENT_PAIRS` remains the only guard at that finer
+    granularity.
+
+    This is a precondition of the null (`cell_ratios` refuses on it, below),
+    not of every read: `lateral_summary` needs no partner pair at all, and
+    `permuted_samples` is kept expressly to exercise the shared-frame
+    rejection on a file this would refuse -- so it lives here as its own
+    function rather than inside `read_geometry`, which every reader shares.
+
+    Linear in the number of distinct pairs, using `_pair_key` above for
+    identity rather than a quadratic pairwise scan (a long session has
+    thousands). A family of pairwise-INTERSECTING two-element sets is always
+    either a star (one frame common to every pair) or a triangle (exactly
+    three distinct pairs spanning exactly three frames -- the only simple
+    graph on three vertices with three edges). So: no disjoint pair exists
+    iff fewer than two distinct pairs, or a frame is common to all of them, or
+    there are exactly three distinct pairs over exactly three frames.
+    Anything else contains a disjoint pair.
+    """
+    selected = observations["k"] == SEPARATION_K
+    keys = _pair_key(observations)[selected]
+    if keys.size == 0:
+        return False
+    source = observations["src_frame"][selected]
+    target = observations["tgt_frame"][selected]
+    _, first = np.unique(keys, return_index=True)
+    pairs = [{int(source[i]), int(target[i])} for i in first]
+    if len(pairs) < 2:
+        return False
+    if set.intersection(*pairs):
+        return False
+    if len(pairs) == 3 and len(set.union(*pairs)) == 3:
+        return False
+    return True
+
+
 def same_pair_samples(observations, class_index, rng, pairs_per_cell=PAIRS_PER_CELL):
     """Draws pairs of surviving pixels from within one frame pair.
 
@@ -464,6 +505,13 @@ def cell_ratios(observations, class_index, seed=SEED, pairs_per_cell=PAIRS_PER_C
     predicted. Keeping each null draw beside the same-pair draw it answers
     makes the two share a depth composition by construction.
     """
+    if not has_disjoint_pair(observations):
+        raise ValueError(
+            "every (source, target) frame pair in this file shares a frame "
+            "with every other -- the null requires a partner drawn from a "
+            "frame pair sharing no frame, and this file has none; a session "
+            "that never revisits a distance has no null and no answer"
+        )
     rng = np.random.default_rng(seed)
     drawn, collisions, unmatched, shared_rejected, shared_leaked = same_pair_samples(
         observations, class_index, rng, pairs_per_cell=pairs_per_cell
