@@ -77,10 +77,10 @@ diagnostic in synchronous code.
 
 ## The report
 
-After a change, three things in plain prose, under 120 words: what was built and
-any decision satisfied differently than the obvious reading; the exact output of
-the gate; and anything in the instructions that was wrong, ambiguous or guessed
-at. **The third one matters more than the other two.**
+After a change, three things in plain prose, under 120 words of prose: what was
+built and any decision satisfied differently than the obvious reading; the exact
+output of the gate; and anything in the instructions that was wrong, ambiguous
+or guessed at. **The third one matters more than the other two.**
 
 Every rung report states, as its own line and before the five gate commands:
 
@@ -90,3 +90,8 @@ The five commands say what a machine checked. This line says what a person did,
 and `none` is a legitimate value — it is what "built and not done" looks like in
 the report rather than only in the log. A rung whose report omits this line has
 not been reported.
+
+The cap counts prose. Pasted gate output and this line's list sit outside it: a
+rule whose cost rises with the number of checks named would price honesty, and
+this line is names rather than argument. If it stops being names, the cap
+applies again.
