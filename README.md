@@ -183,6 +183,15 @@ since asking "how wrong is a reading at this depth" would send the asker's own
 depths to whoever runs the service. The Swift client evaluates the model
 itself, and that client exists.
 
+**No observation export is committed**, and that sentence is checked rather
+than promised. The files the fit and the span analysis read are derived from
+home captures: the newer of the two carries a frame index and a pixel per row,
+so grouped by frame it is a subsampled depth image of a room. They stay on the
+machine that made them, and only aggregates — the fitted model, and the span
+artifact beside it — ever enter this repository. The drift check walks the tree
+and fails on any file whose first line is an observation schema tag, so
+committing one is a red gate rather than a matter of remembering.
+
 The same service also renders a page describing the model, and that page is
 the first consumer here that does not read the artifact for itself: a browser
 cannot import the fit, so one that parsed the schema would be a third

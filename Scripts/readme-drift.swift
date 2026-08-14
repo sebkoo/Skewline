@@ -67,12 +67,59 @@ func firstPath(withExtension ext: String) -> String? {
     return nil
 }
 
+/// The first path under the repository whose **first line** begins with the
+/// given prefix, ignoring build products and version control.
+///
+/// First line and not "contains", deliberately. An export *begins* with its
+/// schema tag; a source file that merely mentions the tag -- `Fit/fit.py`
+/// declares it as a constant, `Fit/test_fit.py` embeds a whole fixture that
+/// starts with it several lines in -- does not. That distinction is the whole
+/// check: it catches the artifact and never the code that reads it.
+func firstPath(withFirstLine prefix: String) -> String? {
+    let enumerator = FileManager.default.enumerator(
+        at: root,
+        includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey]
+    )
+    while let url = enumerator?.nextObject() as? URL {
+        let relative = url.path.dropFirst(root.path.count + 1)
+        let components = relative.split(separator: "/")
+        if components.first == ".git" || components.contains(".build") || components.contains("DerivedData") || components.contains(".venv") {
+            enumerator?.skipDescendants()
+            continue
+        }
+        guard
+            let values = try? url.resourceValues(forKeys: [.isRegularFileKey]),
+            values.isRegularFile == true,
+            let handle = try? FileHandle(forReadingFrom: url)
+        else { continue }
+        defer { try? handle.close() }
+        // One short read per file: a schema tag is the first thing in the
+        // file or it is not there at all, so nothing needs the whole export
+        // in memory to be refused.
+        let head = (try? handle.read(upToCount: 256)) ?? Data()
+        guard let text = String(data: head, encoding: .utf8) else { continue }
+        let firstLine = text.split(separator: "\n", omittingEmptySubsequences: false).first ?? ""
+        if firstLine.hasPrefix(prefix) {
+            return String(relative)
+        }
+    }
+    return nil
+}
+
 let negativeClaims: [(claim: String, contradiction: () -> String?)] = [
     ("No app", {
         firstPath(withExtension: "xcodeproj").map { "an app project exists at \($0)" }
     }),
     ("no rendering", {
         firstPath(withExtension: "metal").map { "a Metal source exists at \($0)" }
+    }),
+    // The privacy line, made mechanical. Observation exports derive from home
+    // captures and never enter the tree; a `/2` file additionally carries a
+    // frame index and a pixel per row, which is a subsampled depth image of a
+    // room. Both schemas are refused, because the rule predates the second.
+    ("No observation export is committed", {
+        firstPath(withFirstLine: "# skewline-observations/")
+            .map { "an observation export is committed at \($0)" }
     }),
 ]
 for entry in negativeClaims where readme.contains(entry.claim) {

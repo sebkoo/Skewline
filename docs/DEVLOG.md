@@ -2818,3 +2818,48 @@ positionally still reads them.
   the registered stride keeps whole pairs rather than every 64th survivor, so
   the file will be substantially larger; whether it is *unwieldy* is not
   measured, and `P` is the lever if it turns out to be.
+
+## 2026-08-14 · v0.10 commit 5 — the privacy line, made mechanical
+
+**Built and gated, and the guard was shown red four ways before being
+trusted.** v0.9 wrote that its span refusal was documentary — "there is no
+equivalent here: `Estimate` hands out a `Double`" — and said so plainly rather
+than implying a guard that did not exist. This commit is the case where the
+equivalent *is* available, so declining it would have been a choice.
+
+- **What was holding the line until now was location and habit.** Observation
+  exports live outside the repository and CLAUDE.md says stage named paths,
+  never `-A`. That was tolerable while a mis-staged row was five anonymous
+  scalars. It is not tolerable for a row carrying a frame index and a pixel,
+  which grouped by frame is a subsampled depth image of a room — so the
+  widening pays for the guard rather than inheriting the old one.
+- **It is a README claim backed by a tree walk, which is Assertion 1's existing
+  shape.** "No observation export is committed" now appears in the README, and
+  the drift check fails while that sentence is present and any file under the
+  root begins with an observation schema tag. Writing it as a claim rather than
+  an unconditional scan is what makes it a *public promise* that is checked,
+  which is worth more than a private rule that is enforced.
+- **First line, not "contains", and that distinction is the whole check.** An
+  export *begins* with its tag; source that merely mentions the tag does not.
+  `Fit/fit.py` declares it as a constant and `Fit/test_fit.py` embeds a whole
+  fixture whose first line is `# skewline-observations/1` — several lines into
+  the file. A "contains" check would go red on the harness that reads the
+  format, which is the one file that must be allowed to name it. One 256-byte
+  read per file, because a tag is at the top or it is nowhere.
+- **Both schemas are refused, because the rule predates the second one.** A
+  `/1` export was never committable either; only nobody had written it down as
+  something a machine could check.
+- **Shown red on the tree, not on a unit fixture.** A planted `/2` file at the
+  root failed the gate and exited 1; a planted `/1` file at `Fit/nested/`
+  failed it too, so the walk is not depth-one; removing each restored green.
+  And the clean tree passing is itself the fourth check — it proves the two
+  Python files that contain the tag are not being flagged, which is the failure
+  mode a careless implementation would have shipped.
+- **The `.gitignore` lines are advisory and are labelled as such.** `git add -f`
+  beats them; they exist so the common case never reaches the gate, not so
+  anyone relies on them. The comment says which of the two is the guard.
+- **The gate did not grow.** Five commands, unchanged: Swift 201, Python 76,
+  both iOS builds, drift green. The drift check gained an assertion rather than
+  the gate gaining a command.
+- **Not measured yet.** Unchanged: every span number, both thresholds, and the
+  export's size at the registered stride.

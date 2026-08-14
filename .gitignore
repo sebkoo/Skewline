@@ -29,5 +29,13 @@ __pycache__/
 # Never commit
 PRIVATE-*.md
 
+# Observation exports. These derive from home captures and stay beside them;
+# a /2 file carries a frame index and a pixel per row, which grouped by frame
+# is a subsampled depth image of a room. This is advisory only -- `git add -f`
+# beats it -- and the guard that actually holds is in Scripts/readme-drift.swift,
+# which fails on any file whose first line is an observation schema tag.
+*observations*.csv
+*geometry*.csv
+
 # Transient artifact staging (outside reviewer)
 .tmp-*/
