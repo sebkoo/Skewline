@@ -102,6 +102,19 @@ the same tap can be re-derived on a Mac:
 once, on a device against a laptop, and the two agreed to the digit. A reading
 nobody can check would be the second job arriving in disguise.
 
+![Two typeset panels, the phone and the Mac: the phone's live reading at
+frame 1296 — depth 1.27 m, class 2, disagreeing by about 4 mm — beside
+SightProbe's offline run against the same frame and pixel, the same depth
+and class, disagreeing by 0.004096 m.](docs/media/the-pair.png)
+
+*A typeset figure, not a screenshot — no pixel of either screen is in it.
+Both blocks are verbatim from the run recorded in `docs/DEVLOG.md`.
+0.004096 m is not the phone's own number copied over: the high class is
+refused a fitted form, so 1.27 m falls to its banded table and lands in
+`[1.0, 2.0)`, whose median is 0.004096031 m — already committed in
+`Fit/model.json`. Two readers, one artifact, and nothing in this tree
+regenerates the figure itself: it was typeset by hand from that same run.*
+
 ```sh
 swift build && swift test
 ```
