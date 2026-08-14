@@ -16,6 +16,7 @@
       "Bash(git add --all:*)",
       "Bash(git add .:*)",
       "Bash(git commit --amend:*)",
+      "Bash(git push:*)",
       "Bash(git push --force:*)",
       "Bash(git reset --hard:*)",
       "Read(./PRIVATE-*.md)"
