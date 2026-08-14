@@ -28,7 +28,21 @@ import numpy as np
 # --- Registered constants -------------------------------------------------
 
 SCHEMA_TAG = "skewline-observations/1"
+GEOMETRY_SCHEMA_TAG = "skewline-observations/2"
 ARTIFACT_SCHEMA = "skewline-fit/1"
+
+# The two export shapes, by name and in file order. /2 appends to /1 and never
+# reorders it: the first five columns mean the same thing in both, so the fit
+# below reads a /2 file without knowing what the extra ones are for, and the
+# artifact fitted from /1 files stays reproducible from them.
+COLUMNS_V1 = ("k", "delta_t", "class", "depth", "delta")
+COLUMNS_V2 = COLUMNS_V1 + (
+    "src_frame", "tgt_frame", "src_x", "src_y", "tgt_x", "tgt_y", "rt_dx", "rt_dy",
+)
+SCHEMA_COLUMNS = {SCHEMA_TAG: COLUMNS_V1, GEOMETRY_SCHEMA_TAG: COLUMNS_V2}
+INTEGER_COLUMNS = frozenset(
+    {"k", "class", "src_frame", "tgt_frame", "src_x", "src_y", "tgt_x", "tgt_y"}
+)
 
 ESTIMAND = (
     "upper median |delta| of same-class cross-frame reprojection at k=1 "
@@ -279,41 +293,66 @@ def diagnostic_bins(depth, abs_delta):
 # --- The observation files --------------------------------------------------
 
 def read_observations(path):
-    """One CalibrationProbe export: the `#` provenance header, then bare
-    `k,delta_t,class,depth,delta` rows. The schema tag is checked before
-    anything is believed."""
+    """One CalibrationProbe export, of either schema: the `#` provenance
+    header, then bare rows. The tag is checked before anything is believed,
+    and the tag alone decides how many columns there must be.
+
+    Both `/1` and `/2` are read here rather than in two readers. The columns
+    the fit uses are the first five of either, so a second reader would be a
+    second copy of the same positional agreement -- the drift `serve.py` and
+    `view.py` already refused to create.
+    """
     header = []
     with open(path, encoding="utf-8") as handle:
         for line in handle:
             if not line.startswith("#"):
                 break
             header.append(line[1:].strip())
-    if not header or header[0] != SCHEMA_TAG:
-        raise ValueError(f"{path}: not a {SCHEMA_TAG} file")
+    tag = header[0] if header else ""
+    columns = SCHEMA_COLUMNS.get(tag)
+    if columns is None:
+        known = " or ".join(sorted(SCHEMA_COLUMNS))
+        raise ValueError(f"{path}: not a {known} file")
     metadata = {}
     survivors = {}
+    intrinsics = {}
     for line in header[1:]:
         key, _, value = line.partition(" ")
         if key == "survivors":
             bucket, _, count = value.rpartition(" ")
             survivors[bucket] = int(count)
+        elif key == "intrinsics":
+            frame, fx, fy, cx, cy = value.split()
+            intrinsics[int(frame)] = (float(fx), float(fy), float(cx), float(cy))
         else:
             metadata[key] = value
+    # The `# columns` line has been written since v0.6 and never read. A
+    # writer that silently reordered its columns would otherwise be a green
+    # suite and wrong numbers everywhere, because every consumer below is
+    # positional.
+    declared = metadata.get("columns")
+    if declared is not None and tuple(declared.split(",")) != columns:
+        raise ValueError(
+            f"{path}: header declares columns {declared}, expected {','.join(columns)}"
+        )
     data = np.loadtxt(path, delimiter=",", comments="#", ndmin=2)
     if data.size == 0:
-        data = np.empty((0, 5))
-    if data.shape[1] != 5:
-        raise ValueError(f"{path}: expected 5 columns, found {data.shape[1]}")
-    return {
+        data = np.empty((0, len(columns)))
+    if data.shape[1] != len(columns):
+        raise ValueError(
+            f"{path}: {tag} expects {len(columns)} columns, found {data.shape[1]}"
+        )
+    observations = {
         "session": metadata.get("session", ""),
+        "schema": tag,
         "metadata": metadata,
         "survivors": survivors,
-        "k": data[:, 0].astype(int),
-        "delta_t": data[:, 1],
-        "class": data[:, 2].astype(int),
-        "depth": data[:, 3],
-        "delta": data[:, 4],
+        "intrinsics": intrinsics,
     }
+    for index, name in enumerate(columns):
+        column = data[:, index]
+        observations[name] = column.astype(int) if name in INTEGER_COLUMNS else column
+    return observations
 
 
 def load_class_containers(paths):

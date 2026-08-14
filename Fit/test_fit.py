@@ -225,6 +225,32 @@ OBSERVATION_FIXTURE = """\
 """
 
 
+# The same four rows as above, in the widened schema: identical first five
+# columns, eight geometry columns appended. The fit must read this file to
+# exactly the same numbers, which is what "the first five are frozen" means.
+GEOMETRY_FIXTURE = """\
+# skewline-observations/2
+# session 2110CDA9-TEST
+# separations 1,5
+# nominal-frame-interval 0.03333333333333333
+# band-edges 0.5,1.0,2.0,3.0,5.0
+# decimation 1
+# sampling pair-stride
+# pair-stride 8
+# pairs-seen 100
+# pairs-kept 13
+# survivors k=1 class=0 band=0 167224
+# survivors k=1 class=2 band=1 54321
+# intrinsics 36 190.41724 190.41724 128.07576 95.83778
+# intrinsics 44 178.35194 178.35194 128.48602 95.59109
+# columns k,delta_t,class,depth,delta,src_frame,tgt_frame,src_x,src_y,tgt_x,tgt_y,rt_dx,rt_dy
+1,0.0333,2,1.25,0.004,36,37,10,20,10,20,0.01,0.02
+1,0.0333,0,0.75,-0.02,36,37,11,20,11,20,-0.03,0.01
+5,0.1666,2,1.25,0.009,44,49,12,21,12,21,0.02,-0.02
+1,0.0334,2,1.5,-0.003,44,45,13,21,13,21,0.00,0.00
+"""
+
+
 class ObservationFiles(unittest.TestCase):
     def write_fixture(self, directory, text=OBSERVATION_FIXTURE):
         path = os.path.join(directory, "observations.csv")
@@ -266,6 +292,68 @@ class ObservationFiles(unittest.TestCase):
         np.testing.assert_allclose(containers[0][0][2], [0.02])
         self.assertEqual(containers[1][0][1].size, 0)
         self.assertEqual(provenance, [{"session": "2110CDA9-TEST", "decimation": 64}])
+
+    def test_the_widened_schema_reads_to_the_same_first_five_columns(self):
+        # The freeze, stated as an equality rather than as a comment: /2 is
+        # /1 with columns appended, so the fit's own inputs are untouched by
+        # the widening and `Fit/model.json` stays reproducible from the files
+        # it was fitted from.
+        with tempfile.TemporaryDirectory() as directory:
+            narrow = fit.read_observations(self.write_fixture(directory))
+            wide = fit.read_observations(
+                self.write_fixture(directory, text=GEOMETRY_FIXTURE)
+            )
+        self.assertEqual(narrow["schema"], fit.SCHEMA_TAG)
+        self.assertEqual(wide["schema"], fit.GEOMETRY_SCHEMA_TAG)
+        for name in fit.COLUMNS_V1:
+            with self.subTest(column=name):
+                np.testing.assert_allclose(wide[name], narrow[name])
+
+    def test_the_widened_schema_carries_geometry_and_intrinsics(self):
+        with tempfile.TemporaryDirectory() as directory:
+            wide = fit.read_observations(
+                self.write_fixture(directory, text=GEOMETRY_FIXTURE)
+            )
+        np.testing.assert_array_equal(wide["src_frame"], [36, 36, 44, 44])
+        np.testing.assert_array_equal(wide["tgt_frame"], [37, 37, 49, 45])
+        np.testing.assert_array_equal(wide["src_x"], [10, 11, 12, 13])
+        np.testing.assert_allclose(wide["rt_dx"], [0.01, -0.03, 0.02, 0.0])
+        self.assertEqual(
+            wide["intrinsics"][36], (190.41724, 190.41724, 128.07576, 95.83778)
+        )
+        self.assertEqual(sorted(wide["intrinsics"]), [36, 44])
+        # k counts eligible frames, so the gap is not the separation. The row
+        # with k=5 spans frames 44 to 49 here; a reader that assumed
+        # tgt - src == k would be wrong on any container with a gap.
+        self.assertEqual(int(wide["tgt_frame"][3] - wide["src_frame"][3]), 1)
+        self.assertEqual(int(wide["k"][2]), 5)
+
+    def test_a_tag_that_disagrees_with_its_column_count_is_rejected(self):
+        # The /2 tag on /1 rows: the tag alone decides the width, so this
+        # cannot be read as a narrow file that happens to be tagged wrongly.
+        text = GEOMETRY_FIXTURE.replace(
+            "# columns k,delta_t,class,depth,delta,"
+            "src_frame,tgt_frame,src_x,src_y,tgt_x,tgt_y,rt_dx,rt_dy",
+            "# columns k,delta_t,class,depth,delta",
+        )
+        text = "\n".join(
+            line for line in text.splitlines() if not line[:1].isdigit()
+        ) + "\n1,0.0333,2,1.25,0.004\n"
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(ValueError):
+                fit.read_observations(self.write_fixture(directory, text=text))
+
+    def test_a_reordered_columns_header_is_rejected(self):
+        # Written since v0.6 and never read until now. Every consumer is
+        # positional, so a writer that swapped two columns would be a green
+        # suite and wrong numbers everywhere.
+        text = OBSERVATION_FIXTURE.replace(
+            "# columns k,delta_t,class,depth,delta",
+            "# columns k,delta_t,class,delta,depth",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(ValueError):
+                fit.read_observations(self.write_fixture(directory, text=text))
 
 
 class TheRefuser(unittest.TestCase):

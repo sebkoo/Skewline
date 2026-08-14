@@ -2863,3 +2863,46 @@ equivalent *is* available, so declining it would have been a choice.
   the gate gaining a command.
 - **Not measured yet.** Unchanged: every span number, both thresholds, and the
   export's size at the registered stride.
+
+## 2026-08-14 · v0.10 commit 6 — one reader, two schemas
+
+**Built and gated; the fit's own inputs are provably untouched.** `fit.py`
+raised on a `/2` file — loudly, so there was no correctness emergency, only an
+ergonomics one. It now reads either schema, and the tag alone decides the
+width.
+
+- **One reader and not two, for the reason `serve.py` and `view.py` already
+  settled.** The columns the fit uses are the first five of either schema, so a
+  second reader would be a second copy of the same positional agreement, and
+  two copies of a positional agreement is exactly how one of them drifts. A
+  tag→columns map replaces the hard-coded five; the returned dictionary is
+  keyed by column **name**, so `load_class_containers` and everything
+  downstream is untouched.
+- **The freeze is asserted as an equality rather than described in a comment.**
+  A test reads the same four rows in both schemas and requires every one of the
+  five shared columns to compare equal. That is what "`/2` appends and never
+  reorders" means operationally, and it is why `Fit/model.json` stays
+  reproducible from the `/1` files it was fitted from.
+- **The `# columns` line has been written since v0.6 and read by nobody until
+  now.** Every consumer below it is positional, so a writer that quietly
+  swapped two columns would have been a green suite and wrong numbers
+  everywhere — the worst failure shape available here. The header is now
+  checked against the registered order for its tag.
+- **Shown red by swapping `depth` and `delta` in the registered constant.**
+  Four tests errored and one failed, and the one that *failed* is the
+  interesting one: `test_a_reordered_columns_header_is_rejected` stopped
+  raising, because with the constant swapped the deliberately-bad header
+  matched. That is the check working in both directions — it compares the file
+  against the registration, so corrupting either side is caught.
+- **Two small correctness fixes rode along.** The empty-file case built a
+  five-wide array regardless of schema and now uses the tag's own width; and a
+  `/2` tag on `/1` rows is refused rather than read as a narrow file that
+  happens to be mislabelled, because the tag is what decides.
+- **The `k`-counts-eligible trap is now pinned in Python too.** The `/2`
+  fixture contains a k=5 row whose frame indices differ by 1, so a reader that
+  assumed `tgt_frame - src_frame == k` goes red on the fixture rather than on
+  somebody's container.
+- **The gate did not grow.** Five commands, unchanged: Swift 201, Python 80,
+  both iOS builds, drift green.
+- **Not measured yet.** Unchanged: every span number, both thresholds, the
+  export's size at the registered stride.
