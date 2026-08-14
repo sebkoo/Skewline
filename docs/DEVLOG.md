@@ -3430,3 +3430,45 @@ line is deferred to the v0.10 closing doc commits.
   `swift Scripts/readme-drift.swift` — green.
 - **Not measured yet.** Every span number, and the export's size at the
   registered stride. No container has been exported.
+
+## 2026-08-14 · v0.10 commit 14 — analyze all span containers before writing
+
+**Independent review of commits 11-13 found one correctness bug and one
+documentation error in `_analyze_container`/`main`, both fixed here, plus
+one optimization taken while the same code was open.**
+
+- **A mid-run refusal was leaving a partial artifact set on disk.** `main`
+  wrote each container's artifact inside the same loop that analyzed it, so
+  four containers with the third refusing left two artifacts written and
+  exit `1` — and unanimity is read across all four files, so a partial set
+  is precisely the state that invites a wrong reading of it. Every container
+  is now analyzed first, in one loop, and only if all of them succeed does a
+  second loop write any artifact.
+- **`_analyze_container`'s own docstring cited the wrong functions for two
+  of its five refusals.** It said the disjoint-pair check lives in
+  `read_geometry`; it lives in `cell_ratios` (`has_disjoint_pair`'s own
+  docstring already said so correctly, one function away). It said the
+  missing-intrinsics-row check is inside `cell_ratios`; it is inside
+  `camera_xy`, reached through `same_pair_samples`. Both corrected, and the
+  "before any artifact is written" claim is now true across the whole run,
+  not only per container, since the ordering fix above makes it so.
+- **`cell_ratios` was called seven times per class where three suffice.**
+  `results` called it once at `SEED`, `sharpness_spread` recomputed it at
+  each of the three registered seeds, and `seed_stability` recomputed the
+  SAME three seeds again — `SEED == SEED_STABILITY_SEEDS[0]`, so `results`
+  duplicated one of the other two's calls exactly. `_cell_ratios_per_seed`
+  now computes the three registered seeds once per class; `seed_stability`
+  and `sharpness_spread` are thin wrappers over it for any caller that wants
+  just one diagnostic, and `_analyze_container` reads `results`, `sharpness`
+  and `stability` from the one shared computation. Deterministic before and
+  after, so this is a performance change with no output difference — every
+  test that pinned a specific numeric result still passed unchanged.
+- **Not a fabricated measurement, but worth naming: no benchmark exists for
+  the speedup.** The reviewer estimated roughly 2.3x the necessary work
+  before this commit; that arithmetic is theirs, not a measured wall-clock
+  figure, and none is claimed here.
+- **The gate.** `.venv/bin/python -m unittest discover -s Fit -v` is green
+  at 121, output unchanged from commit 13's run. The other four commands are
+  unaffected — nothing outside `Fit/span.py` and `Fit/test_span.py` changed
+  — and were not re-run.
+- **Not measured yet.** Every span number. No container has been exported.

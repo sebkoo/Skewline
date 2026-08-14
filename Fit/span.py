@@ -570,21 +570,51 @@ def cell_verdict(cell, margin=None):
     return DOES_NOT_CANCEL
 
 
+def _cell_ratios_per_seed(observations, class_index, seeds=SEED_STABILITY_SEEDS, pairs_per_cell=PAIRS_PER_CELL):
+    """`cell_ratios` at each of `seeds`, keyed by seed. The one place that
+    call actually happens for the registered seeds -- `seed_stability`,
+    `sharpness_spread` and `_analyze_container` all read from this rather
+    than each recomputing it, since `SEED == SEED_STABILITY_SEEDS[0]` makes a
+    caller's own `cell_ratios(observations, class_index)` (seed `SEED`) and
+    this dict's `[SEED]` entry the same deterministic call twice over."""
+    return {
+        seed: cell_ratios(observations, class_index, seed=seed, pairs_per_cell=pairs_per_cell)
+        for seed in seeds
+    }
+
+
+def _spread_from_cells_per_seed(cells_per_seed):
+    """Per band, `(max - min) / mean` of `cell["permuted"]` (:485) across the
+    given seeds' cells, in the shape `_cell_ratios_per_seed` produces. `None`
+    where any seed's `permuted` was itself `None` (a cell thin enough that
+    `cell_ratios` could not compute it, :475-478) or where the mean is zero
+    -- both cases where a ratio would divide something meaningless."""
+    spreads = []
+    for band_index in range(len(SEPARATION_EDGES) - 1):
+        values = [cells[band_index]["permuted"] for cells in cells_per_seed]
+        if any(value is None for value in values):
+            spreads.append(None)
+            continue
+        mean = sum(values) / len(values)
+        spreads.append(None if mean == 0 else (max(values) - min(values)) / mean)
+    return spreads
+
+
 def seed_stability(observations, class_index, seeds=SEED_STABILITY_SEEDS):
     """The ratio at each registered seed. Randomness entered a measured path
     for the first time in this repository here, so a statistic that moves with
     the seed is a finding and is printed beside the result rather than
     discovered later."""
+    per_seed = _cell_ratios_per_seed(observations, class_index, seeds=seeds)
     return {
-        str(seed): [cell["ratio"] for cell in cell_ratios(observations, class_index, seed=seed)["cells"]]
+        str(seed): [cell["ratio"] for cell in per_seed[seed]["cells"]]
         for seed in seeds
     }
 
 
 def sharpness_spread(observations, class_index, seeds=SEED_STABILITY_SEEDS, pairs_per_cell=PAIRS_PER_CELL):
-    """Per band, the null's replicate spread: `(max - min) / mean` of
-    `cell["permuted"]` (:485) across the registered seeds, each seed's
-    `cell_ratios` recomputed fresh.
+    """Per band, the null's replicate spread across the registered seeds --
+    see `_spread_from_cells_per_seed` for the arithmetic.
 
     Replicate means SEED, not container. `SEED_STABILITY_SEEDS` is this
     repository's only randomness on a measured path (see the comment above
@@ -593,24 +623,9 @@ def sharpness_spread(observations, class_index, seeds=SEED_STABILITY_SEEDS, pair
     one -- and the four containers are already guarded by unanimity, a
     separate, coarser check; reading "replicate" as container would spend
     that axis twice and leave `PAIRS_PER_CELL`'s own sampling noise unchecked.
-
-    `None` where any seed's `permuted` was itself `None` (a cell thin enough
-    that `cell_ratios` could not compute it, :475-478) or where the mean is
-    zero -- both cases where a ratio would divide something meaningless.
     """
-    per_seed = [
-        cell_ratios(observations, class_index, seed=seed, pairs_per_cell=pairs_per_cell)["cells"]
-        for seed in seeds
-    ]
-    spreads = []
-    for band_index in range(len(SEPARATION_EDGES) - 1):
-        values = [cells[band_index]["permuted"] for cells in per_seed]
-        if any(value is None for value in values):
-            spreads.append(None)
-            continue
-        mean = sum(values) / len(values)
-        spreads.append(None if mean == 0 else (max(values) - min(values)) / mean)
-    return spreads
+    per_seed = _cell_ratios_per_seed(observations, class_index, seeds=seeds, pairs_per_cell=pairs_per_cell)
+    return _spread_from_cells_per_seed([per_seed[seed]["cells"] for seed in seeds])
 
 
 def sharpness_verdict(spread, margin=None):
@@ -808,19 +823,35 @@ def _analyze_container(path):
     """Everything this CLI knows about one `/2` file: its own artifact
     inputs, plus the diagnostics (sharpness, seed stability) the printed
     report needs beside them. Raises on any of the file-level refusals --
-    the schema, sampling, intrinsics-header and disjoint-pair checks in
-    `read_geometry`, the missing-intrinsics-row check inside `cell_ratios`,
-    and the missing-radius check above -- all before any artifact is
-    written."""
+    the schema, sampling and intrinsics-header checks in `read_geometry`,
+    the disjoint-pair check inside `cell_ratios` (`has_disjoint_pair`,
+    :262), the missing-intrinsics-ROW check inside `camera_xy` (reached
+    through `same_pair_samples`), and the missing-radius check above.
+    `cell_ratios` is where any of these still-unraised checks first fire --
+    it runs before `sharpness_spread`/`seed_stability` need their own seeds
+    -- so nothing here writes an artifact before this function returns.
+
+    Calls `_cell_ratios_per_seed` once per class rather than three times: a
+    caller-visible `cell_ratios(observations, class_index)` (seed `SEED`),
+    `sharpness_spread`'s three seeds and `seed_stability`'s three seeds are
+    the SAME three calls, since `SEED == SEED_STABILITY_SEEDS[0]`. Reading
+    `results` off `per_seed[SEED]` rather than calling `cell_ratios` again is
+    exact, not an approximation -- the call is deterministic."""
     observations = read_geometry(path)
     radius = _forward_backward_radius(observations, path)
     provenance = _provenance_entry(observations)
     results, laterals, sharpness, stability = {}, {}, {}, {}
     for class_index in range(len(CLASS_NAMES)):
-        results[class_index] = cell_ratios(observations, class_index)
+        per_seed = _cell_ratios_per_seed(observations, class_index)
+        results[class_index] = per_seed[SEED]
         laterals[class_index] = lateral_summary(observations, class_index, radius)
-        sharpness[class_index] = sharpness_spread(observations, class_index)
-        stability[class_index] = seed_stability(observations, class_index)
+        sharpness[class_index] = _spread_from_cells_per_seed(
+            [per_seed[seed]["cells"] for seed in SEED_STABILITY_SEEDS]
+        )
+        stability[class_index] = {
+            str(seed): [cell["ratio"] for cell in per_seed[seed]["cells"]]
+            for seed in SEED_STABILITY_SEEDS
+        }
     return {
         "path": path,
         "provenance": provenance,
@@ -912,16 +943,21 @@ def main(argv):
         print(USAGE)
         return 64
 
+    # Every container is analyzed before any artifact is written. Writing
+    # inside this loop would leave a partial artifact set on disk if a later
+    # container refuses -- exactly the state that invites a wrong reading,
+    # since unanimity is read across all of them.
     containers = []
     for path in paths:
         try:
-            container = _analyze_container(path)
+            containers.append(_analyze_container(path))
         except ValueError as problem:
             print(f"span.py: {problem}", file=sys.stderr)
             return 1
+
+    for container in containers:
         out_path = _write_container_artifact(output_dir, container)
         print(f"wrote {out_path}")
-        containers.append(container)
 
     _print_report(containers)
     return 0
