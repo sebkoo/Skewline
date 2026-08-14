@@ -75,7 +75,7 @@ change, that is a signal the boundary was drawn wrong, and it belongs in
 
 ## What has shipped
 
-Twenty-nine steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
+Thirty-five steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
 including the ones that were mistakes.
 
 1. **Types.** A pose, a 6×6 covariance beside it, and the tracker's own opinion
@@ -348,44 +348,132 @@ including the ones that were mistakes.
     at the default width by eye, not by a test. Fifteen more tests; Swift
     unchanged, because the only Swift edit is a comment.
 
+30. **The sighted point, and the span it refuses.** `Sight`, the seventh
+    module: one depth sample and the sensor's own 0/1/2 class become what the
+    model says about that point, and the join lives where `swift test` can
+    reach it rather than in a screen. `Sighting` nests `Estimate` instead of
+    flattening five outcomes into one, because the two silences a sensor makes
+    happen before the model is consulted and the two the model makes are its
+    own — four different reasons to have no number. Depth is checked before
+    class, since a pixel with no return has no reading for a class to describe.
+    `DepthMapGrid` does the half of a tap that can be wrong quietly: half-open
+    on both axes and truncating, the convention the depth domain and the bands
+    already use, with a clamp that makes the rule true of the *result* and not
+    only of the input. The span is refused and the refusal is documentary —
+    turning two per-point disagreements into an interval on their separation
+    needs a propagation rule never derived here and a correlation between two
+    points' errors that no export this repository produces could measure.
+    `SightProbe` is this rung with the phone taken out.
+31. **The interface the operator names.** A phone cannot reach a loopback
+    socket on a laptop, so `Fit/serve.py` gained `--host`, in the same
+    hand-rolled loop `--port` lives in and with the same shape: the safe value
+    is what an operator gets for saying nothing, and reaching the network costs
+    an explicit act that warns on every run. v0.7's decision survives intact
+    because the flag does not move the default. What lost was shipping the
+    artifact inside the app bundle — it builds and it lies, since the phone
+    would read a copy rather than consume the API and `unreachable` would be a
+    silence no client could reach. Four texts asserted the old unconditional
+    fact and **none of them is covered by a drift assertion**, so naming them
+    as a set was worth more than fixing them one at a time. The bind-host test
+    was renamed rather than deleted and gained a sibling that drives the parse,
+    making opt-in mechanical instead of promised. A wildcard bind now says the
+    printed URL is not one a client can use, rather than printing
+    `http://0.0.0.0:PORT` and looking helpful; no address is discovered to fill
+    the gap, because choosing an interface for the operator is the default the
+    flag exists to avoid.
+32. **One sentence, two readers.** The registered wording lived on a `@main`
+    struct, so a screen could not import it and copying was the only way to
+    have it. Copied words drift exactly as copied schemas do, and worse: a
+    refusal worded two ways is two findings to a reader who meets both, with
+    nothing going red. It moved to `Sight` and `Model`, each beside the type it
+    describes. The move found what hid behind it — as static functions on an
+    executable target the wording had **never been tested at all**. Eight tests
+    arrived with it, two of them properties rather than strings: every branch
+    carrying a number must name the sessions it came from, and every refusal
+    kind must have its own non-empty name, so a fourteenth kind added without
+    one goes red with nobody remembering to add a case.
+33. **The scale belongs to the reader.** "Disagreed by about 0.004096 m" was
+    two claims that cannot both hold — either the digits matter and the hedge
+    is noise, or a person is reading it and the digits are. One sentence, a
+    precision the caller states, and no default: a default is how a screen ends
+    up printing the machine's scale because nobody chose, and making it
+    required turned the change into eight compile errors instead of eight
+    silent string mismatches. The boundary test then found a real bug: the
+    guard against printing "0 mm" ran on the raw value while `%.0f` rounds half
+    to even, so exactly 0.5 mm cleared the guard and printed the reading the
+    guard exists to prevent. The guard moved onto the rounded value — the same
+    correction `DepthMapGrid`'s clamp makes, a rule about output enforced on
+    the output.
+34. **The frame the phone read.** `SightProbe --frame N` names a frame by its
+    index instead of taking the first one carrying both maps. The default's
+    rule is untouched and its reason still holds — picking the frame that
+    answers best would be picking the finding — while naming one is the
+    opposite act, an operator repeating a measurement rather than shopping for
+    one. The report says which of the two happened. Three refusals stay apart:
+    a container with nothing to sight, an index the container does not have,
+    and a frame that exists and carries no maps. No unit test, and the reason
+    is structural rather than an omission: an `executableTarget` with `@main`
+    cannot be imported by the test target, and no probe here has ever had one.
+    It was verified by running against a synthetic four-frame container that
+    stayed in the scratchpad, the call v0.8 made about its capture driver.
+35. **The point you tap, and the run that closed the rung.** The harness gained
+    passthrough over the session it already owns — `ARView.session` has a
+    setter, and `automaticallyConfigureSession` is set false because otherwise
+    it reconfigures that session and drops the `.sceneDepth` semantic with
+    nothing going red. The tap reads the frame the drain **wrote**, never
+    `arSession.currentFrame`: the source strides and drops, so the frame on
+    screen is often one no container will ever hold, and a reading taken from
+    it could never be checked. The slot holds tight-packed bytes the depth
+    encode already produced and discarded, so nothing retains an ARKit buffer
+    and `DepthMapGrid`'s packed index is valid by construction rather than on
+    the devices whose row stride happens to equal `width * 4`. Nine row states,
+    none collapsing into another; unreachable and permission-denied are
+    deliberately one, because iOS publishes no way to tell them apart and the
+    preflight that exists raises the very prompt it would check. **No App
+    Transport Security key ships**: the run fetched over the LAN to a numeric
+    private address with none, and needed none — the key covers named hosts,
+    not numeric IP loads, so shipping it would have registered a constraint
+    that is not real and no run could have contradicted it. The rung closed on
+    the pair its condition named, registered before the data: the phone read
+    `about 4 mm` at frame 1296 and `SightProbe --frame 1296` read
+    `0.004096 m` at the same pixel, one number at the two scales step 33 split.
+    Six of the nine row states were not reached by that run and are written as
+    a gap rather than a moved bar.
+
 ## Decided but not yet done
 
 A list that only shrinks. Anything finished moves to *What has shipped* above
 rather than gaining a tick here, so this section is empty when there is nothing
 outstanding — which is the honest resting state, not a gap. It is empty now.
 
-```text
-  v0.9 point is a rung, not a commit list. Nothing below this line is
-  decided at commit level, and nothing should be.
-```
+The divider went when v0.8 closed and came back when v0.9 opened. It is gone
+again, and for the reason it went the first time: there is no rung below it to
+name, and rewording it onto one that does not exist would be the invention this
+repository refuses. It returns with the next rung, if a next rung is forced.
 
-The divider went when v0.8 closed, because there was no rung below it to name
-and rewording it onto one that did not exist would have been the invention this
-repository refuses. There is one again, so it is back — reworded, as it has been
-at every boundary since v0.2, and not re-argued.
-
-Below that line, what each commit contains is decided by what the one before it
-turned out to be wrong about. That is why [`DEVLOG.md`](DEVLOG.md) records the
-mistakes and not only the decisions — it is the input to the next commit rather
-than a diary. Commit 2's shape came out of commit 1's report; commit 5 exists
-because commit 2 discovered that `canImport(ARKit)` is true on macOS.
+What each commit contains is decided by what the one before it turned out to be
+wrong about. That is why [`DEVLOG.md`](DEVLOG.md) records the mistakes and not
+only the decisions — it is the input to the next commit rather than a diary.
+Commit 2's shape came out of commit 1's report; commit 5 exists because commit 2
+discovered that `canImport(ARKit)` is true on macOS.
 
 ## What is next, and what forces it
 
 | Version | Ships | What forces it |
 |---|---|---|
-| **v0.9** point | What the model says about a point you tap on the live scene | The model exists, a Swift reader for it exists, and the person who needs both is holding the phone |
 
-The table emptied when v0.8 shipped and has one row again, which is the state it
-was built to be able to return to rather than a rung invented to fill it. Python
-entered in v0.6 not because it is popular but because an uncertainty model had to
-be fitted somewhere; step 25 is that fit, steps 26 and 27 are the seam that
-carries it, and steps 28 and 29 are the page that reads it, so the model reaches
-a reader without a capture ever leaving the machine. The reader that rung built
-is a laptop's. v0.9 is the same artifact in the hand of somebody pointing a
-sensor at a room — pulled in by the rung below it, which is the only way a rung
-has ever been added here. It answers about one point and refuses a span, for
-reasons kept in *Deliberately not built* rather than in a screen's source.
+The table is empty and the ladder above it has ended — every rung marked done.
+That is a state and not a gap, and it is the second time this section has been
+in it: v0.8's close emptied the table, v0.9 refilled it because the rung below
+pulled one in, and it is empty again now for the reason it was the first time. A
+row returns when something forces one, never because the section looks bare.
+Python entered in v0.6 because an uncertainty model had to be fitted somewhere;
+step 25 is that fit, steps 26 to 29 are the seam and the page that carry it to a
+laptop's reader, and steps 30 to 35 put the same artifact in the hand of somebody
+pointing a sensor at a room. What the chain ends with is a number on a phone that
+a Mac re-derives from the container the same run wrote. It answers about one
+point and refuses a span, for reasons kept in *Deliberately not built* rather
+than in a screen's source.
 
 What stays unmeasured is unchanged and stays written as a condition rather than
 a plan: request latency, throughput, behavior under concurrent requests, the
@@ -394,9 +482,11 @@ per-request read-and-render cost and startup.
 reader does not operate — the first moment a figure describes an experience
 rather than a loopback round trip — and a registered workload exists to measure
 against, so the number is reproducible rather than one anecdote.** Before both,
-a millisecond from a local GET is decoration. A phone fetching from a laptop is
-the first half of that condition and not the second, so the trigger stands
-untripped: v0.9 opening does not turn it green, and no number here is owed one
+a millisecond from a local GET is decoration. **The first half has now
+happened** — v0.9's by-hand run served the model to a phone from a laptop that
+phone's reader does not operate — and the second has not: no workload is
+registered, so there is nothing for a number to be reproducible against. The
+trigger stands untripped on its remaining half, and no number here is owed one
 yet. That trigger and the three in *Deliberately not built* are the only
 registered conditions under which this table gains a further line, and none of
 them is a promise that it will. That is the difference between a ladder and a
