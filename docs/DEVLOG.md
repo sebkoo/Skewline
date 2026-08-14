@@ -2490,10 +2490,13 @@ a phone against a laptop, including the six checks that did not happen.
   which is not the path taken here. The repository needed no security
   exception, which is a better sentence than any exception, and it is the same
   sentence the refused upload endpoint already earns.
-- **The local-network prompt appeared on the first fetch and was allowed.**
-  `NSLocalNetworkUsageDescription` carried the string, which is what keeps that
-  prompt from arriving blank and the request from failing in a way that looks
-  like a bug.
+- **Permission was granted; the prompt was not observed.** A successful fetch
+  entails the grant and nothing more — whether this run showed the prompt or
+  inherited a grant from an earlier install is not recorded, because nobody
+  watched for it and, by this rung's own finding (`:2416`), the app has no API
+  that could have watched for it either.
+  `INFOPLIST_KEY_NSLocalNetworkUsageDescription` is set and is what a prompt
+  would carry; that it carried it is unobserved too.
 - **What still has not run, named rather than left to the absence.** Six of the
   nine row states were not reached: permission **denied** as against a stopped
   service — so **no `URLError` code is recorded and the two remain
