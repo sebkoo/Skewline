@@ -147,6 +147,7 @@ v0.6  fit          the uncertainty model, fitted offline              done
 v0.7  service      the fitted model reaches the device                done
 v0.8  view         a dashboard over the same service                  done
 v0.9  point        what the model says about a point you tap          done
+v0.10 span         two points, and whether their errors cancel        next
 ```
 
 Rungs are planned; individual commits are not. What each commit contains is

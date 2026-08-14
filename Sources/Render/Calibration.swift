@@ -88,8 +88,54 @@ public enum Calibration {
         public var depth: Float
 
         /// The signed residual in meters: observed minus predicted depth,
-        /// the exact value the default buckets accumulate.
+        /// the exact value the default buckets accumulate. Axial: planar z
+        /// along the *target* camera's optical axis, never a raycast
+        /// distance.
         public var residual: Float
+
+        /// The source and target frames' indices in `session.frames`. Two
+        /// indices and not one pair id plus k, because `k` counts *eligible*
+        /// frames: `targetFrame - sourceFrame` is not always `separation`,
+        /// and two observations can only be known to share a frame -- which
+        /// is what disqualifies them as an independent pair -- when both
+        /// ends are named.
+        public var sourceFrame: Int
+        public var targetFrame: Int
+
+        /// The source pixel, column and row in the depth map. The identity
+        /// the fit's data seam lacked: without it two observations cannot be
+        /// known to come from one frame pair, and no separation between two
+        /// points is computable.
+        public var sourceX: Int
+        public var sourceY: Int
+
+        /// The matched target pixel, rounded. Carried because two source
+        /// pixels can round to *one* target pixel and then literally share
+        /// the `observed` depth their residuals are measured from -- a
+        /// coincidence that concentrates at small separation and would
+        /// manufacture agreement out of arithmetic.
+        public var targetX: Int
+        public var targetY: Int
+
+        /// The forward-backward round trip's displacement in source pixels,
+        /// the quantity the chain computes and then throws away after
+        /// comparing it against `forwardBackwardRadius`. Components rather
+        /// than a magnitude: a relative-rotation error's signature is
+        /// directional, and a magnitude destroys it.
+        ///
+        /// Censored by construction. Every observation that exists survived
+        /// the gate, so `roundTripX² + roundTripY²` is bounded by the
+        /// registered radius and *every* statistic of it -- the median
+        /// included -- is biased low. It is reportable only beside that
+        /// bound.
+        public var roundTripX: Float
+        public var roundTripY: Float
+
+        /// The source frame's depth-map-scaled pinhole. Rides each
+        /// observation so an exporter's per-frame table is provably a
+        /// projection of the emitted stream rather than a second path that
+        /// can disagree with it.
+        public var sourceIntrinsics: ScaledIntrinsics
 
         public init(
             separation: Int,
@@ -97,7 +143,16 @@ public enum Calibration {
             confidenceClass: Int,
             band: Int,
             depth: Float,
-            residual: Float
+            residual: Float,
+            sourceFrame: Int,
+            targetFrame: Int,
+            sourceX: Int,
+            sourceY: Int,
+            targetX: Int,
+            targetY: Int,
+            roundTripX: Float,
+            roundTripY: Float,
+            sourceIntrinsics: ScaledIntrinsics
         ) {
             self.separation = separation
             self.deltaT = deltaT
@@ -105,6 +160,15 @@ public enum Calibration {
             self.band = band
             self.depth = depth
             self.residual = residual
+            self.sourceFrame = sourceFrame
+            self.targetFrame = targetFrame
+            self.sourceX = sourceX
+            self.sourceY = sourceY
+            self.targetX = targetX
+            self.targetY = targetY
+            self.roundTripX = roundTripX
+            self.roundTripY = roundTripY
+            self.sourceIntrinsics = sourceIntrinsics
         }
     }
 
@@ -333,6 +397,10 @@ public enum Calibration {
     // MARK: - The analysis
 
     private struct EligibleFrame {
+        /// This frame's index in `session.frames`, kept because the pair loop
+        /// runs over *eligible* frames and an eligible index means something
+        /// different in every container.
+        let frameIndex: Int
         let timestamp: TimeInterval
         let intrinsics: ScaledIntrinsics
         let pose: simd_float4x4
@@ -421,6 +489,7 @@ public enum Calibration {
                     return
                 }
                 eligible.append(EligibleFrame(
+                    frameIndex: index,
                     timestamp: frame.timestamp,
                     intrinsics: scaled,
                     pose: pose.simd,
@@ -577,6 +646,13 @@ public enum Calibration {
                     let targetMasked = target.mask[targetIndex]
                     let mismatched = target.confidences[targetIndex] != rawClass
                     let roundTripFails: Bool
+                    // The round trip's displacement, kept rather than
+                    // discarded at the comparison: it is the only lateral
+                    // disagreement this chain computes. A point with no
+                    // image has no displacement, and the filter rejects it,
+                    // so no observation ever carries the sentinel.
+                    var roundTripX: Float = .nan
+                    var roundTripY: Float = .nan
                     let matched = Unprojector.cameraPoint(
                         x: targetX, y: targetY, depth: observed, intrinsics: target.intrinsics
                     )
@@ -587,6 +663,8 @@ public enum Calibration {
                     ) {
                         let dx = returned.x - Float(index % width)
                         let dy = returned.y - Float(y)
+                        roundTripX = dx
+                        roundTripY = dy
                         roundTripFails = !(dx * dx + dy * dy <= radiusSquared)
                     } else {
                         roundTripFails = true
@@ -602,13 +680,27 @@ public enum Calibration {
                         filters.forwardBackward[sourceClass][band] += 1
                     } else {
                         defaultSamples[sourceClass][band].append(residual)
+                        // `index % width` and `y`, never `x`: the loop
+                        // advances `x` by the stride before the cascade
+                        // runs, so `x` here names the next pixel. The round
+                        // trip above already computes its source coordinate
+                        // the same way, and for the same reason.
                         observationSink?(Observation(
                             separation: k,
                             deltaT: deltaT,
                             confidenceClass: sourceClass,
                             band: band,
                             depth: depth,
-                            residual: residual
+                            residual: residual,
+                            sourceFrame: source.frameIndex,
+                            targetFrame: target.frameIndex,
+                            sourceX: index % width,
+                            sourceY: y,
+                            targetX: targetX,
+                            targetY: targetY,
+                            roundTripX: roundTripX,
+                            roundTripY: roundTripY,
+                            sourceIntrinsics: source.intrinsics
                         ))
                     }
                     if !sourceMasked, !targetMasked, !mismatched {

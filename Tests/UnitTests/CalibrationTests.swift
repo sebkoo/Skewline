@@ -591,6 +591,133 @@ private struct SinkKey: Hashable {
     #expect(delivered == 0)
 }
 
+// MARK: - The identity the seam carries
+
+/// Collects one container's observations through the sink.
+private func observations(
+    _ frames: [SceneFrame],
+    constants: Calibration.Constants = testConstants()
+) throws -> [Calibration.Observation] {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+        .appendingPathExtension(SessionContainer.pathExtension)
+    defer { try? FileManager.default.removeItem(at: url) }
+    try write(frames, to: url)
+    var collected: [Calibration.Observation] = []
+    _ = try Calibration.analyze(
+        reader: try SessionContainer.Reader(contentsOf: url),
+        constants: constants,
+        observationSink: { collected.append($0) }
+    )
+    return collected
+}
+
+/// A moving fixture that survives the chain at two separations, so identity
+/// is exercised across more than one pair.
+private func movingFrames() -> [SceneFrame] {
+    [
+        SceneFrame(timestamp: 0, depth: 1),
+        SceneFrame(timestamp: 1.0 / 30.0, depth: 1, pose: translation(0, 0, -0.25)),
+        SceneFrame(timestamp: 2.0 / 30.0, depth: 1, pose: translation(0.03, 0.01, -0.5)),
+    ]
+}
+
+/// Identity that is not unique is not identity: within one frame pair, no
+/// two observations may name the same source pixel.
+@Test func sinkObservationsCarryDistinctPixelIdentity() throws {
+    let collected = try observations(movingFrames())
+    #expect(!collected.isEmpty)
+    var seen: Set<[Int]> = []
+    for observation in collected {
+        #expect(observation.sourceX >= 0 && observation.sourceX < mapWidth)
+        #expect(observation.sourceY >= 0 && observation.sourceY < mapHeight)
+        let key = [
+            observation.separation,
+            observation.sourceFrame,
+            observation.targetFrame,
+            observation.sourceX,
+            observation.sourceY,
+        ]
+        #expect(seen.insert(key).inserted, "two observations name one source pixel of one pair")
+    }
+}
+
+/// The pixel the residual was measured at, pinned on the fixture where the
+/// answer is known by construction: with equal poses every source pixel
+/// projects onto itself and the round trip returns to it exactly.
+///
+/// This is the test the transposition check lives in. A swapped
+/// `targetX`/`targetY` still yields plausible coordinates, a plausible
+/// separation and a plausible ratio, and nothing else in this suite or in the
+/// Python harness would go red -- so the assertion is made here, on a **9×7**
+/// map, which is non-square precisely so a transposition is detectable. The
+/// last expectation proves the fixture can detect one rather than assuming it.
+@Test func theProjectedPixelIsTheOneTheResidualUsed() throws {
+    let collected = try observations([
+        SceneFrame(timestamp: 0, depth: 1),
+        SceneFrame(timestamp: 1.0 / 30.0, depth: 1),
+    ])
+    #expect(!collected.isEmpty)
+    for observation in collected {
+        #expect(observation.targetX == observation.sourceX)
+        #expect(observation.targetY == observation.sourceY)
+        #expect(observation.roundTripX == 0)
+        #expect(observation.roundTripY == 0)
+    }
+    #expect(
+        collected.contains { $0.sourceX != $0.sourceY },
+        "the fixture never separates column from row, so it could not catch a transposition"
+    )
+}
+
+/// Two real frames, named in the session's own index space rather than the
+/// eligible list's -- and `targetFrame - sourceFrame` is not asserted to be
+/// `separation`, because `k` counts eligible frames and the two coincide only
+/// while every frame is eligible.
+@Test func pairIdentityNamesTwoRealFrames() throws {
+    let frames = movingFrames()
+    let collected = try observations(frames, constants: testConstants(separations: [1, 2]))
+    #expect(!collected.isEmpty)
+    for observation in collected {
+        #expect(observation.sourceFrame >= 0)
+        #expect(observation.targetFrame < frames.count)
+        #expect(observation.sourceFrame < observation.targetFrame)
+    }
+    #expect(Set(collected.map(\.separation)) == [1, 2])
+}
+
+/// The intrinsics riding each observation are that source frame's own, so an
+/// exporter's per-frame table is a projection of the emitted stream rather
+/// than a second path that can disagree with it.
+@Test func eachObservationCarriesItsSourceFramesIntrinsics() throws {
+    let expected = try ScaledIntrinsics.scaling(
+        sceneIntrinsics(), toWidth: mapWidth, height: mapHeight
+    )
+    let collected = try observations(movingFrames())
+    #expect(!collected.isEmpty)
+    for observation in collected {
+        #expect(observation.sourceIntrinsics == expected)
+    }
+}
+
+/// The censoring, made visible in the suite rather than only in the entry:
+/// the forward-backward gate is a *filter*, so every observation that exists
+/// carries a round trip inside the registered radius by construction. Any
+/// statistic of that displacement is truncated from above, which is why the
+/// lateral estimand is reportable only beside this bound.
+@Test func everyObservationsRoundTripIsInsideTheRegisteredRadius() throws {
+    let constants = testConstants()
+    let radius = constants.forwardBackwardRadius
+    let collected = try observations(movingFrames(), constants: constants)
+    #expect(!collected.isEmpty)
+    for observation in collected {
+        let squared = observation.roundTripX * observation.roundTripX
+            + observation.roundTripY * observation.roundTripY
+        #expect(squared <= radius * radius)
+        #expect(observation.roundTripX.isFinite && observation.roundTripY.isFinite)
+    }
+}
+
 // MARK: - Determinism
 
 @Test func analysisByteReproducesItsOwnReport() throws {

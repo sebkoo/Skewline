@@ -444,12 +444,19 @@ including the ones that were mistakes.
 
 A list that only shrinks. Anything finished moves to *What has shipped* above
 rather than gaining a tick here, so this section is empty when there is nothing
-outstanding — which is the honest resting state, not a gap. It is empty now.
+outstanding — which is the honest resting state, not a gap.
 
-The divider went when v0.8 closed and came back when v0.9 opened. It is gone
-again, and for the reason it went the first time: there is no rung below it to
-name, and rewording it onto one that does not exist would be the invention this
-repository refuses. It returns with the next rung, if a next rung is forced.
+**v0.10, below the divider.** The geometry export and the harness that reads
+it; the pair statistic and its permuted null; and the two thresholds that
+decide reportable-or-refused, which are registered as `TODO(owner):` on
+purpose and filled in a commit of their own **before the first container is
+exported**. A criterion with an open threshold is not registered, and the hole
+is exactly where the data would walk in.
+
+The divider went when v0.8 closed and came back when v0.9 opened; it went again
+when v0.9 closed, and it is back, because a rung was forced. It was written
+last time that it returns with the next rung *if* a next rung is forced — that
+is the condition, and it has been met rather than reinterpreted.
 
 What each commit contains is decided by what the one before it turned out to be
 wrong about. That is why [`DEVLOG.md`](DEVLOG.md) records the mistakes and not
@@ -461,12 +468,24 @@ discovered that `canImport(ARKit)` is true on macOS.
 
 | Version | Ships | What forces it |
 |---|---|---|
+| **v0.10** span | The seam two points share, and whether their errors cancel across it | v0.9 refused an interval on a distance behind two gates, and both are reachable: the rule is derivable and the seam is two integers and a discarded displacement away |
 
-The table is empty and the ladder above it has ended — every rung marked done.
-That is a state and not a gap, and it is the second time this section has been
-in it: v0.8's close emptied the table, v0.9 refilled it because the rung below
-pulled one in, and it is empty again now for the reason it was the first time. A
-row returns when something forces one, never because the section looks bare.
+The table was empty when v0.9 closed, for the reason it was empty when v0.8 did.
+A row returns when something forces one, never because the section looks bare —
+and what forced this one is a refusal rather than a feature. v0.9 wrote the
+span's two gates down precisely enough that a later rung could check whether
+they were shut or merely unopened, and they were unopened: the propagation rule
+had never been derived because nobody had tried, and the missing seam was a
+frame index and a pixel this analysis already holds and discards. A refusal
+whose gates turn out to be one commit away is a finding about the refusal, and
+it is the kind of thing that only shows up when the trigger was written in
+advance.
+
+This row is not a promise of an interval. It ships the seam and the
+measurement; whether a span's uncertainty can be *stated* is what the rung
+finds out, and refusal stays a legitimate outcome — see *Deliberately not
+built*, where the entry is edited rather than removed.
+
 Python entered in v0.6 because an uncertainty model had to be fitted somewhere;
 step 25 is that fit, steps 26 to 29 are the seam and the page that carry it to a
 laptop's reader, and steps 30 to 35 put the same artifact in the hand of somebody
@@ -519,22 +538,49 @@ to put one on. A tape measure printing `1.42 m ± 0.03` is the obvious feature a
 would be the largest overclaim in this project's history: the estimand is the
 disagreement of **one point** at one depth, and turning two per-point
 disagreements into an interval on their separation needs an error-propagation
-rule that has never been derived here and a correlation between the two points'
-errors that has never been measured. The trigger, in the same shape, and it has
-two gates rather than one. First, that rule, derived and written down. Second, a
-data seam that does not exist: `Calibration.Observation` carries a separation, a
-Δt, a class, a depth and a residual, and **no frame identifier and no pixel
-identity**, so two observations cannot be known to come from one frame pair — the
-correlation is not computable from any export this repository has ever produced.
-The export that could compute it carries per-pair per-pixel rows, much closer to
-reconstructable than the aggregates the privacy line permits, so building it
-needs a privacy decision before it needs code. Before all of that, a span
-interval is a plausible number, which is worse than no number.
+rule and a correlation between the two points' errors **that has never been
+measured**. The trigger, in the same shape, and it had two gates rather than
+one. First, that rule, derived and written down. Second, a data seam that did
+not exist: `Calibration.Observation` carried a separation, a Δt, a class, a
+depth and a residual, and no frame identifier and no pixel identity, so two
+observations could not be known to come from one frame pair.
+
+**v0.10 opened both gates, and neither opening is a number.** The rule is
+`Var(r_b − r_a) = Var(r_a) + Var(r_b) − 2·Cov(r_a, r_b)`; the naive σ√2 is the
+`Cov = 0` case, and the whole question is the third term. That derivation is
+**axial only** — `r` is planar z along the target camera's optical axis, so it
+is a rule for one diagonal element of a point's error and not for a distance,
+and ticking gate 1 off whole would be the overclaim this entry exists to
+prevent. The seam now carries the frame pair, the source pixel, the matched
+target pixel and the round-trip displacement the filter chain used to discard.
+**The correlation still has not been measured**, and that clause stands here
+until a number replaces it.
+
+A third gate was never named, and opening the first two is what made it
+visible: the estimand is an upper median of absolute *disagreement*, not a σ,
+so `±` has no defined meaning against it. A ratio below 1 would say the errors
+cancel; it would not say what to print after the number.
+
+What is left is no longer a measurement question. A **product** decision:
+shipping an interval means an API takes two points, which is the harness
+becoming a measuring tool — the second job this project's README refuses in its
+own words. And a **wire** decision: per-pair per-pixel rows stay on the machine
+that made them, and sending an interval to a client is a question this entry
+never claimed was settled. Before both, a span interval is a plausible number,
+which is worse than no number.
 
 Unlike the refusals the router enforces, this one is documentary. A 404 is a
 fact; here nothing stops a caller adding two of the module's own `Double`s
 together. What enforces it is that no API takes two points and no surface offers
 a span, and saying so plainly is better than implying a guard that is not there.
+
+**That sentence is why the entry can lose two gates and keep refusing.** It
+predates every measurement here and does not depend on one: v0.10 ships no
+two-point API and no span surface, so it stays literally true, and the refusal
+is not a goalpost being moved when the reasons behind it change. The moment
+such an API exists, this paragraph becomes false and must change in the same
+commit that makes it so — and no check in this repository can catch that, which
+is exactly why it is written down.
 
 ## Sequencing
 

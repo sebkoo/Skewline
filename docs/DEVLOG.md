@@ -2518,3 +2518,159 @@ a phone against a laptop, including the six checks that did not happen.
   The service was run for a reader on a machine that reader does not operate —
   the first half — but no registered workload exists, so no latency, throughput
   or concurrency number is owed or given. Nothing here was timed.
+
+## 2026-08-14 · v0.10 commit 1 — the seam two points share, and the criteria before the data
+
+**Built and gated; every span number awaits the export and the fit.** The rung
+opens on an argument rather than a feature. v0.9 refused an interval on a
+distance behind two gates and wrote them down precisely enough that a later
+rung could check whether they were *shut* or merely *unopened*. They were
+unopened: the propagation rule had never been derived because nobody had tried,
+and the missing seam turned out to be two integers and a displacement this
+analysis already computes and throws away. This commit ships that seam and
+registers both estimands, the rule, the criteria and the privacy decision —
+before a single pair exists.
+
+- **A refusal whose gates are one commit away is a finding about the refusal.**
+  It only shows up because the trigger was written in advance and in enough
+  detail to be falsified. The entry in *Deliberately not built* is edited
+  rather than deleted, and the edit is deliberately **half**: the derivation
+  clause goes, and "a correlation between the two points' errors that has never
+  been measured" **stays**, because it is still true and stays true for nine
+  more commits and a by-hand run. Writing the whole edit now would put a
+  measurement claim in the tree ten commits before the measurement.
+- **Two estimands, both registered now, because the data must not choose which
+  question was asked.** AXIAL: the upper median of |r_b − r_a| for two
+  same-class source pixels sharing one (source, target) frame pair at k=1,
+  over the same statistic for partners matched on class and fine depth but
+  drawn from a frame pair sharing no frame — the disagreement of a **depth
+  difference** along the target camera's optical axis, dimensionless as a
+  ratio, banded by lateral separation, never pooled. LATERAL: the upper median
+  of the forward-backward round-trip displacement of those same pairs, in
+  **depth pixels**, reportable only beside its truncation bound. The axial one
+  is the floor and ships regardless; the lateral one may be refused.
+- **The lateral quantity is censored by the filter that produces it, and that
+  is the finding this rung turns on.** `forwardBackwardRadius` is a *gate*:
+  every sample that reaches the sink has round-trip displacement inside the
+  registered radius **by construction**, so the survivors' distribution is
+  truncated from above and every statistic of it — the median included — is
+  biased low. A lateral number computed over survivors without saying this
+  would be a measurement of the filter, not of the sensor. This file already
+  knows the shape of that problem: `Report.medianFocalLengthX` exists as "the
+  denominator of the printed forward-backward truncation bound", and
+  `SeparationResult` records that the fwbw variant "rides every k because its
+  truncation bound tightens as the baseline grows". So the conversion from
+  pixels to meters is not a new liberty either — it is arithmetic on two
+  measured quantities that this file already performs for exactly this bound.
+- **The rule, derived, and axial only.** `Var(r_b − r_a) = Var(r_a) + Var(r_b)
+  − 2·Cov(r_a, r_b)`. The naive σ√2 is the `Cov = 0` case and is precisely the
+  hypothesis under test; quoting it as the fallback when the test refuses would
+  be the same overclaim arriving by the back door. `r` is planar z along one
+  camera's axis, so this is a rule for one diagonal element of a point's error
+  and **not** for a distance. Gate 1 is therefore recorded as partially open.
+  Three further things it does not cover, named rather than left to the
+  absence: the pixel-localization term (target depth is sampled at the
+  *rounded* pixel, so part of a point's error becomes axial only through the
+  local depth gradient); the conditionality (the covariance is conditional on
+  the ten filters, and no argument is on file that it bounds the unconditional
+  one); and distortion, which the pinhole model does not carry and which grows
+  with separation just as the effect under test does.
+- **The null is a permutation, not √2, and three things in the first reading of
+  the physics were wrong.** A permuted partner leaves both marginals where they
+  were and forces `Cov` to zero by construction, so the ratio is 1 under
+  independence with no distribution assumed. Then: the rotation term depends on
+  **lateral** separation only — `(δθ × ΔX)_z = δθ_x·ΔY − δθ_y·ΔX`, in which ΔZ
+  does not appear — so the covariate is lateral camera-space separation in
+  meters, and a ΔZ dependence would be a *depth-scale* error instead, a
+  separable second prediction. "Cancels exactly" holds only for the predicted
+  term: a translation error moves the sampled target pixel too, and `observed`
+  moves with it through the local depth gradient, a channel that does not
+  cancel and also grows with separation. And "the small-separation limit is
+  sensor noise alone" is false twice over — depth-map noise is spatially
+  correlated by construction, and at small separation two source pixels can
+  round to **one** target pixel and literally share the `observed` value they
+  are each measured from. The last of those is why `targetX`/`targetY` ride the
+  seam: the collision rate has to be counted, not assumed away.
+- **The matching is on fine depth and not on band, and that is not a
+  refinement.** |Δ| grows with depth and neighbouring pixels have nearer
+  depths, so a band-matched partner is drawn from a wider depth spread than the
+  point it replaces — inflating the null, deflating the ratio, and
+  manufacturing cancellation out of a scale mismatch. It is the difference
+  between measuring the effect and inventing it.
+- **Two thresholds are registered as `TODO(owner):` on purpose.** The lateral
+  clearance and the cancellation margin each decide reportable-or-refused, and
+  each gets its own name and its own argument in `Fit/span.py` rather than
+  borrowing `Constants.orderingMargin`'s. That constant is real and is the same
+  magnitude, but its registered question is "are two class error scales
+  distinguishable", which is not "does a median sit clear of a truncation
+  radius" — reusing the number avoids inventing one, and reusing the
+  *justification* would be a coincidence of magnitude doing an argument's work.
+  Neither value has a distribution-free derivation, because deriving one needs
+  the shape assumption this rung refuses everywhere else, so both are judgments
+  and are labelled as judgments. **They are filled in a commit of their own,
+  before the first container is exported** — not merely before a commit lands.
+  A criterion with an open threshold is not registered, and the hole is exactly
+  where the data would walk in.
+- **The sharpness condition has one registered reading, because it admits two
+  opposite ones.** The replicate spread of the permuted denominator is a
+  *measured* quantity, so "the margin must exceed it" could mean setting the
+  margin from the observed spread — choosing a threshold with the data in view,
+  the one thing this design forbids. It does not. The margin is set in advance,
+  and the spread is checked afterwards as a **validity condition**: a margin
+  that did not clear the null's own replicate spread means the comparison was
+  never sharp enough to conclude anything, and the class is refused wherever
+  the ratio fell. That reading can only add refusals and never manufacture an
+  adoption, which is why it is the one written down.
+- **The privacy decision, made before the code and not after it.** A `/1` row
+  is five scalars with no address; nothing in the file says which two rows saw
+  the same wall, which is exactly why v0.9 could not compute the correlation.
+  Adding a frame index and a pixel supplies the join key, and joinable rows
+  grouped by frame are a subsampled depth image — a labelled point cloud of
+  somebody's home in all but the last arithmetic step. Arguing that as "two
+  more integers" would be the dishonest framing, so it is not the one used. It
+  is allowed by **confinement, not by any property of the file**: the export is
+  written beside the containers, which already hold every depth map and pose,
+  and it never enters the tree and never crosses the wire. Pose stays out
+  permanently — it is the step that turns a stack of depth images into one
+  cloud, and no statistic here needs it. One cost is paid rather than hidden:
+  no reader can rerun this rung, so v0.6's reproducibility gap is inherited and
+  widened.
+- **The seam gained nine fields and no default values, and the audit that was
+  supposed to fire found one caller.** Defaults were refused deliberately: a
+  default would let a caller omit the identity that is the entire point, and
+  compile errors are the cheapest possible audit of who constructs an
+  `Observation` — step 33's argument about the precision parameter. The
+  prediction was several compile errors. There were **zero**: the sink is the
+  only construction site in the repository, and the tests read observations
+  rather than build them. The audit ran and returned a smaller number than
+  expected, which is worth recording as such rather than quietly enjoying.
+- **Three traps, each of which yields a plausible wrong number rather than a
+  crash.** The inner loop advances `x` by the stride *before* the filter
+  cascade runs, so `x` at the sink names the next pixel — the source column is
+  taken as `index % width`, which is what the round-trip check beside it
+  already does, and for the same reason. `EligibleFrame` carried no session
+  frame index and the enumerating loop discarded it, so it now stores one:
+  exporting the *eligible* index would be a number silently meaning something
+  different in every container. And `k` counts eligible frames, so
+  `targetFrame − sourceFrame` is **not** always `separation` — the export
+  exposes that for the first time, and the test asserts the ordering rather
+  than the difference.
+- **Five tests, and the one that matters was shown red first.**
+  `theProjectedPixelIsTheOneTheResidualUsed` is the only new column whose
+  wrongness is invisible downstream: a transposed `targetX`/`targetY` still
+  produces plausible coordinates, a plausible separation, a plausible ratio and
+  a plausible artifact. Transposing it at the emission site turned that test
+  red with 60 issues while conservation, report-equality and pixel-uniqueness
+  all stayed green — the division of labor, demonstrated rather than asserted.
+  The fixture is 9×7 and the test ends by requiring a pixel whose column and
+  row differ, so it proves it *can* catch a transposition instead of assuming
+  it. Restored; 197 tests green, up from 192.
+- **The gate did not grow.** Five commands, unchanged: Swift 197, Python 76,
+  both iOS builds, drift green. The ladder reopened and the ROADMAP table
+  gained its row in this same commit, because Assertion 2 couples them and
+  splitting them commits a red gate.
+- **Not measured yet.** Every ratio, every verdict, both thresholds, the
+  export's row counts, file sizes and runtime. No container has been exported
+  and no pair has been formed. v0.8's measurement trigger is untouched and
+  stands on its remaining half: no registered workload exists, so no latency or
+  throughput number is owed or given, and nothing here was timed.
