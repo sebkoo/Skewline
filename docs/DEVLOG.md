@@ -2953,3 +2953,67 @@ not a correction anybody can audit.
 - **The gate did not grow.** Five commands, unchanged: Swift 201, Python 80,
   both iOS builds, drift green. Nothing here touches code.
 - **Not measured yet.** Every span number, both margins, and `P`'s final value.
+
+## 2026-08-14 · v0.10 commit 7 — how two residuals cancel, and the null that says so
+
+**Built and gated, and the planted fixtures found a real error in the
+statistic before any container did.** `Fit/span.py` forms pairs within one
+frame pair, answers each with a depth-matched partner from a pair sharing no
+frame, and reports the ratio per class per lateral separation band. Nothing is
+fitted; every registered value is a module constant.
+
+- **The null was pooled over depth, and that manufactured cancellation.** The
+  first implementation drew one null for the class and compared every
+  separation band against it — defensible-sounding, because a permuted partner
+  genuinely has no separation of its own. It is wrong, and the planted fixture
+  showed it: separation is `(pixel offset) × depth / focal length`, so a
+  small-separation cell is populated by **near** points, whose residuals are
+  smaller because |Δ| grows with depth. A pooled null sits above those cells for
+  a reason that has nothing to do with cancellation. On a population with **no
+  pair structure at all** it read ratios of 0.41, 0.42, 0.43 and 0.59 — a clean
+  false positive, exactly where the real effect is predicted to be largest.
+  Each null draw now rides beside the same-pair draw it answers and is binned
+  by that draw's separation, so the two share a depth composition by
+  construction. The same fixture now reads 1.03, 0.99, 1.03, 1.00, 0.99.
+- **This is the failure the rung was built to avoid, caught by the method
+  rather than by luck.** It is the same shape as the band-matching error
+  already argued against in the module docstring, one level deeper: it is not
+  enough to match the *partner* on depth if the *cells* are stratified by
+  something depth drives.
+- **A property of the estimand surfaced while writing the fixture.** The
+  matched null needs depth **overlap between frame pairs that share no frame**.
+  A first fixture gave each pair its own depth window, and the null came back
+  empty: every depth-matched partner was necessarily from the same pair and was
+  correctly rejected. A session that never revisited a distance would have no
+  null and no answer — that is a real limit on when this statistic exists, not
+  a fixture artifact, and it is recorded rather than engineered around.
+- **Two guards were broken and stayed green, which is its own finding.** The
+  frame-sharing rejection was first tested through `permuted_samples`, and
+  breaking the guard on the path `cell_ratios` actually uses changed nothing.
+  Then dropping the depth match changed nothing either, because the first
+  fixture gave each pair iid depths — in a real frame pair the pixels sample
+  one scene, so their depths are close. Both tests were rewritten against the
+  real path and the real mechanism, and both now go red when the guard goes.
+  **A red-first that passes is worth more than one that fails**: it named two
+  tests that were describing behaviour they never exercised.
+- **The guard reports two counters, and a test asserts both.** Zero
+  shared-frame partners *used*, and more than zero *rejected*. Asserting only
+  the zero would pass vacuously on any fixture where sharing never arose, which
+  is precisely how a guard stays untested while looking tested.
+- **Target-pixel collisions are rejected and counted.** Two source pixels can
+  round onto one target pixel and then share the `observed` depth both
+  residuals are measured from — a perfectly cancelling pair with no pose in it,
+  concentrated at small separation. The fixture plants forty of them rather
+  than two, because two left the count to chance and the point is the rejection
+  rather than the draw.
+- **No verdict exists yet, and asking for one raises.** `CANCELLATION_MARGIN`
+  and `LATERAL_CLEARANCE_MARGIN` are `None`, not a plausible number, so
+  `cell_verdict` refuses rather than quietly answering. A test asserts that
+  refusal. They are filled in one commit before the first container is
+  exported, and `P` with them.
+- **The gate did not grow.** Five commands, unchanged: Swift 201, Python 95,
+  both iOS builds, drift green. `unittest discover` finds `test_span.py`
+  without a new command, job or README count.
+- **Not measured yet.** Every span number. The ratios quoted above are the
+  planted fixtures' and describe the *code*, not any capture: they are
+  synthetic by construction, which is what lets them be printed here at all.
