@@ -2453,3 +2453,65 @@ entry rather than implied by its absence.
   the rung stands on — that the phone's reading and
   `SightProbe --frame N x,y` agree for the same tap. Until that last pair is
   recorded, this rung is built and not done.
+
+## 2026-08-13 · v0.9 — the by-hand run
+
+**Run, and recorded before the close touches anything.** This file is
+append-only and a close never writes to it, so the run that decides whether the
+rung may close is entered first and on its own. What follows is what happened on
+a phone against a laptop, including the six checks that did not happen.
+
+- **The pair, both lines verbatim.** Container `session-DDC15BC3`, 1367 frames.
+  The phone:
+
+      frame 1296 at 0.5326,0.5305  depth 1.27 m  class 2
+      no form was adopted for this class; on the 4 sessions this was fitted
+      from, its band disagreed by about 4 mm
+
+  and `swift run SightProbe Fit/model.json <container> --frame 1296
+  0.5326,0.5305` on the Mac, against the same frame, resolving to pixel
+  136,101, the same 1.27 m and the same class 2, ending `by 0.004096 m`.
+  They agree. 1.27 m in the `high` class lands in the refused table's
+  `[1.0, 2.0)` band, whose median in the committed artifact is `0.004096031` —
+  so `0.004096 m` and `about 4 mm` are one number at the two scales v0.9
+  commit 4 split, and the two readers arrived at it independently.
+- **This is the check the rung was built to survive, and it is the one that
+  could have failed silently.** Had the tap read `arSession.currentFrame`
+  instead of the frame the drain wrote, frame 1296 would have named a frame the
+  container does not hold, and the probe would have answered about a different
+  pixel with a plausible number. The agreement is evidence for the plumbing,
+  not just for the arithmetic.
+- **App Transport Security: no exception was needed, and none ships.** The
+  phone fetched `/v1/model` over the LAN from a numeric private address with
+  **no ATS key in `Info.plist` at all**, and it succeeded. That is the outcome
+  the experiment was ordered to produce: had the key shipped, this run would
+  have succeeded too and told nobody anything, because ATS does not govern
+  numeric IP loads — `NSAllowsLocalNetworking` covers the named-host path,
+  which is not the path taken here. The repository needed no security
+  exception, which is a better sentence than any exception, and it is the same
+  sentence the refused upload endpoint already earns.
+- **The local-network prompt appeared on the first fetch and was allowed.**
+  `NSLocalNetworkUsageDescription` carried the string, which is what keeps that
+  prompt from arriving blank and the request from failing in a way that looks
+  like a bug.
+- **What still has not run, named rather than left to the absence.** Six of the
+  nine row states were not reached: permission **denied** as against a stopped
+  service — so **no `URLError` code is recorded and the two remain
+  undistinguished**, exactly as the commit that built them predicted; a tap off
+  the map; a pixel with no return; a class the artifact cannot name; a depth
+  outside the domain; and a band without samples. They are held by the compiler
+  and by reading, not by a run. The two that did run are the unreachable state
+  before the address was typed, and the answer above.
+- **The rung closes anyway, and the reason is that the condition was registered
+  before the data.** `docs/DEVLOG.md:2453-2456` wrote it as "until that last
+  pair is recorded, this rung is built and not done", naming one pair and not
+  nine states. The pair is recorded. Raising the bar now because six states
+  went unreached would be as much a move as lowering it would have been if the
+  pair had disagreed, and registered criteria exist to forbid exactly that. The
+  six are a written gap, not a renegotiated bar.
+- **The gate did not grow.** Five commands, unchanged: Swift 192, Python 76,
+  both iOS builds, drift green.
+- **Not measured yet.** Unchanged, and this run does not trip v0.8's trigger.
+  The service was run for a reader on a machine that reader does not operate —
+  the first half — but no registered workload exists, so no latency, throughput
+  or concurrency number is owed or given. Nothing here was timed.
