@@ -115,6 +115,35 @@ refused a fitted form, so 1.27 m falls to its banded table and lands in
 `Fit/model.json`. Two readers, one artifact, and nothing in this tree
 regenerates the figure itself: it was typeset by hand from that same run.*
 
+That refusal has a companion measurement. Two points seen in the same frame
+pair share a pose error, and a shared error should largely cancel in their
+difference — so the useful question is not what one point's uncertainty is, but
+how much of it survives a subtraction. The disagreement of a same-frame-pair
+difference is compared against a null in which the second point is replaced by
+one matched on class and depth from a frame pair sharing no frame, which forces
+independence by construction. Below 1 is cancellation; 1 is what independence
+itself would read.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/span-dark.svg">
+  <img alt="Twelve curves rising from roughly 0.08 at the closest separations
+  toward 1.00 at the widest, four per confidence class, every one of them
+  monotone; one curve crosses 1.00 in the last band and is ringed as unsettled."
+  src="docs/media/span-light.svg">
+</picture>
+
+*The errors do cancel, and the cancellation weakens as the two points move
+apart — monotonically, across all seven bands, in all twelve series, without
+exception. One cell of eighty-four sits above 1, and its verdict changes with
+the analysis seed, so it is drawn as a question rather than as a finding. This
+is still not an interval: what is plotted is a ratio of upper medians against a
+permutation null and not a covariance, so it says the errors cancel without
+saying what to print after a number. Both files are drawn from the committed
+artifacts by
+`.venv/bin/python Fit/span_figure.py --artifacts Fit --output-dir docs/media`,
+and a test regenerates them and compares byte for byte — editing either one by
+hand is a red gate.*
+
 ```sh
 swift build && swift test
 ```

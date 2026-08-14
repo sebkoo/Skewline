@@ -3813,3 +3813,48 @@ drawing checkable at all.
 - **Not measured yet.** Unchanged: `span.py`'s own runtime, and peak memory for
   either the export or the analysis. Nothing here was timed either, and the
   figure's own generation cost is not a number anybody asked for.
+
+## 2026-08-14 · v0.10 — the figure reaches the readme
+
+**The split the ladder close could not have, and the reason is the rule rather
+than the custom.** `:1954-1961` splits when each half is independently green
+and combines when splitting would commit a defect on purpose. Here both halves
+are green alone: the generator, its test and the two assets landed at `334ad9e`
+with `readme-drift` green and no README claim depending on them, and this
+commit adds the README paragraph to files already in the tree. So the customary
+pair is restored — unlike the close two commits ago, where each half was red
+and one commit was forced.
+
+- **`<picture>` rather than a filter.** Dark mode selects the file drawn for a
+  dark surface; it does not invert the light one. A CSS filter would have been
+  one line and would have produced colours nobody validated — inverting a
+  palette moves every step off the band it was checked against, and the whole
+  argument for the two files is that each mode's steps were checked separately.
+  The `<img>` inside carries the light asset, so a reader whose client ignores
+  `<source>` gets a working figure rather than nothing.
+- **The alt text describes the shape, not the subject.** "A chart of the span
+  result" tells a screen-reader user only that they are missing something.
+  What is written instead is what a sighted reader takes from it: twelve curves
+  rising from roughly 0.08 toward 1.00, four per class, all monotone, one
+  crossing 1.00 and ringed. The caption beneath then carries the finding for
+  every reader, which is where it belongs — a figure that needs its caption is
+  normal, and a figure whose caption is its only honest part is not.
+- **Two drift assertions were checked before writing, not after.** Assertion 3
+  matches a bolded-and-backticked single word in the README and demands a
+  matching `.library` product, so nothing in the new paragraph is written that
+  way — `Fit/span_figure.py` appears in plain backticks. Assertion 4 counts
+  "<number> CI jobs"; the README's existing sentence is untouched, since no job
+  was added. Both were read out of `Scripts/readme-drift.swift` rather than
+  recalled.
+- **The claim the paragraph makes is the one the figure can support.** It says
+  the errors cancel and that the cancellation weakens with separation; it says
+  the one cell above 1 is a question rather than a finding; and it says plainly
+  that this is still not an interval, because a ratio of upper medians against
+  a permutation null is not a covariance. A README paragraph is where an
+  overclaim would do the most damage, being the only page most readers see.
+- **The gate.** All five commands, since the README changed:
+  `swift build && swift test` — Swift, unchanged at 201; both `xcodebuild`
+  invocations green; `.venv/bin/python -m unittest discover -s Fit -v` — green
+  at 134; `swift Scripts/readme-drift.swift` — green.
+- **Not measured yet.** Unchanged: `span.py`'s own runtime, and peak memory for
+  either the export or the analysis.
