@@ -29,10 +29,30 @@ frame pairs share no sample. The permuted spread is therefore the naive rule's
 own prediction computed on this data, and the ratio is 1 under independence BY
 CONSTRUCTION. Cancellation is ratio < 1.
 
-The null is SEPARATION-FREE, and that is a feature rather than an omission: a
-permuted partner has no separation from `a`, because separation is a property
-of the pair and not of either point. So the null is flat in separation, and the
-same-pair curve rising toward a flat null is the signal.
+THE NULL IS MATCHED PER CELL, NOT FLAT. A permuted partner has no separation of
+its own -- separation is a property of a pair, not of a point -- which invites
+pooling the null into one number per class and reading the signal off a
+same-pair curve rising toward it. That design was registered first and is
+WRONG, and a planted synthetic population proved it before any container was
+exported: separation is `(pixel offset) * depth / focal length`, so a
+small-separation cell is populated by NEAR points, whose residuals are smaller
+because |delta| grows with depth. A pooled null sits above those cells for a
+reason unrelated to cancellation, and on data with no pair structure at all it
+read ratios near 0.4 -- a false positive, strongest exactly where the real
+effect is predicted.
+
+So each null draw rides beside the same-pair draw it answers and inherits that
+draw's separation band. Numerator and denominator then share a depth
+composition by construction, and the comparison is within-cell.
+
+WHAT A CANCELLATION LOOKS LIKE NOW. Not "a curve rising toward a flat null" --
+that reading belonged to the pooled design and would mislead. The comparison is
+within each cell, so every separation dependence lives in the numerator and the
+ratio carries it directly: cancellation is a ratio BELOW 1 inside a band, and
+cancellation degrading with distance is that ratio RISING TOWARD 1 as the bands
+widen. A ratio at 1 in every band is independence, and above 1 is
+anti-correlation, which is worse than the naive rule rather than the same as no
+effect.
 
 MATCHED ON FINE DEPTH, NEVER ON BAND. |delta| grows with depth and neighbouring
 pixels have nearer depths, so a band-matched partner is drawn from a wider
@@ -75,16 +95,19 @@ SEPARATION_K = 1
 CLASS_NAMES = fit.CLASS_NAMES
 
 ESTIMAND = (
-    "ratio of the upper median |r_b - r_a| for two same-class source pixels "
-    "sharing one (source, target) frame pair at k=1 under the registered "
-    "filter chain, to the same statistic over partners matched on class and "
-    "fine depth but drawn from a frame pair sharing no frame; r is the signed "
-    "axial depth residual in meters -- observed minus predicted planar z along "
-    "the target camera's optical axis -- the ratio dimensionless, reported per "
-    "class and lateral separation band and never pooled to one number -- not a "
-    "3-D distance error, not accuracy against any known length, not a "
-    "single-reading sigma, not sigma times root two, not a correlation "
-    "coefficient and not an interval"
+    "within each lateral separation band, the ratio of the upper median "
+    "|r_b - r_a| for two same-class source pixels sharing one (source, target) "
+    "frame pair at k=1 under the registered filter chain, to the upper median "
+    "of |r_a - r_b'| over those same draws with b replaced by a residual "
+    "matched on class and fine depth and drawn from a frame pair sharing no "
+    "frame -- each null draw inheriting the separation band of the same-pair "
+    "draw it answers, so numerator and denominator share a depth composition "
+    "by construction; r is the signed axial depth residual in meters -- "
+    "observed minus predicted planar z along the target camera's optical axis "
+    "-- the ratio dimensionless, reported per class and separation band and "
+    "never pooled to one number -- not a 3-D distance error, not accuracy "
+    "against any known length, not a single-reading sigma, not sigma times "
+    "root two, not a correlation coefficient and not an interval"
 )
 UNITS = "dimensionless -- a ratio of meters to meters"
 COMPONENT = "axial"

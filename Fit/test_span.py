@@ -328,6 +328,36 @@ class WhatTheStatisticMeasures(unittest.TestCase):
         self.assertGreater(result["sharedFrameRejected"], 0)
 
 
+    def test_the_null_is_matched_per_cell_and_not_pooled(self):
+        # The estimand's text says each null draw inherits the separation band
+        # of the same-pair draw it answers. Nothing else in this suite compares
+        # that sentence to the code, so this does -- structurally rather than
+        # by matching words.
+        #
+        # Two invariants, and the pooled design violates both: a null draw
+        # exists only where a same-pair draw did, so no cell can hold more null
+        # draws than same-pair draws; and every null separation is one of the
+        # same-pair separations rather than a value of its own. A null pooled
+        # over the class would put its whole population into every cell.
+        rng = np.random.default_rng(18)
+        rows = planted_rows(rng, pairs=6, per_pair=300, common=0.05, independent=0.01)
+        with tempfile.TemporaryDirectory() as directory:
+            observations = span.read_geometry(written(rows, directory))
+        drawn, *_ = span.same_pair_samples(
+            observations, 2, np.random.default_rng(span.SEED)
+        )
+        self.assertGreater(drawn["null"].size, 0)
+        self.assertEqual(drawn["null"].size, drawn["nullSeparation"].size)
+        self.assertLessEqual(drawn["nullSeparation"].size, drawn["separation"].size)
+        self.assertTrue(
+            np.isin(drawn["nullSeparation"], drawn["separation"]).all(),
+            "a null draw carried a separation no same-pair draw had",
+        )
+        for cell in span.cell_ratios(observations, 2)["cells"]:
+            with self.subTest(band=(cell["low"], cell["high"])):
+                self.assertLessEqual(cell["nullPairs"], cell["pairs"])
+
+
 class TheSeedIsRegistered(unittest.TestCase):
     def test_the_statistic_is_reported_at_every_registered_seed(self):
         rng = np.random.default_rng(15)

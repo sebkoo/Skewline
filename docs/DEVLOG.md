@@ -3017,3 +3017,48 @@ fitted; every registered value is a module constant.
 - **Not measured yet.** Every span number. The ratios quoted above are the
   planted fixtures' and describe the *code*, not any capture: they are
   synthetic by construction, which is what lets them be printed here at all.
+
+## 2026-08-14 · v0.10 — the estimand catches up with the code
+
+**Amended inside the registration window, and the date is the point.** Commit 7
+replaced the pooled null with a per-cell matched one and did not amend the
+registered sentence, so `ESTIMAND` went on describing a design that no longer
+ran. A registered criterion that disagrees with the code it names is worse than
+an unregistered one: it reads as a promise kept.
+
+- **What changed. The null is no longer separation-free.** The registered text
+  said "partners matched on class and fine depth but drawn from a frame pair
+  sharing no frame" and said nothing about how a null draw acquires a band; the
+  plan behind it said more, and said the opposite of what now runs — "the null
+  is flat in separation, and the same-pair curve rising toward a flat null IS
+  the signal". It is not flat. Each null draw rides beside the same-pair draw
+  it answers and inherits that draw's separation band, so numerator and
+  denominator share a depth composition by construction and the comparison is
+  within-cell.
+- **Why this is still pre-registration, stated so a later reader need not
+  guess.** The error was found on a **planted synthetic population**, before
+  the threshold commit and **before any container was exported**. Amending
+  criteria on synthetic data inside the registration window is legitimate — it
+  is what the window is for. The same amendment after an export would not be,
+  and would be indistinguishable in the artifact from this one if the
+  distinction were not written down. It is written down here, dated, and the
+  export has still not run.
+- **What a cancellation looks like now, because the old sentence told a reader
+  what to expect.** "A curve rising toward a flat null" belonged to the pooled
+  design and would now mislead. The comparison is within each cell, so every
+  separation dependence lives in the numerator and the ratio carries it
+  directly: cancellation is a ratio **below 1 inside a band**, and cancellation
+  degrading with distance is that ratio **rising toward 1 as the bands widen**.
+  One in every band is independence; above one is anti-correlation, which is
+  worse than the naive rule rather than the same as no effect.
+- **The gap the amendment exposed: nothing compared an estimand's text to the
+  code computing it.** That is now pinned structurally rather than lexically, on
+  the two properties the sentence claims — a cell can never hold more null
+  draws than same-pair draws, and every null separation is one a same-pair draw
+  had. Reverting to the pooled null turns seven tests red including that one;
+  before this commit it would have turned none of them red for the *reason*
+  that matters, because no test named the relationship.
+- **The gate did not grow.** Five commands, unchanged: Swift 201, Python 96,
+  both iOS builds, drift green.
+- **Not measured yet.** Every span number, all three registered values, and the
+  export's size. No container has been exported.
