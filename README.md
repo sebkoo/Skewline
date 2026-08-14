@@ -89,17 +89,19 @@ authoritative. Reproduce it from any capture:
 
 The app is `App/SkewlineHarness`: a start button, a stop button, a panel of
 what the run measured, and — while a recording runs — a camera view you can
-tap to see what the fitted model says about that one point. It exists to put the
-pipeline in front of real sensors and produce containers a Mac can replay, and
-it should not grow a second job. **A second job would be a measuring tool**:
-two points and the distance between them, a history of readings, an export of
-its own. Showing what the model says about a single point the sensor is looking
-at now is the same job rather than a new one, because the model is this
-pipeline's own output and the frame being tapped is one the container keeps —
-the phone shows the frame's index and the point, and
-`swift run SightProbe <model> <container> --frame N x,y` re-derives the same
-answer on a Mac. A reading nobody can check would be the second job arriving
-in disguise.
+tap to see what the fitted model says about that one point. It exists to put
+the pipeline in front of real sensors and produce containers a Mac can
+replay, and it should not grow a second job. **A second job would be a
+measuring tool**: two points and the distance between them, a history of
+readings, an export of its own. Showing what the model says about a single
+point the sensor is looking at now is the same job rather than a new one,
+because the model is this pipeline's own output and the frame being tapped is
+one the container keeps — the phone shows the frame's index and the point, so
+the same tap can be re-derived on a Mac:
+`swift run SightProbe <model> <container> --frame N x,y`.
+**Whether the two agree on a device is not yet recorded** — there has been no
+phone and laptop on one LAN. A reading nobody can check would be the second job
+arriving in disguise.
 
 ```sh
 swift build && swift test
