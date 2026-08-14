@@ -3664,3 +3664,76 @@ that nothing in the tree can check.
   measured: `span.py`'s own runtime, which was never timed and for which nothing
   was recorded, and peak memory for either the export or the analysis. v0.8's
   latency trigger is untouched and stands on its remaining half.
+
+## 2026-08-14 · v0.10 — the close, and the first time the ladder ends
+
+**One commit, and this time the gate decided it rather than the author.** The
+close moves the README ladder's last rung to `done` and moves the ROADMAP row
+out of *What is next* into *What has shipped*. Both files, together, because
+`Scripts/readme-drift.swift` refuses either half on its own — checked by reading
+it rather than by assuming the shape the last three closes used.
+
+- **Both halves are red alone, so `:1954-1961`'s rule gives one commit.** The
+  README edit alone makes `ladderHasEnded` true at `:166` while the ROADMAP
+  still carries its `| **v0.10** span |` row, and the row loop at `:210` fails
+  that row at `:221-226` — "the ROADMAP still lists v0.10 in its what-is-next
+  table". The ROADMAP edit alone empties `roadmapRows` while the ladder still
+  marks a rung current, and that fails at `:202-204`. Neither half is
+  independently green, so splitting would commit a red gate on purpose. Note
+  that these are **not** the `:157`/`:165` citations the v0.8-to-v0.9 boundary
+  recorded at `:1954-1961`: the file has moved since, and those lines are now
+  `doneRows` and the `ladderHasEnded` comment. The failures are at `:204` and
+  `:221-226`, cited from this reading rather than carried forward.
+- **The trap is `:197-207`, and the empty table stays.** With the ladder ended
+  and no rows left, the assertion requires the literal
+  `| Version | Ships | What forces it |` to still be present: deleting the
+  now-empty section fails at `:206`, because "an empty table is a state where a
+  missing one is drift". The row moved out; the header stands, with the
+  separator row beneath it and nothing after. A section that looks unfinished is
+  the intended appearance of a finished ladder.
+- **Three paths in the drift gate execute for the first time in this
+  repository's history.** No ladder here has ever ended, so `ladderHasEnded`
+  has been false at `:166` on every previous run; the `:172` branch that
+  permits no current rung has never been taken; and the `:205-207` empty-table
+  branch has never been reached, because `roadmapRows` has never been empty
+  while the ladder was done. All three run green on this commit — and green
+  alone would not have been evidence, because code that never runs and code
+  that runs correctly are indistinguishable from a passing gate. **Both
+  refusals were shown red first.** Deleting the table header produced `:206`'s
+  message verbatim — "an empty table is a state where a missing one is drift" —
+  and exit `1`; putting a `| **v0.10** span |` row back while the ladder stayed
+  `done` produced `:221-226`'s — "the ROADMAP still lists v0.10 in its
+  what-is-next table" — and exit `1`. Both edits were reverted and the gate is
+  green on the committed state. The `:172` branch is the exception and cannot
+  be shown red: it is an empty branch whose whole content is permitting the
+  state, so only its absence would be visible. These assertions were written at
+  v0.8's close against a state that did not exist yet; they were speculative
+  for two rungs and are load-bearing for the first time today.
+- **Four steps, not fifteen.** v0.10 landed fifteen commits and three
+  non-commit entries; *What has shipped* gains steps 36 to 39, at the
+  granularity the list already uses — v0.6 and v0.7 took two apiece, v0.9 took
+  six. The seam and its confinement; the statistic and its per-cell null; the
+  thresholds registered before the data and the refusals they buy; and what the
+  measurement found. "Thirty-five steps" became "Thirty-nine steps", which no
+  assertion checks and which is therefore exactly the kind of number that rots.
+- **What the close does not do.** It does not touch the *Deliberately not
+  built* span entry, which the measurement commit already amended and which
+  still refuses. Step 39 says so in its own last sentence: the trigger was met
+  and the refusal survived it, because what was measured is a ratio of upper
+  medians and not `Cov(r_a, r_b)`. A rung closing is not a licence to revisit a
+  refusal that closed on its own terms.
+- **The divider goes, and the condition on its return is not reinterpreted.**
+  It returns with the next rung, if a next rung is forced — the same sentence
+  v0.9's close left. What changed is that no rung is queued to force one, and
+  the honest way to write that is as a state rather than as either a promise of
+  more or a declaration of done.
+- **The gate.** All five commands, and `readme-drift` is load-bearing here in a
+  way it was not for the last three commits: `swift build && swift test` —
+  Swift, unchanged at 201; both `xcodebuild` invocations green;
+  `.venv/bin/python -m unittest discover -s Fit -v` — green at 121;
+  `swift Scripts/readme-drift.swift` — green, exercising the three
+  first-time paths above.
+- **Not measured yet.** Unchanged from the measurement entry: `span.py`'s own
+  runtime and peak memory for either the export or the analysis. v0.8's latency
+  trigger is untouched and stands on its remaining half, and an ended ladder
+  does not trip it.

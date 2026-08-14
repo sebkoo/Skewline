@@ -75,7 +75,7 @@ change, that is a signal the boundary was drawn wrong, and it belongs in
 
 ## What has shipped
 
-Thirty-five steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
+Thirty-nine steps. The decisions behind each are in [`DEVLOG.md`](DEVLOG.md),
 including the ones that were mistakes.
 
 1. **Types.** A pose, a 6×6 covariance beside it, and the tracker's own opinion
@@ -439,24 +439,89 @@ including the ones that were mistakes.
     `0.004096 m` at the same pixel, one number at the two scales step 33 split.
     Six of the nine row states were not reached by that run and are written as
     a gap rather than a moved bar.
+36. **The seam two points share, and the criteria before the data.**
+    `Calibration.Observation` gained nine fields and no default values — the
+    frame pair, the source pixel, the matched target pixel and the round-trip
+    displacement the filter chain had been discarding — because a default lets
+    a caller omit the identity that is the entire point, and compile errors are
+    the cheapest audit of who constructs one. That audit predicted several
+    errors and returned **zero**: the sink is the only construction site in the
+    repository. The rows leave through `--dump-geometry <out.csv>` behind its
+    own flag, with `--pair-stride P` sampling whole frame pairs rather than
+    every Nth row, because a pair statistic needs both halves of a pair or
+    neither. What the flag buys is allowed by **confinement, not by any
+    property of the file**: joinable rows grouped by frame are a subsampled
+    depth image of somebody's home, so the export is written beside the
+    containers, never enters the tree and never crosses the wire, and pose
+    stays out permanently. The privacy line is mechanical rather than promised
+    — `readme-drift` fails on any committed file whose first line carries an
+    observation schema tag, which `git add -f` cannot talk its way past.
+37. **The statistic, and the null it is measured against.** Within each lateral
+    separation band, the ratio of the upper median disagreement between two
+    same-class pixels sharing one frame pair to the same median over a partner
+    matched on class and fine depth and drawn from a frame pair sharing no
+    frame. Reported per class and per band and never pooled to one number,
+    because a pooled mean hides a squeaker. The null is matched **per cell**:
+    a pooled null draws its partner from a wider depth spread than the point it
+    replaces, which manufactures cancellation out of a scale mismatch, and the
+    registered estimand was amended to say so — on synthetic data, dated, and
+    before any container was exported, which is what a registration window is
+    for. The lateral round-trip is reportable only beside the truncation radius
+    that produced it, against a derived floor of `1 − 1/√2 ≈ 0.293` that a
+    fully censored population still shows: a margin at or below that floor
+    would call a filter-shaped distribution "reportable", so the code refuses
+    one. `skewline-span/1` carries `spanInterval: "refused"` at the top and no
+    per-row value anywhere in it.
+38. **The thresholds registered before the data, and the refusals they buy.**
+    `cancellationMargin = 0.10` and `lateralClearanceMargin = 0.50`, both
+    filled in a commit of their own **before the first container was
+    exported**. Neither has a distribution-free derivation, because deriving
+    one needs the shape assumption this rung refuses everywhere else, so both
+    are judgments and are labelled as judgments rather than borrowing a real
+    constant of the same magnitude whose registered question is a different
+    one. The sharpness condition has one registered reading of the two it
+    admits: the margin is fixed in advance and the null's own replicate spread
+    is checked afterwards as a validity condition, a reading that can only add
+    refusals and never manufacture an adoption. A session with no
+    frame-disjoint pair is refused outright, since the null cannot exist there.
+    Structural refusals exit non-zero; per-cell verdicts are ordinary outcomes
+    and exit zero, because one sparse band should not fail an otherwise healthy
+    session — a distinction discoverable only against a real export, which is
+    the worst possible moment to learn it.
+39. **What the measurement found, and the cell it does not settle.** Four
+    containers, 84 cells, run by hand at the shell. The ratio is monotone
+    increasing across all seven separation bands in all twelve
+    class-and-container series, without exception — the shape the amended
+    estimand registered in advance, cancellation sitting below 1 inside a band
+    and degrading with distance as the ratio rises toward 1. Band extremes run
+    0.077–0.187 at the closest separations and 0.609–1.001 at the widest, all
+    of it **axial**. The registered unanimity verdict against `ratio < 0.90`
+    holds in 18 of the 21 class-and-band cells and fails in three, all at the
+    widest separations; the three are named rather than averaged away. One cell
+    of 84 sits above 1, and across the three registered seeds it straddles that
+    boundary by eight times its distance to it, so it is reported as a verdict
+    the data does not settle rather than as an anti-correlation finding — the
+    registered sharpness condition cleared all 84 cells and did not catch it,
+    and the seed-stability diagnostic did. The lateral clears its bound in all
+    twelve, so it reads the sensor rather than the filter. No interval ships:
+    what was measured is a ratio of upper medians against a permutation null
+    and not `Cov(r_a, r_b)`, so the propagation rule still cannot be evaluated,
+    and the refusal in *Deliberately not built* survives its own trigger being
+    met.
 
 ## Decided but not yet done
 
 A list that only shrinks. Anything finished moves to *What has shipped* above
 rather than gaining a tick here, so this section is empty when there is nothing
-outstanding — which is the honest resting state, not a gap.
-
-**v0.10, below the divider.** The geometry export and the harness that reads
-it; the pair statistic and its permuted null; and the two thresholds that
-decide reportable-or-refused, which are registered as `TODO(owner):` on
-purpose and filled in a commit of their own **before the first container is
-exported**. A criterion with an open threshold is not registered, and the hole
-is exactly where the data would walk in.
+outstanding — which is the honest resting state, not a gap. It is empty now.
 
 The divider went when v0.8 closed and came back when v0.9 opened; it went again
-when v0.9 closed, and it is back, because a rung was forced. It was written
-last time that it returns with the next rung *if* a next rung is forced — that
-is the condition, and it has been met rather than reinterpreted.
+when v0.9 closed, came back when v0.10 was forced, and it is gone again. The
+condition on its return is unchanged, and it is not being reinterpreted at the
+moment it stops being satisfiable on a schedule: it returns with the next rung,
+if a next rung is forced. What is new is that the ladder above has ended, so
+there is no rung queued to force one. That is a state and not a promise in
+either direction.
 
 What each commit contains is decided by what the one before it turned out to be
 wrong about. That is why [`DEVLOG.md`](DEVLOG.md) records the mistakes and not
@@ -468,31 +533,32 @@ discovered that `canImport(ARKit)` is true on macOS.
 
 | Version | Ships | What forces it |
 |---|---|---|
-| **v0.10** span | The seam two points share, and whether their errors cancel across it | v0.9 refused an interval on a distance behind two gates, and both are reachable: the rule is derivable and the seam is two integers and a discarded displacement away |
 
-The table was empty when v0.9 closed, for the reason it was empty when v0.8 did.
-A row returns when something forces one, never because the section looks bare —
-and what forced this one is a refusal rather than a feature. v0.9 wrote the
-span's two gates down precisely enough that a later rung could check whether
-they were shut or merely unopened, and they were unopened: the propagation rule
-had never been derived because nobody had tried, and the missing seam was a
-frame index and a pixel this analysis already holds and discards. A refusal
-whose gates turn out to be one commit away is a finding about the refusal, and
-it is the kind of thing that only shows up when the trigger was written in
-advance.
+The table is empty and the ladder above it has ended — every rung marked done,
+and none removed to make that true. This is the third time the section has been
+empty: v0.8's close emptied it, v0.9 refilled it because the rung below pulled
+one in, v0.9's close emptied it again, v0.10 refilled it because a refusal
+turned out to have reachable gates, and v0.10's close empties it with nothing
+queued behind. A row returns when something forces one, never because the
+section looks bare, and that rule is what makes an ended ladder readable as a
+state rather than as a stopping point.
 
-This row is not a promise of an interval. It ships the seam and the
-measurement; whether a span's uncertainty can be *stated* is what the rung
-finds out, and refusal stays a legitimate outcome — see *Deliberately not
-built*, where the entry is edited rather than removed.
+The rung it just lost is worth one sentence, since what forced it was a refusal
+rather than a feature: v0.9 wrote the span's two gates down precisely enough
+that a later rung could check whether they were shut or merely unopened, and
+they were unopened. It shipped the seam and the measurement, and it did not
+ship an interval — which was always a legitimate outcome of it, and is the one
+that happened.
 
 Python entered in v0.6 because an uncertainty model had to be fitted somewhere;
 step 25 is that fit, steps 26 to 29 are the seam and the page that carry it to a
-laptop's reader, and steps 30 to 35 put the same artifact in the hand of somebody
-pointing a sensor at a room. What the chain ends with is a number on a phone that
-a Mac re-derives from the container the same run wrote. It answers about one
-point and refuses a span, for reasons kept in *Deliberately not built* rather
-than in a screen's source.
+laptop's reader, steps 30 to 35 put the same artifact in the hand of somebody
+pointing a sensor at a room, and steps 36 to 39 measure whether two of those
+points' errors cancel. What the chain ends with is a number on a phone that a
+Mac re-derives from the container the same run wrote, beside a measured ratio
+saying those errors do cancel and still refusing to become an interval. It
+answers about one point and refuses a span, for reasons kept in *Deliberately
+not built* rather than in a screen's source.
 
 What stays unmeasured is unchanged and stays written as a condition rather than
 a plan: request latency, throughput, behavior under concurrent requests, the
