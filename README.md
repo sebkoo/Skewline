@@ -98,10 +98,9 @@ point the sensor is looking at now is the same job rather than a new one,
 because the model is this pipeline's own output and the frame being tapped is
 one the container keeps — the phone shows the frame's index and the point, so
 the same tap can be re-derived on a Mac:
-`swift run SightProbe <model> <container> --frame N x,y`.
-**Whether the two agree on a device is not yet recorded** — there has been no
-phone and laptop on one LAN. A reading nobody can check would be the second job
-arriving in disguise.
+`swift run SightProbe <model> <container> --frame N x,y`. That has been done
+once, on a device against a laptop, and the two agreed to the digit. A reading
+nobody can check would be the second job arriving in disguise.
 
 ```sh
 swift build && swift test
@@ -134,7 +133,7 @@ v0.5  interop      a point-cloud reader over Swift–C++                done
 v0.6  fit          the uncertainty model, fitted offline              done
 v0.7  service      the fitted model reaches the device                done
 v0.8  view         a dashboard over the same service                  done
-v0.9  point        what the model says about a point you tap          here
+v0.9  point        what the model says about a point you tap          done
 ```
 
 Rungs are planned; individual commits are not. What each commit contains is
