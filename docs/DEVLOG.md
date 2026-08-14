@@ -2674,3 +2674,42 @@ before a single pair exists.
   and no pair has been formed. v0.8's measurement trigger is untouched and
   stands on its remaining half: no registered workload exists, so no latency or
   throughput number is owed or given, and nothing here was timed.
+
+## 2026-08-14 · v0.10 commit 2 — the sampling leaves the probe
+
+**Built and gated; zero behaviour change, and the test is what says so.**
+v0.6 put the every-Nth retention rule in the probe under the `InteropProbe
+--dump` trade — untestable, and defensible for a counter. It is not defensible
+for a sampling design a covariate rests on, and the rung below this one adds a
+second rule beside it. So the rule moves into `Render` first, on its own, while
+it can still be proved identical.
+
+- **A move, not a change, and the difference is a test rather than a claim.**
+  `Calibration.EveryNthSampler` and `Calibration.ObservationBucket` are the
+  probe's own logic verbatim: one counter per (k × class × band), keep when
+  that bucket's count so far is a multiple of the interval, survivor counts
+  incremented for every observation and therefore pre-sampling. The probe's
+  `ObservationCollector` now holds a sampler and formats rows; `decimation` and
+  `survivors` became forwarding properties so the header writer is untouched.
+- **The pin re-derives the rule rather than transcribing the implementation.**
+  The test walks the real observation stream at four intervals, computes
+  keep/drop from the rule's *words*, and requires the sampler to agree — plus
+  that survivors sum to the full population, and that interval 1 keeps
+  everything. A second test pins the phase: every bucket's first observation
+  survives any interval, because the counter starts at zero.
+- **Both were shown red, on the mistake that would actually be made.** Shifting
+  the phase by one character — `(seen + 1) % interval` — turned the first red
+  with 67 issues and the second with 2. That is the off-by-one a reimplementation
+  invites, and it would have silently dropped the first sample of every bucket
+  while leaving row counts almost unchanged.
+- **The second test caught its own fixture before it caught anything else.**
+  Written against the k=1 fixture it failed on its own guard: that container
+  yields exactly one bucket, so it could not have shown that the counters are
+  *per* bucket. Moved to the two-separation fixture. A test that cannot
+  distinguish the thing it names is worse than no test, and the guard is there
+  because assuming otherwise is easy.
+- **The gate did not grow.** Five commands, unchanged: Swift 199, Python 76,
+  both iOS builds, drift green.
+- **Not measured yet.** Unchanged from commit 1. No container has been
+  exported; the export's row counts, file sizes and runtime are still owed to
+  nobody because no export has run.

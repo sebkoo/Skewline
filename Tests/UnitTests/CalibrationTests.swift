@@ -718,6 +718,55 @@ private func movingFrames() -> [SceneFrame] {
     }
 }
 
+// MARK: - The export's sampling
+
+/// The extracted sampler must reproduce v0.6's registered rule exactly, which
+/// is what makes lifting it out of the probe a move rather than a change:
+/// one counter per (k × class × band), keep when that bucket's count so far is
+/// a multiple of the interval. Re-derived here from the rule's own words
+/// rather than transcribed from the implementation.
+@Test func everyNthSamplerReproducesTheRegisteredDecimation() throws {
+    let collected = try observations(
+        movingFrames(), constants: testConstants(separations: [1, 2])
+    )
+    #expect(!collected.isEmpty)
+    for interval in [1, 2, 3, 64] {
+        var sampler = Calibration.EveryNthSampler(interval: interval)
+        var seen: [Calibration.ObservationBucket: Int] = [:]
+        var kept = 0
+        for observation in collected {
+            let bucket = Calibration.ObservationBucket(observation)
+            let before = seen[bucket, default: 0]
+            seen[bucket] = before + 1
+            let expected = before % interval == 0
+            #expect(sampler.keep(observation) == expected)
+            if expected { kept += 1 }
+        }
+        #expect(sampler.survivors == seen, "survivor counts are pre-sampling, not post")
+        #expect(sampler.survivors.values.reduce(0, +) == collected.count)
+        if interval == 1 { #expect(kept == collected.count) }
+    }
+}
+
+/// Every bucket's first observation is kept, whatever the interval: the
+/// counter starts at zero and `0 % N == 0`. A rule that started at one would
+/// silently drop the first sample of every bucket.
+@Test func everyBucketsFirstObservationSurvivesAnyInterval() throws {
+    let collected = try observations(
+        movingFrames(), constants: testConstants(separations: [1, 2])
+    )
+    #expect(!collected.isEmpty)
+    var sampler = Calibration.EveryNthSampler(interval: 64)
+    var firstSeen: Set<Calibration.ObservationBucket> = []
+    for observation in collected {
+        let bucket = Calibration.ObservationBucket(observation)
+        let isFirst = firstSeen.insert(bucket).inserted
+        let kept = sampler.keep(observation)
+        if isFirst { #expect(kept) }
+    }
+    #expect(firstSeen.count >= 2, "one bucket cannot show that the counters are per-bucket")
+}
+
 // MARK: - Determinism
 
 @Test func analysisByteReproducesItsOwnReport() throws {

@@ -172,6 +172,60 @@ public enum Calibration {
         }
     }
 
+    /// The bucket an observation is counted and sampled in: the same
+    /// (k × class × band) key the report's own tables use.
+    public struct ObservationBucket: Hashable, Comparable, Sendable {
+        public var separation: Int
+        public var confidenceClass: Int
+        public var band: Int
+
+        public init(separation: Int, confidenceClass: Int, band: Int) {
+            self.separation = separation
+            self.confidenceClass = confidenceClass
+            self.band = band
+        }
+
+        public init(_ observation: Observation) {
+            self.init(
+                separation: observation.separation,
+                confidenceClass: observation.confidenceClass,
+                band: observation.band
+            )
+        }
+
+        public static func < (lhs: Self, rhs: Self) -> Bool {
+            (lhs.separation, lhs.confidenceClass, lhs.band)
+                < (rhs.separation, rhs.confidenceClass, rhs.band)
+        }
+    }
+
+    /// v0.6's registered retention rule, lifted out of the probe so it can be
+    /// tested: one counter per (k × class × band), starting at zero, keep when
+    /// `counter % interval == 0` -- systematic-every-Nth over the analysis's
+    /// deterministic accumulation order, no randomness. `survivors` keeps the
+    /// pre-sampling counts a sampled file cannot otherwise recover.
+    ///
+    /// It lived in the probe under the `InteropProbe --dump` trade, which was
+    /// defensible for a counter. It is not defensible for a sampling design a
+    /// covariate rests on, which is why the pair-level rule beside it and this
+    /// one are both library-side now.
+    public struct EveryNthSampler: Sendable {
+        public let interval: Int
+        public private(set) var survivors: [ObservationBucket: Int] = [:]
+
+        public init(interval: Int) {
+            precondition(interval >= 1)
+            self.interval = interval
+        }
+
+        public mutating func keep(_ observation: Observation) -> Bool {
+            let bucket = ObservationBucket(observation)
+            let seen = survivors[bucket, default: 0]
+            survivors[bucket] = seen + 1
+            return seen % interval == 0
+        }
+    }
+
     /// Robust statistics of one bucket's signed residuals. `medianAbs` and
     /// `mad` describe |Δ|; `medianSigned` keeps the sign so a systematic
     /// bias -- a chain bug, not sensor noise -- stays visible.

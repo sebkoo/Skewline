@@ -324,34 +324,18 @@ struct CalibrationProbe {
     /// zero, keep when `counter % N == 0` -- systematic-every-Nth over the
     /// analysis's deterministic accumulation order, no randomness.
     final class ObservationCollector {
-        struct Bucket: Hashable, Comparable {
-            let separation: Int
-            let confidenceClass: Int
-            let band: Int
-
-            static func < (lhs: Bucket, rhs: Bucket) -> Bool {
-                (lhs.separation, lhs.confidenceClass, lhs.band)
-                    < (rhs.separation, rhs.confidenceClass, rhs.band)
-            }
-        }
-
-        let decimation: Int
-        var survivors: [Bucket: Int] = [:]
+        var sampler: Calibration.EveryNthSampler
         var rows: [String] = []
 
+        var decimation: Int { sampler.interval }
+        var survivors: [Calibration.ObservationBucket: Int] { sampler.survivors }
+
         init(decimation: Int) {
-            self.decimation = decimation
+            self.sampler = Calibration.EveryNthSampler(interval: decimation)
         }
 
         func consume(_ observation: Calibration.Observation) {
-            let bucket = Bucket(
-                separation: observation.separation,
-                confidenceClass: observation.confidenceClass,
-                band: observation.band
-            )
-            let seen = survivors[bucket, default: 0]
-            survivors[bucket] = seen + 1
-            guard seen % decimation == 0 else { return }
+            guard sampler.keep(observation) else { return }
             // Shortest-round-trip `description` for every float: lossless,
             // deterministic and locale-independent, where a fixed decimal
             // format would drop low bits of near samples for nothing.
