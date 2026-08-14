@@ -3338,3 +3338,95 @@ revisits a distance "has no null and no answer."
 - **The gate.** `.venv/bin/python -m unittest discover -s Fit -v` is green
   at 114. Full gate reported after commit 13, as before.
 - **Not measured yet.** Every span number. No container has been exported.
+
+## 2026-08-14 · v0.10 commit 13 — give the span statistic a command line
+
+**`span.py` can be run.** `fit.py` and `serve.py` have had `main(argv)` since
+v0.6 and v0.7; `span.py` did not, and `build_artifact`/`write_artifact` had
+no caller anywhere in the tree. Two gaps found while writing this commit
+needed small new code first, not composition of what already existed:
+
+- **Provenance had no producer.** `build_artifact` consumes a `provenance`
+  list but nothing built its entries. `_provenance_entry` mirrors
+  `fit.load_class_containers` exactly: `session` and `decimation`, nothing
+  else — no path, no basename, since a basename can name a room and this
+  entry is what ends up inside a committed file.
+- **The radius comes from the file's own header, never a constant.**
+  `_forward_backward_radius` reads `forward-backward-radius` out of the `/2`
+  header's metadata and raises if it is absent, rather than assuming the
+  `1.0` this rung has used in prose so far. A hardcoded fallback would have
+  been silently wrong the day a container was exported at a different
+  radius.
+- **One artifact per container, never pooled.** `skewline-span/1`'s only
+  axis is confidence class — `low`/`medium`/`high` — and it has no container
+  axis. Writing one artifact per input file, each with a single-session
+  `measuredOn`, keeps the four numbers the module docstring calls "the only
+  guard" (unanimity across containers) visible across the separate files
+  where they belong, rather than pooling them into one artifact where they
+  would simply not exist. `ARTIFACT_SCHEMA` is untouched — it is registered
+  and was already pushed at `d9e7207`.
+- **Artifact filenames are session ids, never input basenames.** The
+  provenance rule already keeps a basename out of the export's *contents*
+  for privacy; putting it in the committed artifact's *filename* instead
+  would leak the identical information one level up. `--output-dir <dir>`
+  plus `<session>.span.json` per input file.
+
+**A placement correction found while testing, not while planning.** Commit
+12's disjoint-pair check lives in `cell_ratios`, not `read_geometry` — see
+that entry — so nothing here had to route around it; `_analyze_container`
+simply calls the functions in order and lets whichever raises first stop the
+run.
+
+**Two kinds of refusal, not one.** File-level `ValueError`s — the `/1`-file
+check, the sampling-header check, commit 12's disjoint-pair check, the
+missing-radius-header check above, and `camera_xy`'s per-row missing-
+intrinsics check — are structural: the CLI exits non-zero (`1`) with the
+underlying message, or `64` on a bad invocation (no `--output-dir`, no input
+files — the same convention `fit.py` and `serve.py` use). Per-cell and
+per-lateral verdicts — `INSUFFICIENT_PAIRS`, `LATERAL_REFUSED`, commit 11's
+sharpness refusal — are not errors: `cell_verdict` and `lateral_verdict`
+already return them as ordinary outcomes on real data, and conflating the
+two would mean one sparse band in an otherwise healthy session fails the
+whole run — discoverable only against a real export, which is the worst
+possible moment to learn it. The report prints them and the process exits
+`0`.
+
+**The report is the registered list, not a better-looking one.** Per class
+and per separation band: every input container's ratio printed separately,
+never pooled — a pooled mean would hide a squeaker; unanimity against
+`ratio < 0.90` (`cell_verdict == CANCELS_WITH_MARGIN` in every container);
+a ratio above `1` (`ANTI_CORRELATED`) called out as its own finding, never
+folded into "does not cancel"; commit 11's sharpness verdict per container,
+which refuses regardless of where the ratio fell; the lateral round-trip
+median against the `0.50` px margin beside its truncation bound and the
+fraction of survivors at the bound; seed stability across the three
+registered seeds; and each written artifact's `spanInterval: "refused"`
+field, unchanged and only surfaced, not recomputed.
+
+**Two things decided now, not left open.** The unanimity verdict lives only
+in the printed report — correct, since it is a cross-file comparison and
+the artifact schema has no container axis to hold it in — which means the
+only place it is ever written down is whichever commit runs a real export
+and records what it found; that commit owns capturing it, not this one.
+Separately: `README:40` documents `serve.py`'s invocation but neither
+`fit.py`'s nor `span.py`'s, and no drift assertion covers Python CLI
+invocations, so the gate stays green either way — this commit does not add
+a README line for the new CLI, since doing so would widen a `feat:` commit
+about giving `span.py` an entry point into a documentation commit too. That
+line is deferred to the v0.10 closing doc commits.
+
+- **Tests.** Seven, on `TheCommandLine`: the four structural refusals, each
+  checked for its own message; the missing-radius-header refusal, checked
+  separately since it is new to this commit rather than one of the four the
+  plan enumerated; a thin-cell fixture that reports `INSUFFICIENT_PAIRS`
+  and still exits `0`; and two containers built with deliberately different
+  cancellation strength, whose independently-computed ratios are asserted
+  distinct and both required to appear verbatim in the printed report — the
+  property a pooled driver could quietly lose. Python: 114 → 121.
+- **The gate.** All five commands, run once for commits 11-13 together since
+  nothing in them touches anything outside `Fit/`: `swift build && swift
+  test` — Swift, unchanged at 201; both `xcodebuild` invocations green;
+  `.venv/bin/python -m unittest discover -s Fit -v` — green at 121;
+  `swift Scripts/readme-drift.swift` — green.
+- **Not measured yet.** Every span number, and the export's size at the
+  registered stride. No container has been exported.

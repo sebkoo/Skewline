@@ -10,6 +10,8 @@ never enter this repository.
 Everything is seeded `default_rng`: a failure reproduces exactly.
 """
 
+import contextlib
+import io
 import json
 import os
 import tempfile
@@ -29,12 +31,12 @@ FX = FY = 200.0
 CX = CY = 128.0
 
 
-def geometry_text(rows, sampling="pair-stride", frames=None, tag=None):
+def geometry_text(rows, sampling="pair-stride", frames=None, tag=None, session="PLANTED-TEST"):
     """A `/2` file: the header the probe writes, then the rows given."""
     frames = frames if frames is not None else sorted({int(r[5]) for r in rows})
     header = [
         f"# {tag or span.SCHEMA_TAG}",
-        "# session PLANTED-TEST",
+        f"# session {session}",
         "# separations 1",
         "# nominal-frame-interval 0.03333333333333333",
         "# band-edges 0.5,1.0,2.0,3.0,5.0",
@@ -689,6 +691,122 @@ class TheArtifact(unittest.TestCase):
         self.assertAlmostEqual(
             artifact["lateralClearanceFloor"], 1.0 - 1.0 / np.sqrt(2.0)
         )
+
+
+class TheCommandLine(unittest.TestCase):
+    """Two kinds of refusal, not one. File-level `ValueError`s are structural
+    -- the CLI exits non-zero with the registered message. Per-cell and
+    per-lateral verdicts are ordinary outcomes on real data -- reported, and
+    the process exits zero -- so a thin band in an otherwise healthy session
+    never fails the whole run."""
+
+    def run_cli(self, args):
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = span.main(["span.py"] + args)
+        return code, out.getvalue(), err.getvalue()
+
+    def output_dir(self, directory):
+        path = os.path.join(directory, "out")
+        os.makedirs(path)
+        return path
+
+    def test_a_v1_file_exits_non_zero(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "observations.csv")
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(
+                    "# skewline-observations/1\n"
+                    "# session S\n"
+                    "# columns k,delta_t,class,depth,delta\n"
+                    "1,0.0333,2,1.25,0.004\n"
+                )
+            code, _, err = self.run_cli(["--output-dir", self.output_dir(directory), path])
+        self.assertEqual(code, 1)
+        self.assertIn("skewline-observations/2", err)
+
+    def test_a_sampling_header_that_is_not_pair_stride_exits_non_zero(self):
+        rows = planted_rows(np.random.default_rng(50), pairs=2, per_pair=8)
+        with tempfile.TemporaryDirectory() as directory:
+            path = written(rows, directory, sampling="every-nth")
+            code, _, err = self.run_cli(["--output-dir", self.output_dir(directory), path])
+        self.assertEqual(code, 1)
+        self.assertIn("pair-stride", err)
+
+    def test_a_session_with_no_disjoint_pair_exits_non_zero(self):
+        rows = [
+            (1, 0.0333, 2, 1.0, 0.001, 0, 1, 10, 10, 10, 10, 0.0, 0.0),
+            (1, 0.0333, 2, 1.0, 0.001, 0, 2, 10, 10, 10, 10, 0.0, 0.0),
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            path = written(rows, directory)
+            code, _, err = self.run_cli(["--output-dir", self.output_dir(directory), path])
+        self.assertEqual(code, 1)
+        self.assertIn("no frame", err)
+
+    def test_a_row_whose_frame_has_no_intrinsics_exits_non_zero(self):
+        # Two disjoint pairs, but intrinsics supplied for only one source
+        # frame -- distinct from the file-level "no intrinsics header" case,
+        # which `read_geometry` already refuses on its own.
+        rows = planted_rows(np.random.default_rng(51), pairs=2, per_pair=50)
+        with tempfile.TemporaryDirectory() as directory:
+            path = written(rows, directory, frames=[0])
+            code, _, err = self.run_cli(["--output-dir", self.output_dir(directory), path])
+        self.assertEqual(code, 1)
+        self.assertIn("no intrinsics", err)
+
+    def test_a_missing_radius_header_exits_non_zero(self):
+        rows = planted_rows(np.random.default_rng(52), pairs=2, per_pair=8)
+        text = geometry_text(rows)
+        text = "\n".join(
+            line for line in text.splitlines()
+            if not line.startswith("# forward-backward-radius")
+        ) + "\n"
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "geometry.csv")
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(text)
+            code, _, err = self.run_cli(["--output-dir", self.output_dir(directory), path])
+        self.assertEqual(code, 1)
+        self.assertIn("forward-backward-radius", err)
+
+    def test_a_thin_cell_reports_insufficient_and_exits_zero(self):
+        # The property the two kinds of refusal must not conflate: a real
+        # session with one sparse band must not fail the whole run.
+        rows = planted_rows(np.random.default_rng(53), pairs=2, per_pair=8)
+        with tempfile.TemporaryDirectory() as directory:
+            path = written(rows, directory)
+            code, out, _ = self.run_cli(["--output-dir", self.output_dir(directory), path])
+        self.assertEqual(code, 0)
+        self.assertIn(span.INSUFFICIENT_PAIRS, out)
+
+    def test_the_report_prints_per_container_values_not_an_aggregate(self):
+        # Two containers with deliberately different cancellation strength,
+        # so a pooled mean would produce a THIRD number neither of these is
+        # -- and the report must show both of theirs, not it.
+        rows_one = planted_rows(
+            np.random.default_rng(60), pairs=10, per_pair=1000, common=0.02, independent=0.01
+        )
+        rows_two = planted_rows(
+            np.random.default_rng(61), pairs=10, per_pair=1000, common=0.08, independent=0.01
+        )
+        with tempfile.TemporaryDirectory() as first, \
+                tempfile.TemporaryDirectory() as second, \
+                tempfile.TemporaryDirectory() as combined:
+            path_one = written(rows_one, first, session="CONTAINER-ONE")
+            path_two = written(rows_two, second, session="CONTAINER-TWO")
+            ratio_one = span.cell_ratios(span.read_geometry(path_one), 2)["cells"][3]["ratio"]
+            ratio_two = span.cell_ratios(span.read_geometry(path_two), 2)["cells"][3]["ratio"]
+            out_dir = self.output_dir(combined)
+            code, out, _ = self.run_cli(["--output-dir", out_dir, path_one, path_two])
+            artifacts = sorted(os.listdir(out_dir))
+        self.assertEqual(code, 0)
+        self.assertEqual(artifacts, ["CONTAINER-ONE.span.json", "CONTAINER-TWO.span.json"])
+        self.assertIsNotNone(ratio_one)
+        self.assertIsNotNone(ratio_two)
+        self.assertNotAlmostEqual(ratio_one, ratio_two, places=3)
+        self.assertIn(f"{ratio_one:.6f}", out)
+        self.assertIn(f"{ratio_two:.6f}", out)
 
 
 if __name__ == "__main__":

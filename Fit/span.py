@@ -76,6 +76,8 @@ repository; only the aggregate artifact does.
 
 import json
 import math
+import os
+import sys
 
 import numpy as np
 
@@ -770,3 +772,160 @@ def read_artifact(path):
     if artifact.get("schema") != ARTIFACT_SCHEMA:
         raise ValueError(f"{path}: not a {ARTIFACT_SCHEMA} artifact")
     return artifact
+
+
+# --- The driver the measured commit will run --------------------------------
+
+USAGE = "usage: span.py --output-dir <dir> <geometry.csv> [<geometry.csv> ...]"
+
+
+def _forward_backward_radius(observations, path):
+    """The `/2` header's own truncation radius. Missing means the lateral
+    bound this analysis requires beside every median is unknown, so this
+    raises rather than defaulting to a plausible-looking constant."""
+    value = observations["metadata"].get("forward-backward-radius")
+    if value is None:
+        raise ValueError(
+            f"{path}: no forward-backward-radius header, so the lateral "
+            f"truncation bound is unknown"
+        )
+    return float(value)
+
+
+def _provenance_entry(observations):
+    """Session and decimation only -- no path, no basename. Mirrors
+    `fit.load_class_containers` (fit.py:358, :374-377): a basename can name a
+    room, and this entry is what `build_artifact` writes into a committed
+    file, so it carries the same restricted field list the export itself
+    does."""
+    return {
+        "session": observations["session"],
+        "decimation": int(observations["metadata"].get("decimation", 0)),
+    }
+
+
+def _analyze_container(path):
+    """Everything this CLI knows about one `/2` file: its own artifact
+    inputs, plus the diagnostics (sharpness, seed stability) the printed
+    report needs beside them. Raises on any of the file-level refusals --
+    the schema, sampling, intrinsics-header and disjoint-pair checks in
+    `read_geometry`, the missing-intrinsics-row check inside `cell_ratios`,
+    and the missing-radius check above -- all before any artifact is
+    written."""
+    observations = read_geometry(path)
+    radius = _forward_backward_radius(observations, path)
+    provenance = _provenance_entry(observations)
+    results, laterals, sharpness, stability = {}, {}, {}, {}
+    for class_index in range(len(CLASS_NAMES)):
+        results[class_index] = cell_ratios(observations, class_index)
+        laterals[class_index] = lateral_summary(observations, class_index, radius)
+        sharpness[class_index] = sharpness_spread(observations, class_index)
+        stability[class_index] = seed_stability(observations, class_index)
+    return {
+        "path": path,
+        "provenance": provenance,
+        "radius": radius,
+        "results": results,
+        "laterals": laterals,
+        "sharpness": sharpness,
+        "stability": stability,
+    }
+
+
+def _write_container_artifact(output_dir, container):
+    """One `skewline-span/1` artifact per container -- never pooled, since
+    the schema has a classes axis and no container axis, and unanimity across
+    containers (`:69-70`) is read across the separate files this writes, not
+    inside any one of them. Named by session id, never by the input file's
+    basename -- see `_provenance_entry`."""
+    artifact = build_artifact(
+        container["results"], container["laterals"],
+        [container["provenance"]], container["radius"],
+    )
+    session = container["provenance"]["session"] or "unknown-session"
+    out_path = os.path.join(output_dir, f"{session}.span.json")
+    write_artifact(out_path, artifact)
+    return out_path
+
+
+def _print_report(containers):
+    """The registered report, per class and per separation band, with every
+    container's value shown separately -- never pooled, so a squeaker is
+    visible rather than averaged away."""
+    print(f"containers: {len(containers)}")
+    for container in containers:
+        print(f"  {container['provenance']['session']}  {container['path']}")
+    for class_index, class_name in enumerate(CLASS_NAMES):
+        print(f"class {class_name}:")
+        for band_index in range(len(SEPARATION_EDGES) - 1):
+            low, high = SEPARATION_EDGES[band_index], SEPARATION_EDGES[band_index + 1]
+            cells = [
+                container["results"][class_index]["cells"][band_index]
+                for container in containers
+            ]
+            verdicts = [cell_verdict(cell) for cell in cells]
+            sharpness_verdicts = [
+                sharpness_verdict(container["sharpness"][class_index][band_index])
+                for container in containers
+            ]
+            printed_ratios = "  ".join(
+                "none" if cell["ratio"] is None else f"{cell['ratio']:.6f}" for cell in cells
+            )
+            print(f"  band [{low:.2f},{high:.2f}): ratios {printed_ratios}")
+            print(f"    verdicts: {', '.join(verdicts)}")
+            print(f"    unanimous ratio<0.90: {all(v == CANCELS_WITH_MARGIN for v in verdicts)}")
+            if any(v == ANTI_CORRELATED for v in verdicts):
+                print("    ANTI-CORRELATED in at least one container")
+            print(f"    sharpness: {', '.join(sharpness_verdicts)}")
+            if any(v == SHARPNESS_REFUSED for v in sharpness_verdicts):
+                print("    SHARPNESS REFUSED in at least one container, regardless of ratio")
+        for container in containers:
+            session = container["provenance"]["session"]
+            lateral = container["laterals"][class_index]
+            median = (
+                "none" if lateral["medianPixels"] is None else f"{lateral['medianPixels']:.6f}"
+            )
+            at_bound = "none" if lateral["atBound"] is None else f"{lateral['atBound']:.4f}"
+            print(
+                f"  lateral {session}: median {median} px  "
+                f"radius {lateral['truncationRadiusPixels']}  atBound {at_bound}  "
+                f"verdict {lateral_verdict(lateral)}"
+            )
+            print(f"  seed stability {session}: {container['stability'][class_index]}")
+
+
+def main(argv):
+    args = argv[1:]
+    output_dir, paths = None, []
+    index = 0
+    while index < len(args):
+        if args[index] == "--output-dir":
+            if index + 1 >= len(args):
+                print(USAGE)
+                return 64
+            output_dir = args[index + 1]
+            index += 2
+        else:
+            paths.append(args[index])
+            index += 1
+    if output_dir is None or not paths:
+        print(USAGE)
+        return 64
+
+    containers = []
+    for path in paths:
+        try:
+            container = _analyze_container(path)
+        except ValueError as problem:
+            print(f"span.py: {problem}", file=sys.stderr)
+            return 1
+        out_path = _write_container_artifact(output_dir, container)
+        print(f"wrote {out_path}")
+        containers.append(container)
+
+    _print_report(containers)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
