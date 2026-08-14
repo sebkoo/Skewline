@@ -2906,3 +2906,50 @@ width.
   both iOS builds, drift green.
 - **Not measured yet.** Unchanged: every span number, both thresholds, the
   export's size at the registered stride.
+
+## 2026-08-14 · v0.10 — what the six entries left out
+
+**Three corrections to the record, none of them to the code.** This file
+records the mistakes and not only the decisions, and these are three places
+where the entries above are thinner than the work was. Written as its own entry
+because the file is append-only and a correction that edits history in place is
+not a correction anybody can audit.
+
+- **A real finding went unrecorded behind a rule that did not cover it.**
+  Commit 4's entry says no number from the smoke run is kept, and that was one
+  category too wide. The prohibition is on reading **the statistic** before the
+  thresholds are registered — the ratio, the medians, anything that is the
+  estimand or a step toward it. A focal length is *structure*, in the same
+  category as "thirteen columns" and "the header parses", both of which were
+  checked and reported. So the finding is recorded here with its provenance:
+  container `2110CDA9`, one deliberately coarse stride, an unregistered smoke
+  export since deleted, three exported source frames — 36, 436 and 836 —
+  carrying focal lengths **190.41724, 178.35194 and 178.66602** depth pixels.
+  ARKit updates intrinsics within a session. That is what turns the per-frame
+  intrinsics table from foresight into evidence: a single header value would
+  have been wrong for two frames of the three, and every camera-space
+  separation derived from it wrong with it. **No span number is recorded**,
+  which is the sentence commit 4 should have written.
+- **`rt_dx`/`rt_dy` was argued in advance, not improvised during the work.**
+  Two components rather than one magnitude, because a relative-rotation error's
+  signature is directional — `δθ_x·ΔY − δθ_y·ΔX` — and a magnitude destroys it.
+  That is a widening beyond the *brief*, which asked for one field, and it was
+  written into the plan and reviewed before a line of it existed. The source
+  comment carries the reason but not the provenance, and the distinction
+  matters in a rung whose whole subject is which decisions preceded the data:
+  "improvised during the work" and "argued in advance" are different claims,
+  and only one of them is true here.
+- **`P` is a third registered value, and it moves only where the margins do.**
+  Commit 3 committed a default and commit 4 noted that the file at that stride
+  will be large and that `P` is the lever. That framing was too casual. File
+  size is not the estimand, but `P` decides **which pairs are in the
+  analysis**, which sits nearer the criteria than the plumbing — and `span.py`
+  refuses a file whose sampling header is not the registered rule, so a changed
+  `P` is a re-registration rather than a tweak. It is therefore governed by the
+  same ordering as `lateralClearanceMargin` and `cancellationMargin`: if it
+  changes, it changes in the threshold commit, before the first real export,
+  with its reason written down. Never between exports, and never after seeing
+  one.
+- **The gate did not grow.** Five commands, unchanged: Swift 201, Python 80,
+  both iOS builds, drift green. Nothing here touches code.
+- **Not measured yet.** Every span number, both margins, and `P`'s final value.
