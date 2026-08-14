@@ -74,6 +74,8 @@ captures, carry a frame index and a pixel per row, and never enter the
 repository; only the aggregate artifact does.
 """
 
+import math
+
 import numpy as np
 
 import fit
@@ -126,6 +128,20 @@ LATERAL_ESTIMAND = (
 )
 LATERAL_UNITS = "depth pixels"
 
+# The clearance a totally censored population still shows, derived rather than
+# observed. If the true displacement scale is far outside the radius, the
+# survivors are those that happen to land inside it -- uniform over the disk in
+# the limit -- and for points uniform on a disk of radius R, P(r <= t) =
+# t^2/R^2, so the median radius is R/sqrt(2) and the clearance
+# (R - median)/R is 1 - 1/sqrt(2) ~ 0.293.
+#
+# So clearance does NOT approach zero when the bound does all the work: it
+# bottoms out here. A registered margin at or below this floor would call a
+# fully filter-shaped distribution "reportable", which is the exact overclaim
+# the criterion exists to prevent. The margin must exceed it, and
+# `_registered_clearance` refuses a value that does not.
+LATERAL_CLEARANCE_FLOOR = 1.0 - 1.0 / math.sqrt(2.0)
+
 # Lateral camera-space separation bands, in meters, half-open like BAND_EDGES
 # and read by the same contract: >= first, < last, outside is no band. The
 # covariate is LATERAL and not full 3-D: for a small relative-rotation error
@@ -158,6 +174,12 @@ CANCELS_WITHOUT_MARGIN = "cancels without margin"
 DOES_NOT_CANCEL = "does not cancel"
 ANTI_CORRELATED = "anti-correlated"
 INSUFFICIENT_PAIRS = "insufficient pairs"
+
+# The lateral component's two outcomes. "Refused" is not "unavailable":
+# the number exists and is not reported, because what it measures is the
+# filter rather than the sensor.
+LATERAL_REPORTABLE = "reportable beside its bound"
+LATERAL_REFUSED = "refused -- the bound is binding at the statistic"
 
 
 # --- Reading the widened export -------------------------------------------
@@ -379,6 +401,20 @@ CANCELLATION_MARGIN = None
 LATERAL_CLEARANCE_MARGIN = None
 
 
+def _registered_clearance(value):
+    """The clearance margin, with the one constraint that IS derivable: it must
+    exceed the floor a totally censored population already shows, or it has no
+    power to refuse one."""
+    margin = _registered(value, "LATERAL_CLEARANCE_MARGIN")
+    if margin <= LATERAL_CLEARANCE_FLOOR:
+        raise ValueError(
+            f"LATERAL_CLEARANCE_MARGIN {margin} is at or below the censored "
+            f"floor {LATERAL_CLEARANCE_FLOOR:.4f}; a fully filter-shaped "
+            f"distribution would clear it"
+        )
+    return margin
+
+
 def _registered(value, name):
     if value is None:
         raise ValueError(
@@ -472,3 +508,63 @@ def seed_stability(observations, class_index, seeds=SEED_STABILITY_SEEDS):
         str(seed): [cell["ratio"] for cell in cell_ratios(observations, class_index, seed=seed)["cells"]]
         for seed in seeds
     }
+
+
+# --- The lateral estimand, and the filter that censors it -----------------
+
+def lateral_summary(observations, class_index, radius):
+    """The forward-backward round-trip displacement of one class's surviving
+    samples, in depth pixels, reported ONLY beside the radius that produced it.
+
+    The radius is a FILTER, not a measurement window: every observation that
+    exists survived `dx^2 + dy^2 <= radius^2`, so this distribution is
+    truncated from above and every statistic of it -- the median included -- is
+    biased low. Reporting the median alone would be a measurement of the
+    filter rather than of the sensor.
+
+    `atBound` is the share of survivors within the last tenth of the radius.
+    It is the diagnostic that says whether the truncation is doing the work: a
+    distribution piled against its bound is one the filter shaped.
+    """
+    selected = (observations["k"] == SEPARATION_K) & (observations["class"] == class_index)
+    displacement = np.hypot(
+        observations["rt_dx"][selected], observations["rt_dy"][selected]
+    )
+    if displacement.size == 0:
+        return {
+            "class": CLASS_NAMES[class_index],
+            "samples": 0,
+            "medianPixels": None,
+            "truncationRadiusPixels": float(radius),
+            "atBound": None,
+            "clearance": None,
+        }
+    median = fit.upper_median(displacement)
+    return {
+        "class": CLASS_NAMES[class_index],
+        "samples": int(displacement.size),
+        "medianPixels": median,
+        "truncationRadiusPixels": float(radius),
+        "atBound": float(np.count_nonzero(displacement >= 0.9 * radius) / displacement.size),
+        # How far below its own bound the statistic sits, relatively. This is
+        # the quantity the registered clearance is compared against.
+        "clearance": (radius - median) / radius,
+    }
+
+
+def lateral_verdict(summary, clearance_margin=None):
+    """Reportable only where the bound is not binding at the statistic.
+
+    Registered before any data: the median must sit below the truncation
+    radius by more than the registered relative clearance. Otherwise the number
+    describes the filter and the lateral component stays REFUSED -- and the
+    ROADMAP keeps its narrower entry, that the lateral has never been measured.
+    """
+    margin = _registered_clearance(
+        LATERAL_CLEARANCE_MARGIN if clearance_margin is None else clearance_margin
+    )
+    if summary["medianPixels"] is None:
+        return INSUFFICIENT_PAIRS
+    return (
+        LATERAL_REPORTABLE if summary["clearance"] > margin else LATERAL_REFUSED
+    )

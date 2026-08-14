@@ -3062,3 +3062,49 @@ an unregistered one: it reads as a promise kept.
   both iOS builds, drift green.
 - **Not measured yet.** Every span number, all three registered values, and the
   export's size. No container has been exported.
+
+## 2026-08-14 · v0.10 commit 8 — the lateral, and the floor its filter puts under it
+
+**Built and gated, and the criterion gained the one constraint that is
+derivable.** The lateral estimand is the forward-backward round-trip
+displacement in depth pixels — the quantity the chain computes, compares
+against `forwardBackwardRadius`, and throws away. It is reportable only beside
+that radius, because the radius is what shaped it.
+
+- **A test written to fail did, and the reason is the finding.** It asserted
+  that a totally censored population would show a clearance near zero. It shows
+  **0.28**. If the true displacement scale is far outside the radius, the
+  survivors are the ones that happened to land inside it — uniform over the
+  disk in the limit — and for points uniform on a disk of radius R,
+  `P(r <= t) = t²/R²`, so the median radius is `R/√2` and the clearance
+  `(R − median)/R` is `1 − 1/√2 ≈ 0.293`. **Clearance does not go to zero when
+  the bound does all the work; it bottoms out.**
+- **So the floor is registered, and it is derived rather than chosen.** A
+  margin at or below `1 − 1/√2` would call a fully filter-shaped distribution
+  reportable, which is the exact overclaim the criterion exists to prevent.
+  `_registered_clearance` refuses such a value — the *constant* is rejected,
+  not the data — and a test pins that both `0.10` and the floor itself raise.
+  This turns `TODO(owner):` from "pick a number" into "pick a number above
+  0.2929", which is a materially different request and the first of the three
+  registered values to acquire a real constraint.
+- **`atBound` rides beside the median for the same reason the radius does.**
+  The share of survivors in the last tenth of the radius separates the two
+  cases far more sharply than the clearance does — under 0.01 when the filter
+  removed almost nothing, over 0.10 when it did the work. It is reported as a
+  diagnostic and is not the criterion, because the criterion was registered
+  before this commit and changing which statistic decides after seeing how the
+  statistics behave is the move this rung exists to refuse. It is written down
+  here so a later rung can register it deliberately if it wants to.
+- **The fixture applies the filter rather than describing it.** Displacements
+  are drawn and rejected until they fall inside the radius, exactly as the
+  analysis only ever sees survivors. A fixture that planted the post-filter
+  distribution directly would have assumed the very shape under test.
+- **"Refused" is not "unavailable", the v0.6 reading.** The lateral number
+  exists in both outcomes. What refusal means is that it is not reported,
+  because what it measures is the filter and not the sensor — and the ROADMAP
+  keeps its narrower entry, that the lateral component has never been measured.
+- **The gate did not grow.** Five commands, unchanged: Swift 201, Python 101,
+  both iOS builds, drift green.
+- **Not measured yet.** Every span number, all three registered values, the
+  export's size. The clearances quoted above are the planted fixtures' and
+  describe the code; no container has been exported.

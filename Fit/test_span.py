@@ -358,6 +358,92 @@ class WhatTheStatisticMeasures(unittest.TestCase):
                 self.assertLessEqual(cell["nullPairs"], cell["pairs"])
 
 
+class TheLateralIsCensoredByItsOwnFilter(unittest.TestCase):
+    """The forward-backward radius is a gate, so every surviving displacement
+    is inside it by construction and every statistic of the survivors is biased
+    low. These tests are about that bias, not around it."""
+
+    RADIUS = 1.0
+
+    def rows_with_displacement(self, rng, scale, count=600):
+        rows = []
+        for index in range(count):
+            while True:
+                dx, dy = rng.normal(0.0, scale, 2)
+                # The filter, applied exactly as the analysis applies it: a
+                # sample outside the radius never reaches the export at all.
+                if dx * dx + dy * dy <= self.RADIUS * self.RADIUS:
+                    break
+            rows.append((
+                1, 0.0333, 2, 1.1, 0.004, 0, 1,
+                index % 256, 5, index % 256, 5, round(float(dx), 6), round(float(dy), 6),
+            ))
+        return rows
+
+    def summary_for(self, scale, seed):
+        rng = np.random.default_rng(seed)
+        with tempfile.TemporaryDirectory() as directory:
+            observations = span.read_geometry(
+                written(self.rows_with_displacement(rng, scale), directory)
+            )
+        return span.lateral_summary(observations, 2, self.RADIUS)
+
+    def test_a_bound_that_does_not_bind_leaves_the_median_clear_of_it(self):
+        # Displacements far inside the radius: the filter removed almost
+        # nothing, so the median describes the sensor.
+        summary = self.summary_for(scale=0.05, seed=20)
+        self.assertLess(summary["medianPixels"], 0.5 * self.RADIUS)
+        self.assertGreater(summary["clearance"], 0.5)
+        self.assertLess(summary["atBound"], 0.01)
+        # Above the floor, so the margin is one that could refuse something.
+        self.assertEqual(
+            span.lateral_verdict(summary, clearance_margin=0.40),
+            span.LATERAL_REPORTABLE,
+        )
+
+    def test_a_binding_bound_lands_on_the_derived_censored_floor(self):
+        # Displacements whose true scale is far OUTSIDE the radius: the filter
+        # keeps only what fits, so the survivors are uniform over the disk in
+        # the limit and the median radius is R/sqrt(2). The clearance therefore
+        # does NOT go to zero -- it bottoms out at 1 - 1/sqrt(2).
+        #
+        # That is the whole reason the floor is registered. The number still
+        # looks perfectly ordinary, which is the danger, and a margin chosen
+        # below the floor would call this reportable.
+        summary = self.summary_for(scale=5.0, seed=21)
+        self.assertGreater(summary["atBound"], 0.10)
+        self.assertAlmostEqual(
+            summary["clearance"], span.LATERAL_CLEARANCE_FLOOR, delta=0.03
+        )
+        self.assertEqual(
+            span.lateral_verdict(summary, clearance_margin=0.40),
+            span.LATERAL_REFUSED,
+        )
+
+    def test_a_margin_at_or_below_the_censored_floor_is_itself_refused(self):
+        # A threshold with no power is not a threshold. Registering one below
+        # the floor would pass a fully filter-shaped distribution, so the
+        # constant is refused rather than the data.
+        summary = self.summary_for(scale=5.0, seed=25)
+        for margin in (0.10, span.LATERAL_CLEARANCE_FLOOR):
+            with self.subTest(margin=margin):
+                with self.assertRaises(ValueError):
+                    span.lateral_verdict(summary, clearance_margin=margin)
+
+    def test_the_radius_always_rides_beside_the_median(self):
+        # The number is never reportable alone. Both outcomes carry the bound.
+        for scale, seed in ((0.05, 22), (5.0, 23)):
+            with self.subTest(scale=scale):
+                summary = self.summary_for(scale, seed)
+                self.assertEqual(summary["truncationRadiusPixels"], self.RADIUS)
+                self.assertIsNotNone(summary["atBound"])
+
+    def test_no_lateral_verdict_before_the_clearance_is_registered(self):
+        self.assertIsNone(span.LATERAL_CLEARANCE_MARGIN)
+        with self.assertRaises(ValueError):
+            span.lateral_verdict(self.summary_for(scale=0.05, seed=24))
+
+
 class TheSeedIsRegistered(unittest.TestCase):
     def test_the_statistic_is_reported_at_every_registered_seed(self):
         rng = np.random.default_rng(15)
