@@ -3737,3 +3737,79 @@ it rather than by assuming the shape the last three closes used.
   runtime and peak memory for either the export or the analysis. v0.8's latency
   trigger is untouched and stands on its remaining half, and an ended ladder
   does not trip it.
+
+## 2026-08-14 · v0.10 — the figure, and the only guard an image can have
+
+**A picture of a measurement is a claim, and this repository has no way to
+review one.** Every other number here is either in a diff or under a test. An
+SVG is neither: it is 13 KB of coordinates nobody reads, sitting beside prose
+that says what it shows. `Fit/span_figure.py` draws the span result from the
+four committed artifacts, and `Fit/test_span_figure.py` is what makes the
+drawing checkable at all.
+
+- **The generator computes nothing.** Every value it draws is already in an
+  artifact, put there by `span.py`. A figure that recomputed a median would be
+  a second implementation of the estimand with no test holding it to the
+  first, and the failure mode is a picture that disagrees with the artifact
+  beside it while both look right. It reads `ratio`, `separationEdges` and
+  `measuredOn`, and it does arithmetic no more interesting than scaling a
+  number to a pixel.
+- **Byte-determinism, and the test that spends it.** Inputs sorted by session
+  rather than taken in `os.listdir` order, since the filesystem's ordering is
+  not a property of the measurement; one float-formatting rule for every
+  coordinate, so `12`, `12.0` and `12.00` cannot appear in three runs for the
+  same quantity; no timestamp anywhere. The test regenerates both files and
+  asserts equality with what is committed. **Shown red first**: changing one
+  colour in `docs/media/span-light.svg` by hand turned two tests red with the
+  exact diff quoted, and regenerating turned them green. That is the whole
+  argument for the module — an image cannot be reviewed, so it is instead made
+  reproducible and pinned.
+- **Standard library only, and `requirements.txt` is not touched.** The
+  analysis needs `numpy`; scaling a number to a pixel does not. A figure is
+  not a reason to widen the environment the gate runs in, and a dependency
+  added for a nicety is one the four other Python files inherit forever. The
+  cost paid for that: `ARTIFACT_SCHEMA` is duplicated rather than imported from
+  `span.py`, because importing it would drag `numpy` into a module whose whole
+  claim is that it needs nothing. The duplication is pinned by a test asserting
+  the two constants equal, which is this repository's habit for a relationship
+  it will not encode in an import.
+- **Colour carries the class, and the steps were checked rather than chosen.**
+  Twelve lines, three colours: the four containers inside a class are
+  replicates of each other rather than four identities, so they share its
+  colour, and what distinguishes them is that there are four lines. The three
+  steps clear a lightness band, a chroma floor, adjacent-pair separation under
+  simulated deuteranopia and tritanopia, a normal-vision floor, and 3:1
+  contrast against that mode's own surface. The repository's own
+  `ConfidencePalette` was the starting point and **did not pass as-is**: its
+  amber sits at lightness 0.796 and reads 1.86:1 on a light surface, so the
+  red and the amber were re-stepped. Worth recording that the palette's
+  docstring already claimed the property that mattered most — separability
+  under red-green colour-vision deficiency — and that claim held: the checked
+  separation is well clear of the floor. What failed was contrast, which the
+  docstring never claimed.
+- **Dark is selected, not flipped.** The two modes carry different steps
+  because the same colour cannot clear both surfaces: the light band tops out
+  at 0.77 and the dark band at 0.67, so the amber that passes one fails the
+  other. A test asserts the two palettes are not equal, so a later edit that
+  "simplifies" them into one dictionary goes red rather than shipping a dark
+  figure validated against a light surface.
+- **Rendered and looked at, which caught what no check would have.** The first
+  layout put the three direct labels past the right edge and ran the caption
+  to the canvas boundary; both were invisible to every assertion in this
+  repository and obvious in a screenshot. Widened gutter, shorter annotation,
+  caption split across two lines. A palette validator checks colour, not
+  geometry.
+- **One finding is drawn rather than described, and it is found rather than
+  hardcoded.** The single cell above 1 gets a ring and four words. The
+  generator locates it by scanning for `ratio > 1.0` and annotates only when
+  there is exactly one, so a future export with none, or with several, draws
+  nothing instead of pointing at the wrong place.
+- **The gate.** `.venv/bin/python -m unittest discover -s Fit -v` is green at
+  **134**, up from 121. `swift Scripts/readme-drift.swift` is green: assertion
+  1 walks the tree by first line, and an SVG begins `<svg`, so neither asset is
+  mistaken for an observation export. The three other commands are unaffected —
+  nothing outside `Fit/` and `docs/media/` changed — and were not re-run; the
+  full five run on the README commit that follows.
+- **Not measured yet.** Unchanged: `span.py`'s own runtime, and peak memory for
+  either the export or the analysis. Nothing here was timed either, and the
+  figure's own generation cost is not a number anybody asked for.
