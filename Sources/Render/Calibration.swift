@@ -226,6 +226,92 @@ public enum Calibration {
         }
     }
 
+    /// The frame pair an observation came from. Two frame indices and not a
+    /// pair ordinal plus k, for the reason `Observation` carries two: `k`
+    /// counts *eligible* frames, so the difference is not the separation.
+    public struct ObservationPair: Hashable, Comparable, Sendable {
+        public var separation: Int
+        public var sourceFrame: Int
+        public var targetFrame: Int
+
+        public init(separation: Int, sourceFrame: Int, targetFrame: Int) {
+            self.separation = separation
+            self.sourceFrame = sourceFrame
+            self.targetFrame = targetFrame
+        }
+
+        public init(_ observation: Observation) {
+            self.init(
+                separation: observation.separation,
+                sourceFrame: observation.sourceFrame,
+                targetFrame: observation.targetFrame
+            )
+        }
+
+        public static func < (lhs: Self, rhs: Self) -> Bool {
+            (lhs.separation, lhs.sourceFrame, lhs.targetFrame)
+                < (rhs.separation, rhs.sourceFrame, rhs.targetFrame)
+        }
+    }
+
+    /// The span analysis's retention rule: keep **every** surviving pixel of
+    /// every P-th frame pair, and drop the other pairs whole.
+    ///
+    /// Why not the every-Nth rule beside it. Separation between two points is
+    /// a *within-pair* quantity, so pair-level thinning is covariate-neutral
+    /// by construction and any within-pair thinning is not. Every-Nth keeps
+    /// roughly every P-th survivor in raster order, which does not merely thin
+    /// the small separations -- the comb is periodic in survivor index, so
+    /// retained separations concentrate near multiples of its period, and the
+    /// edge mask makes that period wander. That is aliasing against the
+    /// covariate, and no later statistic can undo it.
+    ///
+    /// The ordinal is per-separation, assigned on a pair's first delivered
+    /// observation, starting at zero -- so it counts pairs that deliver at
+    /// least one survivor, which is what a consumer of this stream can know.
+    /// Pairs excluded by the Δt gate, and pairs all of whose pixels are
+    /// filtered, are not pairs this rule ever sees.
+    ///
+    /// `P` must exceed the largest separation exported: at `P <= k` two kept
+    /// pairs share a frame, and a permuted partner drawn from "a different
+    /// pair" would still share a camera, a pose error and a depth map with the
+    /// pair it is standing in for. The caller enforces it, because only the
+    /// caller knows which separations it asked for.
+    public struct PairStrideSampler: Sendable {
+        public let stride: Int
+        public private(set) var survivors: [ObservationBucket: Int] = [:]
+        private var ordinals: [ObservationPair: Int] = [:]
+        private var nextOrdinal: [Int: Int] = [:]
+        private var kept: Set<ObservationPair> = []
+
+        public init(stride: Int) {
+            precondition(stride >= 1)
+            self.stride = stride
+        }
+
+        /// Pairs that delivered at least one observation, and the subset of
+        /// them this rule kept -- the provenance a sampled file cannot recover
+        /// from its own rows.
+        public var pairsSeen: Int { ordinals.count }
+        public var pairsKept: Int { kept.count }
+
+        public mutating func keep(_ observation: Observation) -> Bool {
+            survivors[ObservationBucket(observation), default: 0] += 1
+            let pair = ObservationPair(observation)
+            let ordinal: Int
+            if let existing = ordinals[pair] {
+                ordinal = existing
+            } else {
+                ordinal = nextOrdinal[pair.separation, default: 0]
+                ordinals[pair] = ordinal
+                nextOrdinal[pair.separation] = ordinal + 1
+            }
+            guard ordinal % stride == 0 else { return false }
+            kept.insert(pair)
+            return true
+        }
+    }
+
     /// Robust statistics of one bucket's signed residuals. `medianAbs` and
     /// `mad` describe |Δ|; `medianSigned` keeps the sign so a systematic
     /// bias -- a chain bug, not sensor noise -- stays visible.

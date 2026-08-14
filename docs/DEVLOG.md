@@ -2713,3 +2713,52 @@ it can still be proved identical.
 - **Not measured yet.** Unchanged from commit 1. No container has been
   exported; the export's row counts, file sizes and runtime are still owed to
   nobody because no export has run.
+
+## 2026-08-14 · v0.10 commit 3 — whole frame pairs, or none of them
+
+**Built and gated; the sampling design the covariate rests on.** The span
+statistic is banded by the separation between two points, and separation is a
+*within-pair* quantity. That single fact decides the retention rule: thin at
+the pair level and the covariate is untouched; thin inside a pair and it is
+not.
+
+- **v0.6's rule cannot answer this question, and not for want of columns.**
+  Every-Nth keeps roughly every P-th survivor in the analysis's raster order,
+  so consecutive kept pixels sit far apart in one row and the small separations
+  are structurally unsamplable. Worse than a missing band: the comb is periodic
+  in survivor index, so retained separations concentrate near multiples of its
+  period — aliasing against the covariate rather than thinning of it — and
+  because the edge mask removes survivors unevenly the period wanders, so it is
+  not even an alias anyone could model out. No later statistic undoes that.
+- **The replacement, in one sentence.** Keep every surviving pixel of every
+  P-th frame pair; drop the other pairs whole. One knob, monotone in file size,
+  and covariate-neutral by construction. The same row budget spent on all the
+  pixels of a few pairs instead of a few pixels of all the pairs.
+- **The ordinal counts pairs that delivered, and that is registered rather than
+  incidental.** It is assigned on a pair's first delivered observation,
+  per-separation, starting at zero. Pairs the Δt gate excluded, and pairs all
+  of whose pixels were filtered, are not pairs this rule ever sees — which is
+  the only definition a consumer of the sink's stream can compute, and it is
+  written down so nobody later reads the ordinal as a frame number.
+- **`P` must exceed the largest separation, and the sampler does not enforce
+  it.** At `P <= k` two kept pairs share a frame, and then a permuted partner
+  drawn from "a different pair" still shares a camera, a pose error and a depth
+  map with the pair it stands in for — the null would be measuring the thing it
+  exists to exclude. Only the caller knows which separations it asked for, so
+  the caller checks, and the next commit is where that lands.
+- **Shown red under the rule it replaces.** Making the sampler stride over
+  observations instead of pairs — which is exactly v0.6's rule — turned the
+  test red with 46 issues, the first of them "one pair was partly kept and
+  partly dropped". A green test under the old rule would have meant the new
+  sampling was not actually new, which is the only failure worth demonstrating
+  here.
+- **And the fixture is checked for the property the test needs.** A second test
+  requires the container to contain more than one pair and at least one pair
+  with more than one survivor; without both, "keeps whole pairs" is a claim
+  about singletons. This is the second time in two commits that writing the
+  guard first found something — it is cheap, and assuming the fixture is
+  adequate is how a test passes for the wrong reason.
+- **The gate did not grow.** Five commands, unchanged: Swift 201, Python 76,
+  both iOS builds, drift green.
+- **Not measured yet.** The registered value of `P`, the row counts and the
+  file sizes it implies, and every span number. Nothing has been exported.

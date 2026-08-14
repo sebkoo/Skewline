@@ -767,6 +767,55 @@ private func movingFrames() -> [SceneFrame] {
     #expect(firstSeen.count >= 2, "one bucket cannot show that the counters are per-bucket")
 }
 
+/// Whole pairs, or none of them. This is the property that separates the span
+/// rule from v0.6's: within a kept pair *nothing* is dropped, so the
+/// separation covariate is untouched by the sampling.
+@Test func pairStrideSamplerKeepsAndDropsWholePairs() throws {
+    let collected = try observations(
+        movingFrames(), constants: testConstants(separations: [1, 2])
+    )
+    #expect(!collected.isEmpty)
+    for stride in [1, 2, 3] {
+        var sampler = Calibration.PairStrideSampler(stride: stride)
+        var verdicts: [Calibration.ObservationPair: Bool] = [:]
+        for observation in collected {
+            let pair = Calibration.ObservationPair(observation)
+            let kept = sampler.keep(observation)
+            if let already = verdicts[pair] {
+                #expect(kept == already, "one pair was partly kept and partly dropped")
+            } else {
+                verdicts[pair] = kept
+            }
+        }
+        // The ordinal is per-separation and starts at zero, so each
+        // separation's first delivered pair is always kept.
+        var ordinal: [Int: Int] = [:]
+        for pair in verdicts.keys.sorted() {
+            let index = ordinal[pair.separation, default: 0]
+            ordinal[pair.separation] = index + 1
+            #expect(verdicts[pair] == (index % stride == 0))
+        }
+        #expect(sampler.pairsSeen == verdicts.count)
+        #expect(sampler.pairsKept == verdicts.values.filter { $0 }.count)
+        #expect(sampler.survivors.values.reduce(0, +) == collected.count)
+        if stride == 1 { #expect(sampler.pairsKept == sampler.pairsSeen) }
+    }
+}
+
+/// The fixture must contain a pair with more than one survivor, or "keeps
+/// whole pairs" is a claim about singletons and the test above proves nothing.
+@Test func theFixtureHasPairsWithManySurvivorsToKeepWhole() throws {
+    let collected = try observations(
+        movingFrames(), constants: testConstants(separations: [1, 2])
+    )
+    var perPair: [Calibration.ObservationPair: Int] = [:]
+    for observation in collected {
+        perPair[Calibration.ObservationPair(observation), default: 0] += 1
+    }
+    #expect(perPair.count >= 2, "one pair cannot show a stride dropping some and keeping others")
+    #expect(perPair.values.contains { $0 > 1 })
+}
+
 // MARK: - Determinism
 
 @Test func analysisByteReproducesItsOwnReport() throws {
