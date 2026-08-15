@@ -1,8 +1,26 @@
 # Skewline
 
 [![CI](https://github.com/sebkoo/Skewline/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sebkoo/Skewline/actions/workflows/ci.yml)
+[![Swift 6.2](https://img.shields.io/badge/Swift-6.2-6094D8)](Package.swift)
+[![Platforms](https://img.shields.io/badge/platforms-iOS%2018%20%C2%B7%20macOS%2013-6094D8)](Package.swift)
+[![Built with](https://img.shields.io/badge/built%20with-Swift%20%C2%B7%20C%2B%2B%20%C2%B7%20Python-6094D8)](#what-is-here-today)
+[![README drift](https://img.shields.io/badge/README%20drift-checked%20in%20CI-BC8A10)](Scripts/readme-drift.swift)
+[![Licence](https://img.shields.io/badge/licence-Apache--2.0-6094D8)](LICENSE)
 
 Spatial capture for iOS, where every measurement carries its own confidence.
+
+Any reconstruction is only as trustworthy as its input, and depth from a phone
+arrives with no account of its own error. This is the layer underneath that:
+the measurement and the width of its uncertainty, produced together and kept
+together.
+
+Swift 6 and SwiftPM: seven libraries, a harness app, and an offline fit.
+Capture runs on ARKit, Core Motion and AVFoundation; accumulation and shading
+run on Metal, with the compute kernel in the tree; the harness's tap surface
+uses RealityKit; frames and offscreen images are written through ImageIO. The
+PLY reader is a C++ target behind a pure C header. The uncertainty model is
+fitted in Python with numpy, served over a local HTTP endpoint as JSON, and
+evaluated again in Swift on the device.
 
 ## The idea
 
@@ -231,6 +249,18 @@ the repository's own, fixed in the tree, and no parameter exists that could
 carry a viewer's instead. It is also why the page offers no depth slider:
 making it interactive needs either a script in the browser or a query
 parameter, and the second is the per-point query this paragraph refuses.
+
+Three iOS capabilities here are refused rather than missing, and
+[`docs/ROADMAP.md`](docs/ROADMAP.md) names all three with a reason. One of them
+also carries a written condition that would reverse it; the other two do not,
+because a reason to refuse and a condition to revisit are different things.
+There is no CoreML: a learned component is justified when the analytic error
+model is *measured* to break down under some material or lighting condition,
+and before that measurement it is decoration — a rung proposing one was drafted
+and did not open, for exactly that reason. There is no VisionKit and no Core
+Location: document scanning and location services have no job in an indoor
+spatial-capture pipeline today, and the honest answer to why either was here
+would be embarrassing. None of the three is a gap somebody forgot.
 
 Reconstruction is deliberately out of scope. This is the layer underneath it:
 any reconstruction is only as trustworthy as its input, and today that input
