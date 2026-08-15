@@ -257,9 +257,9 @@ def build_svg(artifacts, theme_name):
         )
 
     # The two registered boundaries. These are not grid lines and do not look
-    # like them: 1.00 is what independence would read, and 0.90 is the margin a
+    # like them: 1.00 is what independence would read, and 0.90 is the boundary a
     # verdict needs to clear, both fixed before any container was exported.
-    for value, label in ((0.9, "0.90  cancellation margin"), (1.0, "1.00  independence")):
+    for value, label in ((0.9, "0.90  cancellation boundary"), (1.0, "1.00  independence")):
         y = y_at(value)
         add(
             f'<line x1="{LEFT}" y1="{num(y)}" x2="{RIGHT}" y2="{num(y)}" '

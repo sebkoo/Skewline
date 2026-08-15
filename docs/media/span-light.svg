@@ -13,7 +13,7 @@
 <line x1="88" y1="188.38" x2="772" y2="188.38" stroke="#e6e4df" stroke-width="1"/>
 <text x="76" y="192.38" fill="#6b6862" font-size="11.5" text-anchor="end">0.8</text>
 <line x1="88" y1="155.92" x2="772" y2="155.92" stroke="#b9b5ad" stroke-width="1" stroke-dasharray="5 4"/>
-<text x="94" y="149.92" fill="#6b6862" font-size="11.5">0.90  cancellation margin</text>
+<text x="94" y="149.92" fill="#6b6862" font-size="11.5">0.90  cancellation boundary</text>
 <line x1="88" y1="123.47" x2="772" y2="123.47" stroke="#b9b5ad" stroke-width="1" stroke-dasharray="5 4"/>
 <text x="94" y="117.47" fill="#6b6862" font-size="11.5">1.00  independence</text>
 <line x1="88" y1="448" x2="772" y2="448" stroke="#b9b5ad" stroke-width="1"/>
