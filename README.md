@@ -167,8 +167,8 @@ be a third.
 Each rung is entered only when the one below it runs.
 
 ```text
-v0.1  foundation   types · replay · ingest boundary · tests · CI       done
-v0.2  capture      ARKit · camera frames · device motion · depth       done
+v0.1  foundation   types · replay · ingest boundary · tests · CI      done
+v0.2  capture      ARKit · camera frames · device motion · depth      done
 v0.3  render       a point cloud shaded by its own confidence         done
 v0.4  measure      frame time, and drift under replay                 done
 v0.5  interop      a point-cloud reader over Swift–C++                done
