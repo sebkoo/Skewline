@@ -3891,3 +3891,123 @@ numbers against the artifacts and never checked the noun beside them.
   lines are untouched, so `readme-drift`'s tree walk sees nothing to say.
 - **Not measured yet.** Unchanged: everything the figure already reported.
   Nothing here recomputed a number, only the word beside one.
+
+## 2026-08-15 · v0.10 — the rung that does not open, and the entry that governs it
+
+**Nothing forces a rung, and the check that says so is the whole of this
+entry.** A v0.11 was drafted — `disagree`, the confidence classes tested
+against a learned monocular depth — on the argument that the classes are
+load-bearing on every surface and have only ever been checked against the
+instrument that emits them. That argument is true, and the rung does not open.
+The ladder keeps its ten rows, `ROADMAP:534-535` keeps its bare header, and no
+row was written.
+
+- **`:575-578` is a registration, not a description, and the draft broke it
+  rather than dating it.** "That trigger and the three in *Deliberately not
+  built* are the only registered conditions under which this table gains a
+  further line, and none of them is a promise that it will." A row arriving
+  outside those four does not make the sentence stale; it makes it false. The
+  draft planned to rewrite it to match — which is amending a registration by
+  editing the sentence that binds you, the move `:520-521` refuses one
+  paragraph earlier, where the condition on the divider's return "is not being
+  reinterpreted at the moment it stops being satisfiable on a schedule".
+  `:575-578` is unedited here, and it holds precisely because no row arrived.
+- **The governing entry was `:586-589`, and it was read and then reasoned past
+  without being said out loud.** It registers a trigger for exactly this rung:
+  "if the analytic error model is **measured** to break down under some
+  material or lighting condition, that measurement justifies a learned
+  component. Before the measurement it is decoration." A learned monocular
+  depth model is a learned component, the measurement does not exist, and the
+  trigger is untripped. The distinction that would rescue the rung — that
+  shipping a learned component in the pipeline is not the same as using a
+  learned model as an *instrument* to test the analytic one — is real and may
+  be defensible. It is also an amendment to a registered refusal: it has to be
+  argued in the open and carried into `:575-578` *by* that argument, never
+  tidied to match a row that already landed. Finding the entry and resolving it
+  in silence is the worse failure of the two, because a missed line is caught
+  by the next reader and a silent resolution is not.
+- **The replacement does not open either, and its material half is
+  unmeasurable by construction.** The alternative was the rung that goes
+  looking for where the analytic model breaks — mirrors, glass, dark or
+  specular surfaces — needing no learned component, using the classes and the
+  fitted model already in the tree, and producing precisely what `:586-589`
+  asks for. `Calibration.swift:725-728` guards `depth > 0, depth.isFinite` and
+  books the failures to `sourceDepthInvalid`; `:774-780` guards the target's
+  depth the same way. Both `continue`, and `:782`'s `let residual` sits below
+  both. A pixel with no depth return produces no observation, so every fit,
+  every calibration median and every span cell is computed over pixels that
+  returned depth. A mirror or a window characteristically returns nothing: it
+  enters this repository as a filter tally and never as a residual, and the
+  analytic error model cannot be measured to break down there because it is
+  never evaluated there. The failure mode is **absence, not error**. This is
+  `:2552-2557` one level up — there a statistic was truncated by the gate that
+  produced its samples, here the phenomenon is excluded before a statistic
+  exists.
+- **The lighting half has a real seam, and a seam is not a forcing.**
+  `ExposureRecord` — duration and offset — is written per frame at
+  `FrameEncoder.swift:85` and read by no analysis downstream of the recorder:
+  not `Render`, not `CalibrationProbe`, not `Fit/`. Its only consumer is the
+  recorder's own panel, which reduces it to five accumulators at
+  `SessionRecorder.swift:407-412` and prints one line from them at `:537-543`.
+  Nothing joins it to a residual. The `/2` export carries `src_frame` and
+  `tgt_frame` (`fit.py:38-42`) and `session.json` carries `FrameRecord.exposure`
+  per frame index, so the join is an integer index across two files this
+  repository already writes. Recorded as reachable, not proposed as a rung. The
+  first wording of this bullet said "read by no analysis anywhere" and named
+  the recorder five words later; an unqualified *anywhere* in a permanent
+  record is `:3862`'s failure repeated — a claim whose scope was checked
+  against three named places and then written as universal.
+- **The filter tallies are not an estimand, because they are an exhaustive
+  partition and not a per-cause census.** `Calibration.swift:332-334` —
+  "Removal counts for every registered filter, in registered order -- each
+  considered pixel is attributed to exactly its first failing filter, which is
+  what makes the counts sum to the considered total" — and `:739-742` gives the
+  order: "A sample that cannot produce a residual is structural: no variant can
+  keep it, and attribution follows the registered order -- a masked source
+  outranks whatever geometry then went wrong." So `targetDepthInvalid` is not
+  "the target returned nothing"; the masked-source cases are booked elsewhere,
+  and reading it as a stop-count undercounts. `sourceEdgeMask` is the sharper
+  case, four write sites in two shapes: at `:753`, `:764` and `:776` the mask
+  wins attribution over a structural failure, while at `:813-814` it heads the
+  liftable chain, where the residual exists — computed at `:782` — and the
+  sample is withheld from `defaultSamples` rather than from existence
+  (`:784-785`, "The liftable filters, computed as flags so each variant
+  subtracts exactly one"). One array sums removals of two kinds and no reading
+  of it separates them. What is **not** open: the attribution order itself, and
+  the shape difference between `sourceDepthInvalid`'s four raw-class slots
+  (`:343`, `:362`) and the `[class][band]` grids (`:351`, `:355`) — `:335-339`
+  decides that on purpose and `:341-342` names the fourth slot at the
+  declaration. Recording either as an oversight would be this entry's own
+  subject inverted.
+- **No name is chosen, because there is no decision to name.** `:1964-1965`:
+  "`point` names the estimand's granularity, which is the decision this rung
+  lives on." `disagreement` was never available — forty-five standalone
+  occurrences, and `ROADMAP:288` registers it as the estimand noun, "named for
+  the pairwise disagreement it measures, never `sigma`". `disagree` would be
+  the only verb among ten nouns and would read as more of that same estimand,
+  which is the opposite of what the row claimed the rung was about. The draft
+  description said "two estimators": `estimator` occurs zero times in this tree
+  against `estimand`'s seventy-nine, and the ladder line is the most-read line
+  of the most-read file, which is no place for a technical word's first
+  appearance. A word chosen now would be chosen for a description rather than
+  for a decision, and that is how a label comes to be renamed later.
+- **Nothing couples here, and the gate's silence is not an approval.**
+  `:1954-1961` gives the rule — split when each half is independently green,
+  combine when splitting would commit a defect on purpose — and no ordinal is
+  claimed for this instance: an ordinal is a carried-forward citation with the
+  evidence stripped out, and a stale line number can at least be checked
+  against the file. Here there is nothing to split, because neither `README.md`
+  nor the what-is-next table moves. `readme-drift` stays green on the
+  `:205-207` branch, and that branch passes only while the table header
+  survives, which it does because nothing touched it. The ladder stays ended
+  because nothing forced a rung, not because a check permitted one — a green
+  gate that never ran a check reads identically to one that passed.
+- **The gate.** All five commands, on a change to this file alone: `swift build
+  && swift test` — Swift, unchanged at 201; both `xcodebuild` invocations
+  green; `.venv/bin/python -m unittest discover -s Fit -v` — green at 134;
+  `swift Scripts/readme-drift.swift` — green. Nothing executable changed, so no
+  count moved. `:3887-3891` re-ran only the load-bearing command and argued for
+  it; there is nothing to gain by repeating that here.
+- **Not measured yet.** Unchanged, and nothing here measured anything. No
+  estimand, no threshold, no null, no model choice and no number entered the
+  tree with this entry.
