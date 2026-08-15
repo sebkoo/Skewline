@@ -4011,3 +4011,81 @@ row was written.
 - **Not measured yet.** Unchanged, and nothing here measured anything. No
   estimand, no threshold, no null, no model choice and no number entered the
   tree with this entry.
+
+## 2026-08-15 · v0.10 — what the registry means, and a paraphrase nothing checks
+
+**Four review rounds enumerated `ROADMAP:575-578`'s registered conditions
+wrong, and the correction leaves the verdict they supported standing.** The
+sentence reads "That trigger and the three in *Deliberately not built* are the
+only registered conditions under which this table gains a further line." The
+three were taken to be the three capabilities named at `:582` — on-device
+inference, document scanning, location services. They are not. `awk` over the
+whole section, `:580-665`, returns `trigger` at `:586`, `:597` and `:608` and
+nowhere else: on-device inference's measured breakdown under some material or
+lighting condition, capture upload's registered single-client procedure with
+the wire's privacy line decided for that payload class, and an interval on a
+distance's written propagation rule with a data seam carrying frame-pair
+identity. Document scanning and location services have a reason at `:582-584`
+and no reversing condition, so they were never registered conditions at all.
+
+- **The verdict is unaffected, which is why this is a correction and not a
+  reopening.** A learned-depth rung trips none of the real four: `:586-589`'s
+  measurement does not exist, `:597-600`'s procedure does not exist, and
+  `:608-612`'s two gates were opened by v0.10 while `:614` and `:622` refuse on
+  the entry's own terms — "The cancellation has now been measured, and the
+  entry still refuses." `:3905-3914` quotes `:575-578` and does not enumerate
+  it, so nothing already in the tree carries the wrong four. What was wrong was
+  a count held for four rounds, and a reader who cites that sentence next needs
+  the right referent.
+- **`README.md` was corrected to the ROADMAP rather than the ROADMAP extended
+  to `README.md`.** The refusals paragraph first read that the ROADMAP "records
+  each with the condition that would reverse it", which is true of one of the
+  three. The two available fixes were to reword the README or to write triggers
+  for document scanning and location services into `:580-665`. The second is
+  `:520-521`'s refused move — amending a registration so a sentence becomes
+  true — and it is the whole subject of `:3895-4013` above, committed the same
+  day. `README:253-256` says the asymmetry out loud instead: all three carry a
+  reason, one also carries a condition, and a reason to refuse and a condition
+  to revisit are different things. If either of the other two ever deserves a
+  condition, that is its own commit with its own argument.
+- **`README:253-263` is a drift surface nothing checks, and it was opened on
+  purpose.** It paraphrases `ROADMAP:580-589` and `:3895-4013` above; reword
+  either and the README goes stale in silence. All four assertions stay green
+  through it by construction — no bolded backtick joins assertion 3's set, no
+  `<word> CI jobs` string joins assertion 4's, and neither `No app` nor `no
+  rendering` appears — and that is the point rather than the reassurance.
+  `readme-drift.swift:21-24` already registers "prose that is wrong without
+  being falsifiable" as what none of it can catch. This is a new instance of
+  that class, not a new class.
+- **The badge row stops at six because a seventh would have to be
+  decoration.** Each of the six is falsifiable and none can outlive what it
+  claims: `README:7`'s drift badge dies with assertion 4 the moment
+  `readme-drift` leaves `ci.yml`, and the Swift, platform and licence badges
+  link to the files that fix them. A seventh would be either a number that
+  moves — a coverage figure, a test count — or a claim nothing checks, which is
+  `ROADMAP:589`'s "decoration" arriving on the front page of the repository
+  that coined the usage.
+- **Two commits, on `:1954-1961` rather than on a precedent count.** Both
+  halves are independently green: `ff194c7` touches none of the four
+  assertions, and twenty commits in this tree touch this file alone. The rule
+  splits when each half is green and combines only when splitting would commit
+  a defect on purpose, which is `:3819-3826`'s case exactly. Counting would not
+  have settled it and points the other way — of the twenty `docs:` commits that
+  have touched `README.md`, fifteen carried no entry and five did. `b74f529`
+  carried none because aligning a column taught nothing; `ROADMAP:526-528`
+  makes this file "the input to the next commit rather than a diary", and an
+  enumeration that was wrong for four rounds is input.
+- **The gate.** All five before `ff194c7`: `swift build && swift test` — 201,
+  unchanged; both `xcodebuild` invocations `BUILD SUCCEEDED`; `.venv/bin/python
+  -m unittest discover -s Fit -v` — 134, unchanged; `swift
+  Scripts/readme-drift.swift` — "README agrees with the repository", the
+  load-bearing one for a README change. All five again before this commit:
+  `:4005-4010` ran all five on a change to this file alone and declined to
+  repeat `:3887-3891`'s partial-gate argument, so making that argument here
+  would put two adjacent entries in the record where one adopts a claim and the
+  next refuses it. Two `xcodebuild` invocations is the whole cost of the record
+  not disagreeing with itself one commit apart.
+- **Not measured yet.** Nothing here measured anything. No estimand, no
+  threshold, no null and no number entered the tree with either commit —
+  `ff194c7` names what was already built, and this entry corrects a reading of
+  what was already written.
